@@ -1,0 +1,112 @@
+/* CodeMirror 5 编辑器主题：完全映射语义 token（M4-1）。
+   各主题文件只覆盖 token 值，这里不再写死颜色。 */
+
+.editor-cm .CodeMirror {
+    height: 100%;
+    font-family: var(--font-mono);
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text);
+    background: transparent;
+}
+
+.editor-cm .CodeMirror-gutters {
+    background: var(--bg-1);
+    border-right: 1px solid var(--border);
+}
+
+.editor-cm .CodeMirror-linenumber {
+    color: var(--text-faint);
+    padding: 0 8px 0 10px;
+}
+
+.editor-cm .CodeMirror-cursor { border-left: 2px solid var(--accent); }
+
+.editor-cm .CodeMirror-selected { background: var(--selection) !important; }
+.editor-cm .CodeMirror-focused .CodeMirror-selected { background: var(--selection) !important; }
+
+.editor-cm .CodeMirror-activeline-background {
+    background: var(--syntax-line);
+}
+
+/* 语法高亮 → 语义 token */
+.editor-cm span.cm-keyword { color: var(--syntax-keyword); font-weight: 600; }
+.editor-cm span.cm-string, .editor-cm span.cm-string-2 { color: var(--syntax-string); }
+.editor-cm span.cm-number { color: var(--syntax-number); }
+.editor-cm span.cm-comment { color: var(--syntax-comment); font-style: italic; }
+.editor-cm span.cm-builtin, .editor-cm span.cm-function { color: var(--syntax-function); }
+.editor-cm span.cm-type { color: var(--syntax-type); }
+.editor-cm span.cm-operator { color: var(--syntax-operator); }
+.editor-cm span.cm-atom { color: var(--syntax-null); }
+.editor-cm span.cm-variable, .editor-cm span.cm-variable-2 { color: var(--text); }
+.editor-cm span.cm-variable-3 { color: var(--syntax-type); }
+.editor-cm span.cm-property { color: var(--text); }
+.editor-cm span.cm-def { color: var(--syntax-function); }
+.editor-cm span.cm-bracket { color: var(--syntax-operator); }
+.editor-cm span.cm-tag { color: var(--syntax-keyword); }
+.editor-cm span.cm-attribute { color: var(--syntax-type); }
+.editor-cm span.cm-meta { color: var(--syntax-comment); }
+.editor-cm span.cm-qualifier { color: var(--syntax-type); }
+
+/* 匹配括号 */
+.editor-cm .CodeMirror-matchingbracket {
+    color: var(--accent) !important;
+    background: var(--accent-soft);
+    outline: 1px solid var(--focus-ring);
+}
+
+/* 错误行（M4-5） */
+.editor-cm .cm-error-line {
+    background: color-mix(in srgb, var(--danger) 10%, transparent) !important;
+}
+.editor-cm .cm-error-text {
+    background: color-mix(in srgb, var(--danger) 16%, transparent);
+    border-bottom: 1px dashed var(--danger);
+}
+.editor-cm .cm-error-gutter .CodeMirror-linenumber {
+    color: var(--danger);
+    font-weight: 700;
+}
+.editor-cm .cm-error-gutter::before {
+    content: '●';
+    color: var(--danger);
+    display: block;
+    font-size: 9px;
+    text-align: center;
+}
+
+/* 拖放提示 */
+.editor-cm.is-dragover { outline: 2px dashed var(--accent); outline-offset: -6px; }
+
+/* 补全弹窗（show-hint） */
+.CodeMirror-hints {
+    position: absolute;
+    z-index: 60;
+    overflow: hidden;
+    list-style: none;
+    margin: 0;
+    padding: 4px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--bg-1);
+    box-shadow: var(--shadow-2);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    max-height: 220px;
+}
+
+.CodeMirror-hint {
+    color: var(--text);
+    padding: 4px 10px;
+    border-radius: var(--radius-xs);
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 420px;
+}
+
+li.CodeMirror-hint-active {
+    background: var(--accent-soft);
+    color: var(--accent-hover);
+}

@@ -1,6 +1,9 @@
 // 工作台装配：连接、对象树、查询标签、结果、详情、历史之间的协作。
+// M4：CodeMirror 补全、标签持久化恢复、.sql 打开/保存（M4-1/2/8）。
 (function () {
     'use strict';
+
+    const U = window.SilkitUtil;
 
     function create(options) {
         const api = window.SilkitApi;
@@ -8,6 +11,7 @@
         const toast = options.toast;
 
         const dom = {};
+        let tabsPersistTimer = 0;
 
         const app = {
             api: api,
@@ -19,7 +23,8 @@
             detail: null,
             tree: null,
             connections: null,
-            history: null
+            history: null,
+            hint: null
         };
 
         app.showDetail = function (sessionId, ref) {
@@ -45,8 +50,7 @@
             if (!tab) return;
             const offset = typeof error.offset === 'number' ? error.offset : -1;
             if (offset < 0) return;
-            const length = Math.max(1, Math.min(80, (tab.runSql || '').length - offset));
-            app.tabs.selectRange(offset, offset + length);
+            app.tabs.showErrorAt(offset, error && error.message);
         };
         app.onRunningChanged = function (tab, running) {
             app.tabs.refreshRunning(tab);
@@ -58,8 +62,17 @@
             app.history.record(sql, session, result);
             if (isSchemaChange(sql)) {
                 app.tree.refreshSession(session.id);
+                if (app.hint && session) app.hint.invalidate(session.id);
             }
         };
+        // 标签内容变化 → 防抖持久化（M4-2 重启恢复）。
+        app.onTabChanged = function () {
+            scheduleTabsPersist();
+        };
+        app.onTabSqlChanged = function () {
+            scheduleTabsPersist();
+        };
+
         app.onOpen = function (session) {
             const existing = state.sessionForProfile(session.profile && session.profile.id);
             if (existing && existing.id !== session.id) {
@@ -71,6 +84,7 @@
 
             state.addSession(session);
             app.tree.addSession(session);
+            if (app.hint) app.hint.prefetch(session);
 
             const active = state.activeTab();
             if (active && active.kind === 'query' && !active.sessionId && isBlankSql(active.sql)) {
@@ -90,14 +104,129 @@
             app.tree.removeSession(session.id);
             state.removeSession(session.id);
             app.tree.updateStatus();
+            if (app.hint) app.hint.invalidate(session.id);
             updateStatus();
         };
         app.onProfilesError = function (error) {
             console.warn('[silkit] conn.list 失败', error);
         };
 
+        // ------------------------------------------------------------ .sql 打开/保存
+        async function readSqlFromPath(path) {
+            const result = await api.appReadFile(path);
+            if (!result || !result.ok) {
+                throw new Error((result && result.error && result.error.message) || '读取失败');
+            }
+            return result;
+        }
+
+        async function openSqlDialog() {
+            try {
+                const picked = await api.pickFile({ kind: 'sql' });
+                if (!picked || !picked.path) return;
+                const file = await readSqlFromPath(picked.path);
+                app.tabs.openQuery(state.activeSession(), {
+                    sql: file.content,
+                    title: U.stripExtension(picked.path),
+                    focus: true,
+                    filePath: picked.path,
+                    dirty: false
+                });
+                toast('已打开 ' + U.basename(picked.path));
+            } catch (error) {
+                if (error && error.code === 'cancelled') return;
+                toast('打开 SQL 失败：' + (error.message || error), 'error');
+            }
+        }
+
+        async function saveSqlDialog(forceDialog) {
+            const tab = state.activeTab();
+            if (!tab) return;
+            app.tabs.saveEditor();
+            const content = app.tabs.getValue();
+            let path = tab.filePath;
+            if (!path || forceDialog) {
+                try {
+                    const picked = await api.pickFile({
+                        kind: 'sql',
+                        save: true,
+                        defaultName: (U.stripExtension(tab.title) || 'query') + '.sql'
+                    });
+                    if (!picked || !picked.path) return;
+                    path = picked.path;
+                } catch (error) {
+                    if (error && error.code === 'cancelled') return;
+                    toast('保存 SQL 失败：' + (error.message || error), 'error');
+                    return;
+                }
+            }
+            try {
+                const result = await api.appSaveFile(path, content);
+                if (!result || !result.ok) {
+                    throw new Error((result && result.error && result.error.message) || '保存失败');
+                }
+                tab.filePath = path;
+                if (tab.kind === 'query') app.tabs.setTabTitle(tab, U.stripExtension(path));
+                tab.dirty = false;
+                app.tabs.render();
+                scheduleTabsPersist();
+                toast('已保存 ' + U.basename(path));
+            } catch (error) {
+                toast('保存 SQL 失败：' + (error.message || error), 'error');
+            }
+        }
+
+        app.openSqlDialog = openSqlDialog;
+        app.saveSqlDialog = saveSqlDialog;
+
+        // ------------------------------------------------------------ 标签持久化
+        function tabsSnapshot() {
+            return state.tabs.slice(0, 50).map(function (tab) {
+                return {
+                    kind: tab.kind,
+                    title: tab.title,
+                    sql: tab.sql || '',
+                    dirty: !!tab.dirty,
+                    ref: tab.ref || null,
+                    autoLimit: tab.autoLimit || null,
+                    filePath: tab.filePath || null
+                };
+            });
+        }
+
+        function scheduleTabsPersist() {
+            clearTimeout(tabsPersistTimer);
+            tabsPersistTimer = setTimeout(function () {
+                api.settingsSet({ query: { tabs: tabsSnapshot(), activeTab: 0 } })
+                    .catch(function (error) {
+                        console.warn('[silkit] 保存标签失败', error);
+                    });
+            }, 600);
+        }
+
+        function restoreTabs(settings) {
+            const saved = settings && settings.query && Array.isArray(settings.query.tabs)
+                ? settings.query.tabs
+                : null;
+            if (!saved || !saved.length) return false;
+            const restored = [];
+            saved.slice(0, 20).forEach(function (item) {
+                if (!item || typeof item.sql !== 'string') return;
+                restored.push(state.addTab({
+                    kind: item.kind === 'table' ? 'query' : 'query',
+                    title: item.title || '查询',
+                    sessionId: null,
+                    sql: item.sql,
+                    dirty: !!item.dirty,
+                    filePath: item.filePath || null
+                }));
+            });
+            return restored.length > 0;
+        }
+
         app.results = window.SilkitResults.create(app);
         app.query = window.SilkitQuery.create(app);
+        app.hint = window.SilkitHint ? window.SilkitHint.create(app) : null;
         app.tabs = window.SilkitTabs.create(app);
         app.detail = window.SilkitDetail.create(app);
         app.tree = window.SilkitTree.create(app);
@@ -129,17 +258,20 @@
             if (label) {
                 if (session) {
                     const profile = session.profile || {};
+                    const engineLabel = profile.engine === 'mysql' ? 'MySQL'
+                        : (profile.engine === 'postgres' ? 'PostgreSQL' : 'SQLite');
                     label.textContent = (profile.name || '已连接') +
                         (session.currentDb ? ' · ' + session.currentDb : '') +
                         (session.readOnly ? ' · 只读' : '');
-                    label.title = (profile.file || '') + '\nSQLite ' + (session.serverVersion || '');
+                    label.title = (profile.file || profile.host || '') + '\n' +
+                        engineLabel + ' ' + (session.serverVersion || '');
                 } else {
                     label.textContent = '未连接';
                     label.title = '文件 · 新建连接';
                 }
             }
             if (mode) {
-                mode.textContent = session ? 'M1 · SQLite' : 'M1 · 等待连接';
+                mode.textContent = session ? 'M4 · 查询工作区' : 'M4 · 等待连接';
             }
             if (run) run.disabled = !!(state.activeTab() && state.activeTab().running);
         }
@@ -149,13 +281,19 @@
             dom.newQuery = byId('newQueryBtn');
             dom.openSql = byId('openSqlBtn');
             dom.treeRefresh = byId('treeRefresh');
+            dom.format = byId('formatBtn');
+            dom.explain = byId('explainBtn');
 
             app.results.init();
             app.detail.init();
+            app.history.load(settings);
+            // 先恢复标签，再初始化标签视图（tabs.init 在无标签时才建默认标签）。
+            const restored = restoreTabs(settings);
             app.tabs.init();
+            if (restored) toast('已恢复上次打开的标签');
+            app.tabs.bindDragDrop();
             app.tree.init();
             app.connections.init();
-            app.history.init();
 
             if (dom.newConn) dom.newConn.addEventListener('click', function () { app.connections.openDialog(); });
             if (dom.newQuery) {
@@ -164,8 +302,15 @@
                 });
             }
             if (dom.openSql) {
-                dom.openSql.addEventListener('click', function () {
-                    toast('SQL 文件导入将在 M4 接入');
+                dom.openSql.addEventListener('click', openSqlDialog);
+            }
+            if (dom.format) {
+                dom.format.addEventListener('click', function () { app.tabs.formatEditor(); });
+            }
+            if (dom.explain) {
+                dom.explain.addEventListener('click', function () {
+                    const tab = state.activeTab();
+                    if (tab) app.query.explain(tab);
                 });
             }
             if (dom.treeRefresh) {
@@ -173,8 +318,6 @@
             }
 
             state.settings = settings || {};
-            app.history.load(state.settings);
-
             state.on('active-session', updateStatus);
             state.on('active-tab', updateStatus);
             state.on('tab-updated', function () { updateStatus(); });

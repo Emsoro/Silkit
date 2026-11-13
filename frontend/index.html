@@ -23,6 +23,8 @@
     <link rel="stylesheet" href="css/themes/lilac.css">
     <link rel="stylesheet" href="css/themes/mocha.css">
     <link rel="stylesheet" href="css/themes/mint.css">
+    <link rel="stylesheet" href="vendor/codemirror/codemirror.css">
+    <link rel="stylesheet" href="css/editor-theme.css">
     <link rel="stylesheet" href="css/base.css">
     <link rel="stylesheet" href="css/layout.css">
     <link rel="stylesheet" href="css/workbench.css">
@@ -33,7 +35,7 @@
         <div class="brand">
             <span class="brand-mark">S</span>
             <span class="brand-name">Silkit</span>
-            <span class="brand-tag">M1</span>
+            <span class="brand-tag">M4</span>
         </div>
 
         <div class="topbar-actions">
@@ -98,17 +100,22 @@
                     <span class="editor-title" id="editorTitle">查询 1</span>
                     <span class="editor-sub" id="editorSub">未连接 · 打开连接后即可执行</span>
                     <span class="spacer"></span>
+                    <select id="runScope" class="input input-mini" aria-label="执行范围"
+                            title="执行范围（Ctrl+Enter 按所选范围执行）">
+                        <option value="all">全部语句</option>
+                        <option value="current">当前语句</option>
+                    </select>
+                    <button class="btn btn-mini" type="button" id="formatBtn" data-icon="bolt"
+                            title="格式化 SQL（Shift+Alt+F）">格式化</button>
+                    <button class="btn btn-mini" type="button" id="explainBtn" data-icon="pulse"
+                            title="查看执行计划（Ctrl+Shift+P）">EXPLAIN</button>
                     <button class="btn btn-mini" type="button" id="runBtn" data-icon="play"
                             title="执行当前 SQL（Ctrl+Enter / F5）">运行</button>
                     <button class="btn btn-mini btn-danger-soft" type="button" id="cancelBtn" data-icon="stop"
                             title="取消执行（Esc）" hidden>取消</button>
                 </div>
                 <div class="editor-body">
-                    <div class="line-gutter" id="lineGutter" aria-hidden="true">1</div>
-                    <textarea id="sqlEditor" spellcheck="false" autocomplete="off"
-                              aria-label="SQL 编辑器">-- Silkit M1 · SQLite
--- 打开一个 .db 文件后，Ctrl+Enter 或 F5 执行查询
-</textarea>
+                    <div id="sqlEditor" class="editor-cm" aria-label="SQL 编辑器"></div>
                 </div>
             </section>
 
@@ -120,12 +127,19 @@
                     <button class="rtab active" type="button" role="tab" data-target="resultGrid" aria-selected="true">
                         <span data-icon="grid"></span> 结果
                     </button>
+                    <button class="rtab" type="button" role="tab" data-target="explainView" aria-selected="false">
+                        <span data-icon="pulse"></span> 计划
+                    </button>
                     <button class="rtab" type="button" role="tab" data-target="messageLog" aria-selected="false">
                         <span data-icon="message"></span> 消息
                         <span class="rtab-count" id="msgCount" hidden>0</span>
                     </button>
+                    <span class="result-sets" id="resultSets" role="tablist" aria-label="结果集"></span>
                     <span class="spacer"></span>
-                    <select class="result-select" id="resultSetSelect" aria-label="结果集" hidden></select>
+                    <button class="btn btn-mini" type="button" id="exportCsvBtn" data-icon="save"
+                            title="导出当前结果集为 CSV" aria-label="导出 CSV" disabled>CSV</button>
+                    <button class="btn btn-mini" type="button" id="exportJsonBtn" data-icon="save"
+                            title="导出当前结果集为 JSON" aria-label="导出 JSON" disabled>JSON</button>
                     <button class="btn btn-mini" type="button" id="resultCopyBtn" data-icon="copy"
                             title="复制当前结果集为 TSV（含表头）" aria-label="复制结果" disabled></button>
                     <span class="result-meta" id="resultMeta"></span>
@@ -139,6 +153,16 @@
 
                 <div class="result-body">
                     <div id="resultGrid" class="grid-wrap" role="tabpanel" aria-label="查询结果"></div>
+
+                    <div id="explainView" class="explain-wrap" role="tabpanel" hidden>
+                        <div class="explain-empty" id="explainEmpty">
+                            <span data-icon="pulse"></span>
+                            <p>还没有执行计划</p>
+                            <p class="muted">选中语句后点击 EXPLAIN，或在计划面板查看最近一次输出。</p>
+                        </div>
+                        <pre class="explain-pre" id="explainPre" hidden></pre>
+                        <div class="explain-warn" id="explainWarn" hidden></div>
+                    </div>
 
                     <div id="messageLog" class="log-wrap" role="tabpanel" hidden>
                         <div class="log-empty" id="logEmpty">
@@ -379,15 +403,25 @@
 <!-- ---------------------------------------------------------------- 右键菜单 / 历史 -->
 <div id="treeMenu" class="context-menu" role="menu" hidden></div>
 
-<div id="historyPanel" class="history-panel" role="dialog" aria-label="最近查询" hidden>
+<div id="historyPanel" class="history-panel" role="dialog" aria-label="最近查询与片段" hidden>
     <div class="history-head">
-        <span>最近查询</span>
-        <span class="muted">成功执行后自动记录</span>
+        <span class="history-mode is-active" id="historyTabRecent" role="tab" tabindex="0">最近</span>
+        <span class="history-mode" id="historyTabSnippets" role="tab" tabindex="0">片段</span>
+        <span class="muted" id="historyHeadHint">成功执行后自动记录</span>
         <span class="spacer"></span>
         <button id="historyClear" class="btn btn-mini" type="button">清空</button>
     </div>
-    <div id="historyEmpty" class="history-empty">还没有查询历史</div>
+    <div class="history-search">
+        <input id="historyFilter" type="search" placeholder="搜索 SQL…" autocomplete="off" spellcheck="false">
+    </div>
     <div id="historyList" class="history-list"></div>
+    <div id="snippetList" class="history-list" hidden></div>
+    <div class="history-foot">
+        <button id="snippetAddBtn" class="btn btn-mini" type="button" hidden
+                title="把编辑器当前选区（或整段 SQL）保存为片段">保存片段</button>
+        <span class="spacer"></span>
+        <span class="muted" id="historyCount"></span>
+    </div>
 </div>
 
 <!-- ---------------------------------------------------------------- 主题面板 -->
@@ -409,9 +443,18 @@
 <script src="js/mock/mock.js"></script>
 <script src="js/bridge.js"></script>
 <script src="js/api.js"></script>
+<script src="vendor/codemirror/codemirror.js"></script>
+<script src="vendor/codemirror/sql.js"></script>
+<script src="vendor/codemirror/show-hint.js"></script>
+<script src="vendor/codemirror/sql-hint.js"></script>
+<script src="vendor/codemirror/matchbrackets.js"></script>
+<script src="vendor/codemirror/closebrackets.js"></script>
+<script src="vendor/codemirror/active-line.js"></script>
 <script src="js/icons.js"></script>
 <script src="js/themes.js"></script>
 <script src="js/util.js"></script>
+<script src="js/editor/sql_tools.js"></script>
+<script src="js/editor/hint.js"></script>
 <script src="js/state.js"></script>
 <script src="js/components/grid.js"></script>
 <script src="js/views/results.js"></script>

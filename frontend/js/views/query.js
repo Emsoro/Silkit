@@ -1,4 +1,5 @@
 // 查询执行：调用 query.execute，把 statement/batch 事件交给结果面板。
+// M4：执行范围（选中 / 当前语句 / 全部）+ EXPLAIN（M4-3 / M4-10）。
 (function () {
     'use strict';
 
@@ -15,15 +16,28 @@
             return session;
         }
 
-        function sqlFor(tab) {
-            if (state.activeTab() === tab && ctx.getSelectionText) {
-                const selected = ctx.getSelectionText();
-                if (selected && selected.trim()) return selected;
+        // scope: 'auto'（有选区用选区，否则全部）| 'all' | 'current'
+        function sqlFor(tab, scope) {
+            const mode = scope || 'auto';
+            const tabs = ctx.tabs;
+            if (tabs && state.activeTab() === tab && tabs.getSelectionText) {
+                const selected = tabs.getSelectionText();
+                if (selected && selected.trim()) {
+                    return { sql: selected, label: '选中文本' };
+                }
             }
-            return tab.sql || '';
+            if (mode === 'current' && tabs && tabs.statementAtCursor) {
+                const statement = tabs.statementAtCursor();
+                if (statement && statement.sql && statement.sql.trim()) {
+                    return { sql: statement.sql, label: '当前语句' };
+                }
+                toast('光标附近没有可执行的语句', 'error');
+                return null;
+            }
+            return { sql: tab.sql || '', label: '全部语句' };
         }
 
-        async function run(tab) {
+        async function run(tab, scope) {
             if (!tab) return;
             if (tab.running) {
                 cancel(tab);
@@ -38,15 +52,22 @@
             }
             if (state.activeSessionId !== session.id) state.setActiveSession(session.id);
 
-            const sql = String(sqlFor(tab) || '').trim();
+            const picked = sqlFor(tab, scope);
+            if (!picked) return;
+            const sql = String(picked.sql || '').trim();
             if (!sql) {
                 toast('SQL 不能为空', 'error');
                 return;
             }
 
             tab.runSql = sql;
+            tab.runLabel = picked.label;
             results.begin(tab);
             setRunning(tab, true);
+            if (picked.label !== '全部语句') {
+                results.addMessage(tab, 'info', '执行范围：' + picked.label);
+            }
+            if (ctx.tabs && ctx.tabs.clearErrorHighlight) ctx.tabs.clearErrorHighlight();
 
             const task = api.queryExecute(session.id, sql, {
                 onEvent: function (type, data) {
@@ -84,6 +105,36 @@
             }
         }
 
+        async function explain(tab) {
+            if (!tab) return;
+            if (tab.running) {
+                toast('正在执行中，请等待完成或取消', 'error');
+                return;
+            }
+            const session = resolveSession(tab);
+            if (!session) {
+                toast('请先打开一个数据库连接', 'error');
+                return;
+            }
+            const picked = sqlFor(tab, 'current');
+            if (!picked) return;
+            const sql = String(picked.sql || '').trim();
+            if (!sql) {
+                toast('SQL 不能为空', 'error');
+                return;
+            }
+            try {
+                results.addMessage(tab, 'info', '生成执行计划（' + picked.label + '）…');
+                const data = await api.queryExplain(session.id, sql);
+                results.showExplain(tab, data || {});
+            } catch (error) {
+                const message = (error && error.message) || String(error);
+                results.addMessage(tab, 'error', 'EXPLAIN 失败：' + message);
+                results.showMessages();
+                toast('EXPLAIN 失败：' + message, 'error');
+            }
+        }
+
         function setRunning(tab, running) {
             tab.running = !!running;
             if (ctx.onRunningChanged) ctx.onRunningChanged(tab, !!running);
@@ -101,7 +152,7 @@
             toast('正在取消查询…');
         }
 
-        return { run: run, cancel: cancel };
+        return { run: run, cancel: cancel, explain: explain };
     }
 
     window.SilkitQuery = { create: create };

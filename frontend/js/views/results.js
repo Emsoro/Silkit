@@ -11,13 +11,19 @@
 
         const ids = {
             grid: 'resultGrid',
+            explain: 'explainView',
+            explainPre: 'explainPre',
+            explainWarn: 'explainWarn',
+            explainEmpty: 'explainEmpty',
             logWrap: 'messageLog',
             logList: 'logList',
             logEmpty: 'logEmpty',
             msgCount: 'msgCount',
             meta: 'resultMeta',
-            setSelect: 'resultSetSelect',
+            sets: 'resultSets',
             copyBtn: 'resultCopyBtn',
+            exportCsvBtn: 'exportCsvBtn',
+            exportJsonBtn: 'exportJsonBtn',
             error: 'resultError',
             errorText: 'resultErrorText',
             errorPos: 'resultErrorPos',
@@ -44,18 +50,23 @@
 
             document.querySelectorAll('.rtab').forEach(function (tab) {
                 tab.addEventListener('click', function () {
-                    showView(tab.getAttribute('data-target') === ids.logWrap ? 'messages' : 'grid');
+                    const target = tab.getAttribute('data-target');
+                    showView(target === ids.logWrap ? 'messages' :
+                        (target === ids.explain ? 'explain' : 'grid'));
                 });
             });
 
-            if (dom.setSelect) {
-                dom.setSelect.addEventListener('change', function () {
+            if (dom.sets) {
+                dom.sets.addEventListener('click', function (event) {
+                    const node = event.target.closest('.rset');
+                    if (!node) return;
                     const tab = state.activeTab();
                     if (!tab || !tab.result) return;
-                    const index = Number(dom.setSelect.value);
+                    const index = Number(node.getAttribute('data-set'));
                     const set = tab.result.sets[index];
                     if (!set) return;
                     tab.result.displaySet = set;
+                    renderSetTabs(tab);
                     displaySet(tab, set);
                     updateMeta(tab);
                 });
@@ -67,7 +78,68 @@
                 });
             }
 
+            if (dom.exportCsvBtn) {
+                dom.exportCsvBtn.addEventListener('click', function () { exportResult('csv'); });
+            }
+            if (dom.exportJsonBtn) {
+                dom.exportJsonBtn.addEventListener('click', function () { exportResult('json'); });
+            }
+
             bindCellViewer();
+        }
+
+        // ------------------------------------------------------------ 导出（M4-11 简易版）
+        function csvCell(value) {
+            const text = value == null ? '' : String(value);
+            if (/[",\n\r]/.test(text)) {
+                return '"' + text.replace(/"/g, '""') + '"';
+            }
+            return text;
+        }
+
+        function exportResult(format) {
+            const tab = state.activeTab();
+            const set = tab && tab.result ? tab.result.displaySet : null;
+            if (!set || !set.columns || !set.columns.length) {
+                toast('当前没有可导出的结果集', 'error');
+                return;
+            }
+            const delimiter = (state.settings && state.settings.export && state.settings.export.csvDelimiter) || ',';
+            const columns = set.columns.map(function (column) { return column.name || ''; });
+            let text = '';
+            if (format === 'csv') {
+                text = columns.map(csvCell).join(delimiter) + '\r\n';
+                set.rows.forEach(function (row) {
+                    text += columns.map(function (name, index) {
+                        return csvCell(row[index]);
+                    }).join(delimiter) + '\r\n';
+                });
+            } else {
+                const payload = set.rows.map(function (row) {
+                    const item = {};
+                    columns.forEach(function (name, index) {
+                        item[name] = row[index] == null ? null : row[index];
+                    });
+                    return item;
+                });
+                text = JSON.stringify(payload, null, 2);
+            }
+
+            const mime = format === 'csv' ? 'text/csv' : 'application/json';
+            const blob = new Blob(['\uFEFF' + text], { type: mime + ';charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const anchor = document.createElement('a');
+            anchor.href = url;
+            anchor.download = 'result-' + (format === 'csv' ? 'csv' : 'json') + '-' +
+                new Date().toISOString().replace(/[:.]/g, '-') +
+                (format === 'csv' ? '.csv' : '.json');
+            document.body.appendChild(anchor);
+            anchor.click();
+            setTimeout(function () {
+                URL.revokeObjectURL(url);
+                anchor.remove();
+            }, 800);
+            toast('已导出 ' + U.formatNumber(set.rows.length) + ' 行');
         }
 
         // ------------------------------------------------------------ 标签状态
@@ -101,25 +173,24 @@
             }).join('\u0001');
         }
 
-        function setSelector(tab) {
-            if (!dom.setSelect) return;
+        function renderSetTabs(tab) {
+            if (!dom.sets) return;
             const result = tab.result;
-            if (!result || result.sets.length <= 1) {
-                dom.setSelect.hidden = true;
-                U.clear(dom.setSelect);
-                return;
-            }
-            U.clear(dom.setSelect);
-            result.sets.forEach(function (set, index) {
-                const option = document.createElement('option');
-                option.value = String(index);
-                option.textContent = '结果 ' + (index + 1) + ' · ' + U.formatNumber(set.rows.length) + ' 行';
-                dom.setSelect.appendChild(option);
-            });
+            U.clear(dom.sets);
+            if (!result || result.sets.length <= 1) return;
             const active = result.displaySet || result.sets[result.sets.length - 1];
-            const index = result.sets.indexOf(active);
-            dom.setSelect.value = String(index >= 0 ? index : 0);
-            dom.setSelect.hidden = false;
+            result.sets.forEach(function (set, index) {
+                const node = document.createElement('button');
+                node.type = 'button';
+                node.className = 'rset' + (set === active ? ' active' : '');
+                node.setAttribute('data-set', String(index));
+                node.setAttribute('role', 'tab');
+                const label = '结果 ' + (index + 1);
+                node.appendChild(U.el('span', 'rset-label', label));
+                node.appendChild(U.el('span', 'rset-count', U.formatNumber(set.rows.length)));
+                node.title = label + ' · ' + U.formatNumber(set.rows.length) + ' 行';
+                dom.sets.appendChild(node);
+            });
         }
 
         function setError(tab) {
@@ -191,8 +262,11 @@
                 dom.footTrunc.textContent = result.truncated ? '结果已截断' : '';
             }
             if (dom.footEncoding) dom.footEncoding.textContent = 'UTF-8';
-            if (dom.copyBtn) dom.copyBtn.disabled = !(result.displaySet && result.displaySet.rows.length);
-            setSelector(tab);
+            const hasRows = !!(result.displaySet && result.displaySet.rows.length);
+            if (dom.copyBtn) dom.copyBtn.disabled = !hasRows;
+            if (dom.exportCsvBtn) dom.exportCsvBtn.disabled = !hasRows;
+            if (dom.exportJsonBtn) dom.exportJsonBtn.disabled = !hasRows;
+            renderSetTabs(tab);
             setError(tab);
         }
 
@@ -216,11 +290,13 @@
             document.querySelectorAll('.rtab').forEach(function (button) {
                 const target = button.getAttribute('data-target');
                 const active = (view === 'messages' && target === ids.logWrap) ||
+                    (view === 'explain' && target === ids.explain) ||
                     (view === 'grid' && target === ids.grid);
                 button.classList.toggle('active', active);
                 button.setAttribute('aria-selected', active ? 'true' : 'false');
             });
             if (dom.grid) dom.grid.hidden = view !== 'grid';
+            if (dom.explain) dom.explain.hidden = view !== 'explain';
             if (dom.logWrap) dom.logWrap.hidden = view !== 'messages';
         }
 
@@ -457,6 +533,36 @@
             }
         }
 
+        // ------------------------------------------------------------ 执行计划（M4-10）
+        function showExplain(tab, data) {
+            const result = ensureResult(tab);
+            result.explain = data || {};
+            if (!isActive(tab)) return;
+            const rows = Array.isArray(data && data.plan) ? data.plan : [];
+            const lines = [];
+            rows.forEach(function (row) {
+                if (Array.isArray(row)) {
+                    Array.prototype.push.apply(lines,
+                        row.join(' | ').split('\n').filter(function (line) { return line.trim(); }));
+                } else {
+                    lines.push(String(row));
+                }
+            });
+            const text = lines.join('\n') ||
+                (data && data.message) || '（没有返回计划行）';
+            dom.explainPre.textContent = text;
+            dom.explainPre.hidden = false;
+            if (dom.explainEmpty) dom.explainEmpty.hidden = true;
+            if (dom.explainWarn) {
+                const warnings = Array.isArray(data && data.warnings) ? data.warnings : [];
+                dom.explainWarn.textContent = warnings.join(' · ');
+                dom.explainWarn.hidden = !warnings.length;
+            }
+            showView('explain');
+            addMessage(tab, 'result', '执行计划已生成' +
+                (data && data.engine ? '（' + data.engine + '）' : '') + ' · ' + lines.length + ' 行');
+        }
+
         function show(tab) {
             if (!tab) {
                 if (grid) grid.setEmpty('还没有结果', '打开连接并执行 SQL');
@@ -545,6 +651,7 @@
             finish: finish,
             fail: fail,
             cancelled: cancelled,
+            showExplain: showExplain,
             show: show,
             showView: showView,
             showMessages: showMessages,

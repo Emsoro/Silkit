@@ -1245,6 +1245,165 @@ body.is-col-resizing * {
     font-family: var(--font-mono);
 }
 
+/* ---------------------------------------------------------------- M4 历史面板增强 */
+.history-mode {
+    padding: 3px 10px;
+    border-radius: var(--radius-pill);
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--text-dim);
+    cursor: pointer;
+    border: 1px solid transparent;
+}
+
+.history-mode:hover {
+    background: var(--bg-2);
+    color: var(--text);
+}
+
+.history-mode.is-active {
+    background: var(--accent-soft);
+    color: var(--accent-hover);
+    border-color: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.history-search {
+    flex: none;
+    padding: 0 4px 8px;
+}
+
+.history-search input {
+    width: 100%;
+    padding: 6px 10px;
+    font-size: 12px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--bg-0);
+    color: var(--text);
+}
+
+.history-search input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+.history-foot {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 4px 0;
+}
+
+.history-foot .muted {
+    font-size: 10.5px;
+    color: var(--text-faint);
+}
+
+/* ---------------------------------------------------------------- M4 编辑器工具条 */
+.input-mini {
+    max-width: 120px;
+    padding: 3px 8px;
+    font-size: 11.5px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--bg-1);
+    color: var(--text);
+}
+
+.editor-body { display: flex; min-height: 0; }
+.editor-cm { flex: 1; min-width: 0; position: relative; }
+.editor-cm .CodeMirror { position: absolute; inset: 0; height: 100%; }
+
+/* ---------------------------------------------------------------- M4 结果集子标签 */
+.result-sets {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-left: 10px;
+    overflow-x: auto;
+    max-width: 45%;
+    scrollbar-width: thin;
+}
+
+.rset {
+    flex: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 3px 9px;
+    font-size: 11px;
+    border-radius: var(--radius-pill);
+    border: 1px solid var(--border);
+    background: var(--bg-1);
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: background var(--dur-fast) var(--ease);
+}
+
+.rset:hover { background: var(--bg-2); color: var(--text); }
+
+.rset.active {
+    background: var(--accent-soft);
+    border-color: color-mix(in srgb, var(--accent) 26%, transparent);
+    color: var(--accent-hover);
+    font-weight: 600;
+}
+
+.rset-count {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-faint);
+}
+
+.rset.active .rset-count { color: var(--accent); }
+
+/* ---------------------------------------------------------------- M4 执行计划 */
+.explain-wrap {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 12px;
+}
+
+.explain-empty {
+    margin: auto;
+    text-align: center;
+    color: var(--text-faint);
+    font-size: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    align-items: center;
+}
+
+.explain-empty [data-icon] { width: 26px; height: 26px; opacity: .5; }
+
+.explain-pre {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    line-height: 1.55;
+    white-space: pre;
+    color: var(--text);
+    background: var(--bg-0);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    overflow: auto;
+}
+
+.explain-warn {
+    flex: none;
+    font-size: 11px;
+    color: var(--warning);
+    padding: 2px 4px;
+}
+
 /* ---------------------------------------------------------------- 响应式 */
 @media (max-width: 900px) {
     .modal {

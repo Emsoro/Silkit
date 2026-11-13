@@ -170,6 +170,10 @@
         },
         quit: function () { return call('app.quit'); },
         pickFile: function (args) { return call('app.pick_file', args || {}); },
+        appReadFile: function (path) { return call('app.read_file', { path: path }); },
+        appSaveFile: function (path, content) {
+            return call('app.save_file', { path: path, content: content });
+        },
 
         settingsGet: function () { return call('settings.get'); },
         settingsSet: function (patch) { return call('settings.set', { patch: patch }); },
@@ -251,8 +255,11 @@
         queryCancel: function (sessionId) {
             return call('query.cancel', { sessionId: sessionId });
         },
-        queryExplain: function (sessionId, sql) {
-            return call('query.explain', { sessionId: sessionId, sql: sql });
+        queryExplain: function (sessionId, sql, options) {
+            const opts = options || {};
+            const args = { sessionId: sessionId, sql: sql };
+            if (opts.analyze) args.analyze = true;
+            return call('query.explain', args);
         }
     };
 })();

@@ -244,7 +244,28 @@
                 if (modalOpen()) return;
                 event.preventDefault();
                 const tab = activeTab();
-                if (workbench && tab) workbench.app.query.run(tab);
+                if (workbench && tab) {
+                    workbench.app.query.run(tab, event.shiftKey ? 'current' : undefined);
+                }
+                return;
+            }
+            if (mod && !event.shiftKey && event.code === 'KeyS') {
+                if (modalOpen()) return;
+                event.preventDefault();
+                if (workbench) workbench.app.saveSqlDialog(false);
+                return;
+            }
+            if (event.shiftKey && event.altKey && event.code === 'KeyF') {
+                if (modalOpen()) return;
+                event.preventDefault();
+                if (workbench) workbench.app.tabs.formatEditor();
+                return;
+            }
+            if (mod && event.shiftKey && event.code === 'KeyP') {
+                if (modalOpen()) return;
+                event.preventDefault();
+                const tab = activeTab();
+                if (workbench && tab) workbench.app.query.explain(tab);
                 return;
             }
             if (event.key === 'Escape') {
@@ -357,7 +378,7 @@
 
         if (!bridge.isNative) {
             const tag = document.querySelector('.brand-tag');
-            if (tag) tag.textContent = 'M1 · Mock';
+            if (tag) tag.textContent = 'M4 · Mock';
             if ($('ipcStatus')) $('ipcStatus').textContent = 'IPC 就绪（浏览器 Mock）';
         }
 

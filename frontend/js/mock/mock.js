@@ -582,6 +582,14 @@
     }
 
     // ---------------------------------------------------------------- 命令
+    const mockFiles = new Map();
+    mockFiles.set('C:\\mock\\sample.sql', '-- Mock 示例 SQL\nSELECT * FROM users;\n');
+
+    function sessionEngine(sessionId) {
+        const session = sessions.get(sessionId);
+        return session && session.profile ? (session.profile.engine || 'sqlite') : 'sqlite';
+    }
+
     function startTask(args) {
         const reqId = args.reqId;
         const cmd = args.cmd;
@@ -860,12 +868,48 @@
                 reply(reqId, { ok: true });
                 return { ok: true, reqId };
 
-            case 'query.explain':
+            case 'query.explain': {
+                const engine = sessionEngine(a.sessionId);
+                let plan = [['2', '0', '0', 'SCAN users'], ['8', '0', '0', 'USE TEMP B-TREE FOR ORDER BY']];
+                let warnings = [];
+                if (engine === 'mysql') {
+                    plan = [['id', 'select_type', 'table', 'type', 'key', 'rows', 'Extra'],
+                        ['1', 'SIMPLE', 'users', 'ALL', null, '128', 'Using temporary; Using filesort']];
+                    if (a.analyze) warnings.push('EXPLAIN ANALYZE 需要 MySQL 8.0.18+，旧版本可能报错');
+                } else if (engine === 'postgres') {
+                    plan = [['Seq Scan on users  (cost=0.00..14.50 rows=128 width=64)',
+                        '  Filter: (created_at > now() - interval \'7 days\')']];
+                    if (a.analyze) warnings.push('EXPLAIN ANALYZE 会真实执行语句，写语句会修改数据');
+                }
                 reply(reqId, {
-                    format: 'text',
-                    plan: [['2', '0', '0', 'SCAN users'], ['8', '0', '0', 'USE TEMP B-TREE FOR ORDER BY']]
+                    format: 'text', engine: engine,
+                    plan: plan, warnings: warnings
                 });
                 return { ok: true, reqId };
+            }
+
+            case 'app.read_file': {
+                const path = String(a.path || '');
+                if (!/\.sql$/i.test(path)) {
+                    fail(reqId, { code: 'bad_args', message: 'Mock 仅支持 .sql 文件' });
+                    return { ok: true, reqId };
+                }
+                const mockFile = mockFiles.get(path);
+                if (!mockFile) {
+                    fail(reqId, { code: 'io_error', message: '文件不存在' });
+                    return { ok: true, reqId };
+                }
+                reply(reqId, { ok: true, path: path, content: mockFile, bytes: mockFile.length });
+                return { ok: true, reqId };
+            }
+
+            case 'app.save_file': {
+                const path = String(a.path || '');
+                const content = String(a.content || '');
+                mockFiles.set(path, content);
+                reply(reqId, { ok: true, path: path, bytes: content.length });
+                return { ok: true, reqId };
+            }
 
             default:
                 return { ok: false, error: { code: 'unknown_command', message: '未知命令: ' + cmd } };

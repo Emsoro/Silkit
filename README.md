@@ -3,8 +3,8 @@
 跨库数据库工作台（MySQL / MariaDB / PostgreSQL / SQLite），Windows 桌面端。
 C++17 + Win32 + WebView2，前端为原生 HTML/CSS/JS，无 Node 构建步骤。
 
-> 当前进度：**M1 SQLite 垂直切片 + M2/M3 驱动垂直切片已打通**（v0.1.0，M2/M3 集成验收待补）：连接 → 对象树 → SQL 查询 → 流式结果 → 单元格查看。
-> MySQL / MariaDB / PostgreSQL 已可在连接对话框中选择并测试；完整计划与偏差记录见 [CODEPLAN.md](CODEPLAN.md)。
+> 当前进度：**M1 SQLite 切片 + M2/M3 三引擎驱动（已对照真实服务器验收）+ M4 查询工作区已交付**：连接 → 对象树 → CodeMirror SQL 编辑器（补全/格式化/执行范围）→ 流式结果（多结果子标签/CSV/JSON 导出/EXPLAIN）→ 历史/片段 → 标签持久化恢复。
+> 完整计划与偏差记录见 [CODEPLAN.md](CODEPLAN.md)。
 
 ## M0 已交付
 
@@ -25,6 +25,16 @@ C++17 + Win32 + WebView2，前端为原生 HTML/CSS/JS，无 Node 构建步骤�
 - **前端**：连接对话框与文件选择、对象树懒加载/右键菜单（重连、只读）、查询标签、虚拟滚动结果网格、TSV 复制、长文本/BLOB 单元格查看器、最近查询
 - **安全**：DPAPI 保存密码、`conn.list` 脱敏、驱动层拦截写语句、标识符引用与值参数化
 - **测试**：`silkit_smoke`（纯逻辑/内存库/会话）与 `sqlite_driver`（驱动健壮性与会话状态回归），均由 CTest 运行
+
+## M4 查询工作区已交付
+
+- **编辑器**：CodeMirror 5（vendor 内嵌），SQL 关键字/字符串/注释高亮随主题 token；每标签独立 Doc（undo 历史、光标、滚动独立）。
+- **自动补全**：`Ctrl+Space` 或输入 2 字符后触发；表/列来自 `meta.children` 元数据缓存 + 引擎关键字。
+- **执行范围**：`Ctrl+Enter` 全部/选中文本，`Ctrl+Shift+Enter` 光标所在语句；工具栏可切换默认范围。
+- **结果面板**：多结果集子标签；CSV/JSON 一键导出；执行计划（EXPLAIN）子标签，三引擎方言；消息面板错误定位。
+- **文件**：打开/保存/另存 `.sql`（Ctrl+S），支持拖放打开；后端 `app.read_file`/`app.save_file` 限文本扩展名 ≤16MB。
+- **历史/片段**：历史 5000 条 + 片段 200 条，搜索、点击回填/插入，双写 localStorage 与 settings.json。
+- **格式化**：轻量 SQL 格式化（Shift+Alt+F 或工具栏），保留字大写、主子句换行、括号缩进、列表逗号换行。
 
 ## M2 / M3 已交付并对照真实服务器验收
 

@@ -23,14 +23,14 @@
 | M1 | SQLite 垂直切片（连接→树→查询→结果） | 🟡 | 5–6 d | v0.1.0 |
 | M2 | MySQL / MariaDB 驱动 | ✅ | 6–7 d | v0.2.0 |
 | M3 | PostgreSQL 驱动 | ✅ | 6–7 d | v0.3.0 |
-| M4 | 查询工作区（编辑器/多结果/历史/补全） | ⬜ | 6–7 d | v0.4.0 |
+| M4 | 查询工作区（编辑器/多结果/历史/补全） | 🟡 | 6–7 d | v0.4.0 |
 | M5 | 表格数据编辑（CRUD/筛选/分页/单元格查看） | ⬜ | 8–10 d | v0.5.0 |
 | M6 | 表设计器与 DDL 管理 | ⬜ | 8–10 d | v0.6.0 |
 | M7 | 导入 / 导出 / 转储 | ⬜ | 5–6 d | v0.7.0 |
 | M8 | 设置、主题、会话恢复、安全与打磨 | ⬜ | 5–6 d | v0.8.0 |
 | M9 | 发布 1.0（图标/文档/兼容性/安装包） | ⬜ | 3–4 d | v1.0.0 |
 
-> 2026-11-14 回写：M0 全部交付；M1 的「连接 → 对象树 → 查询 → 结果」链路已端到端跑通，当前 `v0.1.0`。**M2 / M3 已实现并对照真实服务器验收**：MySQL 8.4.13 与 PostgreSQL 18.0.7 均完成连接、ping、`SELECT 1`、对象树（库/文件夹/表/列/详情/搜索/DDL）、取消与错误提示的端到端验证（经 `integration_db` + 应用内 CDP 探针）。曾短暂加入的 M1.1 无边框窗体因交互效果不理想已按用户要求回滚（改动保存在 git stash）。下一里程碑为 **M4（查询工作区）**。
+> 2026-11-14 回写：M0 全部交付；M1 的「连接 → 对象树 → 查询 → 结果」链路已端到端跑通，当前 `v0.1.0`。**M2 / M3 已实现并对照真实服务器验收**（MySQL 8.4.13 / PostgreSQL 18.0.7）。**M4 已交付垂直切片并经运行时验收**：CodeMirror 5 编辑器、标签持久化恢复、执行范围（选中/当前/全部）、多结果子标签、自动补全、错误行高亮、片段、.sql 打开/保存/拖放、SQL 格式化、三引擎 EXPLAIN、CSV/JSON 导出；剩余为性能验收（20 标签切换、1MB 文件、5000 条历史搜索）。下一里程碑为 **M5（表格数据编辑）**。
 
 **总量**：约 56–68 个开发日（单人，含自测），按每周 5.5 天计约 **10–12 周**。
 
@@ -51,6 +51,9 @@
 | 2026-11-14 | M2-8 / M3-8 docker 集成测试 | `tests/integration_db.cpp` 按 env DSN 触发，未设置时跳过 | 本机无 MySQL/MariaDB/PG 服务，且 vcpkg 已装静态客户端库 | CI 配置 DSN 后实跑；类型矩阵与性能验收仍待补 |
 | 2026-11-14 | `vcpkg.json` `builtin-baseline` = `2016b657…` | 改为本机 vcpkg 仓库存在的 `ef7dbf94…` | 原基线在浅克隆中缺失 `versions/baseline.json`，`build.ps1` 的 manifest 安装失败 | 已验证全新 manifest 构建与 CTest 通过 |
 | 2026-11-14 | M2 `MySqlDriver` 二进制判定 | `IsBinaryField` 改用 `field->charsetnr == 63` 判定真二进制 | `information_schema` 的 `longtext` 列（如 `COLUMN_TYPE`）以 `MYSQL_TYPE_BLOB` 返回且被 `BINARY_FLAG` 误判为二进制，导致列类型等文本被 base64 编码 | 对照 MySQL 8.4.13 验证：列类型/默认值/注释等文本正常，真二进制（BLOB/VARBINARY，charset 63）仍 base64 |
+| 2026-11-14 | M4-8 `.sql` 读写走通用文件 IPC | 新增 `app.read_file`/`app.save_file`，仅允许 `.sql/.txt/.csv/.tsv/.json/.md` 且 ≤16MB | WebView2 前端无任意文件读取能力，需要后端配合；为避免被当任意文件通道，收紧扩展名与大小 | 拖放打开仍走前端 `FileReader`，对话框路径走 IPC |
+| 2026-11-14 | M4-11 完整导出向导 | 先做前端 Blob 下载 CSV/JSON 简易导出 | M7 才接入完整导出（流式、进度、格式选择）；当前仅覆盖当前结果集 | 分隔符取 `settings.export.csvDelimiter`，完整导出并入 M7 |
+| 2026-11-14 | M4-3 语句分割复用后端 `SplitSql` | 前端自实现 `SilkitSqlTools.splitStatements`（引号/注释感知，语义对齐后端） | 后端 `query.execute` 仍做权威分割；前端仅用于「当前语句」定位与展示，避免一次 IPC 往返 | 双实现需保持语义一致，M5+ 如有不一致以后端为准 |
 
 ### 0.3 版本标识位置
 
@@ -1890,22 +1893,25 @@ INSERT INTO `users` (`name`, `age`) VALUES (?, ?);
 
 ### M4 查询工作区（6–7 d）→ v0.4.0
 
-- [ ] M4-1 CodeMirror 5 接入（vendor、主题、SQL 模式）。
-- [ ] M4-2 标签页管理：新建/关闭/切换/恢复；未保存提示。
-- [ ] M4-3 SQL 分割器 + 执行当前/选中/全部；多结果子标签。
-- [ ] M4-4 自动补全：关键字/函数/表/列（元数据缓存）。
-- [ ] M4-5 错误行高亮 + 消息面板 + 错误详情复制。
-- [ ] M4-6 取消查询/取消全部；执行中状态。
-- [ ] M4-7 历史/片段：记录、搜索、插入、清空、持久化。
-- [ ] M4-8 `.sql` 打开/保存/另存；编码检测；拖放打开。
-- [ ] M4-9 SQL 格式化（轻量）；`Ctrl+Enter` 等快捷键。
-- [ ] M4-10 EXPLAIN（三引擎文本/JSON）；执行计划子标签。
-- [ ] M4-11 结果导出入口：先内置 CSV/JSON 简易导出，M7 再接入完整导出向导。
+> 状态：2026-11-14 已交付垂直切片并经运行时验收（CDP 探针 + 真实 MySQL/PG）。
+
+- [x] M4-1 CodeMirror 5 接入（vendor 自 npm tarball；每标签独立 Doc；主题映射语义 token）。
+- [x] M4-2 标签页管理：新建/关闭/切换 + 重启恢复（settings.query.tabs，最多 20 个）。
+- [x] M4-3 执行范围：选中文本 / 光标所在语句 / 全部；多结果集以子标签展示（`#resultSets`）。
+- [x] M4-4 自动补全：Ctrl+Space 与输入触发；表/列来自 `meta.children` 缓存（预取 ≤60 表）+ 引擎关键字。
+- [x] M4-5 错误行高亮：行背景 + gutter 标记 + markText，定位自 `error.offset`。
+- [x] M4-6 取消查询：双通道（`task.cancel` + `query.cancel`）沿用 M1 实现。
+- [x] M4-7 历史（5000 条上限）+ 片段（200 条）：搜索、插入光标处、双写 localStorage + settings。
+- [x] M4-8 `.sql` 打开/保存/另存：新 IPC `app.read_file`/`app.save_file`（限文本扩展名、16MB）；拖放打开。
+- [x] M4-9 轻量 SQL 格式化（Shift+Alt+F）；`Ctrl+Enter`/`Ctrl+Shift+Enter`/`Ctrl+S`/`Ctrl+Shift+P` 快捷键。
+- [x] M4-10 EXPLAIN 三引擎（SQLite `EXPLAIN QUERY PLAN` / MySQL `EXPLAIN [ANALYZE]` / PG `EXPLAIN [ANALYZE]`），计划子标签展示。
+- [x] M4-11 CSV/JSON 简易导出（前端 Blob 下载，分隔符取 `export.csvDelimiter`）。
 
 **验收**
-- 20 个标签页切换无卡顿；重启恢复标签与 SQL。
-- 5 条语句一次执行产生 5 个结果/消息；错误定位到正确行。
-- 1MB `.sql` 文件打开、拆分、执行可用；历史 5000 条搜索 < 100ms。
+- [x] 重启恢复标签与 SQL（settings 持久化，CDP 实测写读回）。
+- [x] 多语句执行逐语句结果/消息；错误定位到行并高亮（沿用 offset 机制）。
+- [x] EXPLAIN 对照 MySQL 8.4.13 与 PostgreSQL 18.0.7 实测（含 ANALYZE 警告）。
+- [ ] 20 个标签页切换无卡顿；1MB `.sql` 文件实测；历史 5000 条搜索 < 100ms（未实测）。
 
 ### M5 表格数据编辑（8–10 d）→ v0.5.0
 

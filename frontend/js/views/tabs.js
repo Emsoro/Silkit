@@ -1,4 +1,5 @@
-// 查询标签：标签栏渲染、编辑器状态同步、表数据标签、运行/取消按钮。
+// 查询标签：标签栏渲染、CodeMirror 编辑器、每标签独立 Doc、错误高亮、运行按钮。
+// M4：编辑器升级为 CodeMirror 5（M4-1），补全/格式化/语句定位由 editor/* 模块提供。
 (function () {
     'use strict';
 
@@ -12,14 +13,33 @@
 
         const dom = {};
         let querySeq = 0;
+        let cm = null;
+        let errorMark = null;
+        let hintTimer = 0;
+        const tools = window.SilkitSqlTools || null;
+        const hint = ctx.hint || null;
 
         function byId(id) { return document.getElementById(id); }
+
+        function mimeFor(session) {
+            const engine = session && session.profile ? (session.profile.engine || 'sqlite') : 'sqlite';
+            if (engine === 'mysql') return 'text/x-mysql';
+            if (engine === 'postgres') return 'text/x-pgsql';
+            return 'text/x-sql';
+        }
+
+        function ensureDoc(tab) {
+            if (!tab.doc) {
+                const text = typeof tab.sql === 'string' ? tab.sql : '';
+                tab.doc = window.CodeMirror.Doc(text, mimeFor(state.session(tab.sessionId)));
+            }
+            return tab.doc;
+        }
 
         function init() {
             dom.tabbar = byId('tabbar');
             dom.tabAdd = byId('tabAdd');
-            dom.editor = byId('sqlEditor');
-            dom.gutter = byId('lineGutter');
+            dom.host = byId('sqlEditor');
             dom.title = byId('editorTitle');
             dom.sub = byId('editorSub');
             dom.run = byId('runBtn');
@@ -45,39 +65,10 @@
 
             dom.tabAdd.addEventListener('click', function () { openQuery(); });
 
-            dom.editor.addEventListener('input', function () {
-                const tab = state.activeTab();
-                if (tab) {
-                    tab.sql = dom.editor.value;
-                    tab.dirty = true;
-                    refreshDirty(tab);
-                }
-                updateGutter();
-            });
-
-            dom.editor.addEventListener('scroll', function () {
-                const tab = state.activeTab();
-                if (tab) tab.editorScroll = dom.editor.scrollTop;
-                if (dom.gutter) dom.gutter.scrollTop = dom.editor.scrollTop;
-            });
-
-            dom.editor.addEventListener('select', saveSelection);
-            dom.editor.addEventListener('keyup', saveSelection);
-            dom.editor.addEventListener('mouseup', saveSelection);
-
-            dom.editor.addEventListener('keydown', function (event) {
-                if (event.key !== 'Tab') return;
-                event.preventDefault();
-                const start = dom.editor.selectionStart;
-                const end = dom.editor.selectionEnd;
-                dom.editor.setRangeText('  ', start, end, 'end');
-                dom.editor.dispatchEvent(new Event('input'));
-            });
-
             if (dom.run) {
                 dom.run.addEventListener('click', function () {
                     const tab = state.activeTab();
-                    if (tab) query.run(tab);
+                    if (tab) query.run(tab, runScope());
                 });
             }
             if (dom.cancel) {
@@ -87,14 +78,96 @@
                 });
             }
 
+            createEditor();
+
             if (!state.tabs.length) {
                 openQuery(null, {
-                    sql: '-- Silkit M1 · SQLite\n-- 打开一个 .db 文件后，Ctrl+Enter 或 F5 执行查询\n',
+                    sql: '-- Silkit M4 · 查询工作区\n-- Ctrl+Enter 执行 · Ctrl+Space 补全 · Shift+Alt+F 格式化\n',
                     focus: false
                 });
             } else {
+                state.tabs.forEach(ensureDoc);
                 activate(state.activeTabId || state.tabs[0].id);
             }
+        }
+
+        function createEditor() {
+            if (!dom.host || !window.CodeMirror) {
+                console.warn('[silkit] CodeMirror 未加载，编辑器降级');
+                return;
+            }
+            cm = window.CodeMirror(dom.host, {
+                value: '',
+                mode: 'text/x-sql',
+                lineNumbers: true,
+                indentUnit: 2,
+                smartIndent: true,
+                matchBrackets: true,
+                autoCloseBrackets: true,
+                styleActiveLine: true,
+                scrollbarStyle: 'native',
+                lineWrapping: false,
+                theme: 'silkit'
+            });
+
+            cm.on('change', function () {
+                const tab = state.activeTab();
+                if (!tab) return;
+                if (tab.doc !== cm.getDoc()) return;
+                tab.sql = cm.getValue();
+                tab.dirty = true;
+                refreshDirty(tab);
+                if (ctx.onTabSqlChanged) ctx.onTabSqlChanged(tab);
+            });
+
+            cm.on('scroll', function () {
+                const tab = state.activeTab();
+                if (!tab) return;
+                const info = cm.getScrollInfo();
+                tab.editorScroll = info.top;
+            });
+
+            cm.on('focus', function () {
+                const session = state.activeSession();
+                if (session && hint) hint.prefetch(session);
+            });
+
+            // 输入字母/点号后延迟触发补全（M4-4）。
+            cm.on('inputRead', function (editor, change) {
+                if (!change || change.origin !== '+input') return;
+                if (!change.text || !change.text.length) return;
+                const text = change.text[change.text.length - 1];
+                if (!/[A-Za-z0-9_$.]/.test(text)) return;
+                clearTimeout(hintTimer);
+                hintTimer = setTimeout(function () {
+                    if (!cm.hasFocus()) return;
+                    const cursor = cm.getCursor();
+                    const token = cm.getTokenAt(cursor);
+                    if (token && token.string && /^[A-Za-z0-9_$."`]+$/.test(token.string)) {
+                        cm.showHint({ hint: hintForSession(), completeSingle: false });
+                    }
+                }, 500);
+            });
+
+            cm.addKeyMap({
+                'Ctrl-Space': function () {
+                    cm.showHint({ hint: hintForSession(), completeSingle: false });
+                }
+            });
+
+            cm.on('blur', function () { clearTimeout(hintTimer); });
+        }
+
+        function hintForSession() {
+            if (!hint) return undefined;
+            const session = state.activeSession();
+            if (!session) return undefined;
+            return hint.hint(session);
+        }
+
+        function runScope() {
+            const select = document.getElementById('runScope');
+            return select ? (select.value || 'all') : 'all';
         }
 
         // ------------------------------------------------------------ 标签渲染
@@ -155,18 +228,12 @@
         // ------------------------------------------------------------ 激活与编辑
         function saveEditor() {
             const tab = state.activeTab();
-            if (!tab || !dom.editor) return;
-            tab.sql = dom.editor.value;
-            tab.editorScroll = dom.editor.scrollTop;
-            tab.selectionStart = dom.editor.selectionStart;
-            tab.selectionEnd = dom.editor.selectionEnd;
-        }
-
-        function saveSelection() {
-            const tab = state.activeTab();
-            if (!tab || !dom.editor) return;
-            tab.selectionStart = dom.editor.selectionStart;
-            tab.selectionEnd = dom.editor.selectionEnd;
+            if (!tab) return;
+            if (cm) {
+                tab.sql = cm.getValue();
+                const info = cm.getScrollInfo();
+                tab.editorScroll = info.top;
+            }
         }
 
         function activate(id) {
@@ -177,18 +244,16 @@
                 return;
             }
             saveEditor();
+            clearErrorHighlight();
             state.setActiveTab(id);
-            dom.editor.value = next.sql || '';
-            const scroll = Number(next.editorScroll) || 0;
-            dom.editor.scrollTop = scroll;
-            updateGutter();
-            try {
-                const start = Number(next.selectionStart);
-                const end = Number(next.selectionEnd);
-                if (Number.isFinite(start) && start >= 0 && start <= dom.editor.value.length) {
-                    dom.editor.setSelectionRange(start, Number.isFinite(end) ? end : start);
-                }
-            } catch (error) { /* ignore */ }
+            ensureDoc(next);
+            if (cm) {
+                cm.swapDoc(next.doc);
+                cm.setOption('mode', mimeFor(state.session(next.sessionId)));
+                const scroll = Number(next.editorScroll) || 0;
+                if (scroll > 0) cm.scrollTo(0, scroll);
+                cm.refresh();
+            }
             render();
             updateChrome(next);
             results.show(next);
@@ -220,13 +285,142 @@
             }
         }
 
-        function updateGutter() {
-            if (!dom.editor || !dom.gutter) return;
-            const lines = dom.editor.value.split('\n').length;
-            const numbers = [];
-            for (let i = 1; i <= Math.max(1, lines); i += 1) numbers.push(i);
-            dom.gutter.textContent = numbers.join('\n');
-            dom.gutter.scrollTop = dom.editor.scrollTop;
+        // ------------------------------------------------------------ 编辑器操作
+        function setValue(text) {
+            if (cm) {
+                cm.setValue(String(text == null ? '' : text));
+                cm.refresh();
+                return;
+            }
+            const tab = state.activeTab();
+            if (tab) { tab.sql = String(text || ''); }
+        }
+
+        function getValue() {
+            if (cm) return cm.getValue();
+            const tab = state.activeTab();
+            return tab ? (tab.sql || '') : '';
+        }
+
+        function getSelectionText() {
+            if (!cm) return '';
+            return cm.somethingSelected() ? cm.getSelection() : '';
+        }
+
+        function selectRange(start, end) {
+            if (!cm) return;
+            const text = cm.getValue();
+            const from = Math.max(0, Math.min(text.length, start));
+            const to = Math.max(from, Math.min(text.length, end == null ? start : end));
+            cm.setSelection(cm.posFromIndex(from), cm.posFromIndex(to));
+            cm.scrollIntoView({ from: cm.posFromIndex(from), to: cm.posFromIndex(to) });
+            cm.focus();
+        }
+
+        function posFromOffset(offset) {
+            if (!cm) return null;
+            const text = cm.getValue();
+            const index = Math.max(0, Math.min(text.length, Number(offset) || 0));
+            return cm.posFromIndex(index);
+        }
+
+        // 错误行高亮（M4-5）：行背景 + gutter 标记。
+        function showErrorAt(offset, message) {
+            if (!cm) return;
+            clearErrorHighlight();
+            const pos = posFromOffset(offset);
+            if (!pos) return;
+            cm.addLineClass(pos.line, 'background', 'cm-error-line');
+            cm.addLineClass(pos.line, 'gutter', 'cm-error-gutter');
+            const end = { line: pos.line, ch: cm.getLine(pos.line).length };
+            errorMark = {
+                line: pos.line,
+                marker: cm.markText(pos, end, { className: 'cm-error-text' }),
+                message: message || ''
+            };
+            cm.scrollIntoView(pos, 80);
+        }
+
+        function clearErrorHighlight() {
+            if (!cm || !errorMark) return;
+            cm.removeLineClass(errorMark.line, 'background', 'cm-error-line');
+            cm.removeLineClass(errorMark.line, 'gutter', 'cm-error-gutter');
+            if (errorMark.marker) errorMark.marker.clear();
+            errorMark = null;
+        }
+
+        // 光标所在语句（M4-3）：返回 {start,end,sql} 或 null。
+        function statementAtCursor() {
+            if (!cm || !tools) return null;
+            const cursor = cm.getCursor();
+            const offset = cm.indexFromPos(cursor);
+            const statements = tools.splitStatements(cm.getValue());
+            if (!statements.length) return null;
+            for (let i = 0; i < statements.length; i += 1) {
+                const item = statements[i];
+                if (offset >= item.start && offset <= item.end) return item;
+                if (offset < item.start) return item;
+            }
+            return statements[statements.length - 1];
+        }
+
+        function formatEditor() {
+            if (!cm || !tools) return;
+            const selection = cm.somethingSelected()
+                ? cm.getSelection()
+                : null;
+            const source = selection != null ? selection : cm.getValue();
+            const formatted = tools.formatSql(source);
+            if (!formatted || formatted === source) return;
+            if (selection != null) {
+                cm.replaceSelection(formatted);
+            } else {
+                const cursor = cm.getCursor();
+                const scroll = cm.getScrollInfo();
+                cm.setValue(formatted);
+                cm.setCursor(cursor);
+                cm.scrollTo(scroll.left, scroll.top);
+            }
+            const tab = state.activeTab();
+            if (tab) {
+                tab.sql = cm.getValue();
+                tab.dirty = true;
+                refreshDirty(tab);
+            }
+            toast(selection != null ? '已格式化选区' : '已格式化 SQL');
+        }
+
+        function focusEditor() {
+            if (cm) cm.focus();
+        }
+
+        // 拖放 .sql 文件到编辑器打开（M4-8）。
+        function bindDragDrop() {
+            if (!dom.host) return;
+            dom.host.addEventListener('dragover', function (event) {
+                event.preventDefault();
+                dom.host.classList.add('is-dragover');
+            });
+            dom.host.addEventListener('dragleave', function () {
+                dom.host.classList.remove('is-dragover');
+            });
+            dom.host.addEventListener('drop', function (event) {
+                dom.host.classList.remove('is-dragover');
+                if (!event.dataTransfer || !event.dataTransfer.files || !event.dataTransfer.files.length) return;
+                event.preventDefault();
+                Array.prototype.forEach.call(event.dataTransfer.files, function (file, index) {
+                    if (!/\.sql$/i.test(file.name)) return;
+                    const reader = new FileReader();
+                    reader.onload = function () {
+                        openQuery(null, {
+                            sql: String(reader.result || ''),
+                            title: U.stripExtension(file.name),
+                            focus: index === 0
+                        });
+                    };
+                    reader.readAsText(file, 'utf-8');
+                });
+            });
         }
 
         // ------------------------------------------------------------ 标签创建
@@ -237,19 +431,24 @@
             const target = session || state.activeSession();
             const tab = state.addTab({
                 kind: 'query',
-                title: '查询 ' + querySeq,
+                title: opts.title || ('查询 ' + querySeq),
                 sessionId: target ? target.id : null,
                 sql: opts.sql != null ? opts.sql : '',
-                dirty: false
+                dirty: !!opts.dirty,
+                filePath: opts.filePath || null
             });
             state.setActiveTab(tab.id);
             render();
-            dom.editor.value = tab.sql;
-            dom.editor.scrollTop = 0;
-            updateGutter();
+            ensureDoc(tab);
+            if (cm) {
+                cm.swapDoc(tab.doc);
+                cm.setOption('mode', mimeFor(state.session(tab.sessionId)));
+                cm.refresh();
+            }
             updateChrome(tab);
             results.show(tab);
-            if (opts.focus !== false) dom.editor.focus();
+            if (ctx.onTabChanged) ctx.onTabChanged(tab);
+            if (opts.focus !== false && cm) cm.focus();
             return tab;
         }
 
@@ -299,10 +498,15 @@
             });
             state.setActiveTab(tab.id);
             render();
-            dom.editor.value = sql;
-            updateGutter();
+            ensureDoc(tab);
+            if (cm) {
+                cm.swapDoc(tab.doc);
+                cm.setOption('mode', mimeFor(state.session(tab.sessionId)));
+                cm.refresh();
+            }
             updateChrome(tab);
             results.show(tab);
+            if (ctx.onTabChanged) ctx.onTabChanged(tab);
             if (opts.autoRun !== false) query.run(tab);
             return tab;
         }
@@ -317,13 +521,17 @@
             if (wasActive) saveEditor();
             const index = state.tabs.indexOf(tab);
             state.removeTab(id);
+            if (ctx.onTabChanged) ctx.onTabChanged(tab);
             const next = state.tabs[Math.min(index, state.tabs.length - 1)];
             if (next) {
                 state.setActiveTab(next.id);
                 activate(next.id);
-                // activate 会提前返回（activeTabId 已变化），这里再清理编辑器。
-                dom.editor.value = next.sql || '';
-                updateGutter();
+                if (cm) {
+                    ensureDoc(next);
+                    cm.swapDoc(next.doc);
+                    cm.setOption('mode', mimeFor(state.session(next.sessionId)));
+                    cm.refresh();
+                }
                 updateChrome(next);
                 results.show(next);
             } else {
@@ -336,27 +544,24 @@
             if (state.activeTabId) closeTab(state.activeTabId);
         }
 
-        function getSelectionText() {
-            if (!dom.editor) return '';
-            const start = dom.editor.selectionStart;
-            const end = dom.editor.selectionEnd;
-            if (start == null || end == null || start === end) return '';
-            return dom.editor.value.slice(start, end);
+        function setTabTitle(tab, title) {
+            if (!tab) return;
+            tab.title = title;
+            render();
         }
 
-        function selectRange(start, end) {
-            if (!dom.editor) return;
-            const text = dom.editor.value;
-            const from = Math.max(0, Math.min(text.length, start));
-            const to = Math.max(from, Math.min(text.length, end == null ? start : end));
-            dom.editor.focus();
-            dom.editor.setSelectionRange(from, to);
-            const before = text.slice(0, from).split('\n').length - 1;
-            dom.editor.scrollTop = Math.max(0, before * 22 - 66);
-        }
-
-        function focusEditor() {
-            if (dom.editor) dom.editor.focus();
+        // 片段插入光标处（M4-7）。
+        function insertSnippet(sql) {
+            if (!cm) return;
+            const text = String(sql || '');
+            cm.replaceSelection(text, 'end');
+            const tab = state.activeTab();
+            if (tab) {
+                tab.sql = cm.getValue();
+                tab.dirty = true;
+                refreshDirty(tab);
+            }
+            cm.focus();
         }
 
         return {
@@ -370,10 +575,18 @@
             saveEditor: saveEditor,
             refreshRunning: refreshRunning,
             updateChrome: updateChrome,
-            updateGutter: updateGutter,
             getSelectionText: getSelectionText,
             selectRange: selectRange,
-            focusEditor: focusEditor
+            statementAtCursor: statementAtCursor,
+            formatEditor: formatEditor,
+            showErrorAt: showErrorAt,
+            clearErrorHighlight: clearErrorHighlight,
+            setValue: setValue,
+            getValue: getValue,
+            setTabTitle: setTabTitle,
+            insertSnippet: insertSnippet,
+            focusEditor: focusEditor,
+            bindDragDrop: bindDragDrop
         };
     }
 

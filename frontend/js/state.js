@@ -12,6 +12,7 @@
         tabs: [],
         activeTabId: null,
         history: [],
+        snippets: [],
         settings: {},
         seq: { tab: 0, session: 0 }
     };
@@ -170,7 +171,7 @@
             rows: Number(entry.rows) || 0,
             elapsedMs: Number(entry.elapsedMs) || 0
         });
-        state.history = list.slice(0, 60);
+        state.history = list.slice(0, 5000);
         emit('history', state.history);
     }
 
@@ -196,7 +197,7 @@
     };
 
     // 让界面模块可以直接读写 state.xxx，同时保持 data 为唯一数据源。
-    ['sessions', 'activeSessionId', 'profiles', 'tabs', 'activeTabId', 'history', 'settings', 'seq']
+    ['sessions', 'activeSessionId', 'profiles', 'tabs', 'activeTabId', 'history', 'snippets', 'settings', 'seq']
         .forEach(function (key) {
             Object.defineProperty(api, key, {
                 enumerable: true,
