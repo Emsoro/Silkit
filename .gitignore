@@ -30,3 +30,23 @@
 *.exe
 *.out
 *.app
+
+# ---- Silkit ----
+# 构建产物
+build/
+out/
+.vs/
+CMakeUserPresets.json
+*.vcxproj*
+*.user
+
+# 第三方只读参考：HeidiSQL 源码不入库
+HeidiSQL-12.22/
+
+# 本地运行数据与临时文件
+logs/
+*.log
+*.tmp
+*.part
+Thumbs.db
+
