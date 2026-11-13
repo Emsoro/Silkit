@@ -18,7 +18,26 @@
         check: '<path d="m4.5 12.5 5 5 10-11"/>',
         palette: '<path d="M12 3a9 9 0 1 0 0 18c1.5 0 2-1 2-2 0-1.5 1-2 2.5-2H18a3 3 0 0 0 3-3 9 9 0 0 0-9-9Z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7.5" r="1"/><circle cx="15" cy="8" r="1"/>',
         close: '<path d="m6 6 12 12M18 6 6 18"/>',
-        sparkle: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3Z"/>'
+        sparkle: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3Z"/>',
+        eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/>',
+        key: '<circle cx="8" cy="8" r="4"/><path d="m11 11 9 9M17 17l2-2M20 20l2-2"/>',
+        bolt: '<path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/>',
+        column: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M4 8h16M4 12h16M4 16h16"/>',
+        link: '<path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"/>',
+        trash: '<path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13M10 11v6M14 11v6"/>',
+        stop: '<rect x="6" y="6" width="12" height="12" rx="2"/>',
+        copy: '<rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h8"/>',
+        save: '<path d="M5 3h11l3 3v15H5V3Z"/><path d="M8 3v6h7V3M8 21v-6h8v6"/>',
+        clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+        refresh: '<path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/>',
+        warning: '<path d="M12 3 2 21h20L12 3Z"/><path d="M12 9v5M12 17h.01"/>',
+        info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
+        file: '<path d="M6 2h8l4 4v16H6V2Z"/><path d="M14 2v4h4"/>',
+        filter: '<path d="M3 5h18l-7 8v6l-4 2v-8L3 5Z"/>',
+        chevronDown: '<path d="m6 9 6 6 6-6"/>',
+        folderOpen: '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v1H3V7Z"/><path d="M3 10h18l-2 9H5l-2-9Z"/>',
+        edit: '<path d="M4 20h4L20 8l-4-4L4 16v4Z"/><path d="m13 7 4 4"/>',
+        disconnect: '<path d="M9 3v4M15 3v4"/><path d="M6 7h12v3a6 6 0 0 1-12 0V7Z"/><path d="M12 16v5"/><path d="m3 3 18 18"/>'
     };
 
     function svg(name, size) {

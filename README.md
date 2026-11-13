@@ -3,8 +3,8 @@
 跨库数据库工作台（MySQL / MariaDB / PostgreSQL / SQLite），Windows 桌面端。
 C++17 + Win32 + WebView2，前端为原生 HTML/CSS/JS，无 Node 构建步骤。
 
-> 当前进度：**M0 — 工程骨架、异步 IPC、UI 外壳、五套主题**（v0.0.1）。
-> 数据库连接与查询执行从 M1 开始接入，详见 [CODEPLAN.md](CODEPLAN.md)。
+> 当前进度：**M1 — SQLite 垂直切片已打通**（v0.1.0）：连接 → 对象树 → SQL 查询 → 流式结果 → 单元格查看。
+> 下一步为 **M2（MySQL / MariaDB 驱动）**；完整计划与偏差记录见 [CODEPLAN.md](CODEPLAN.md)。
 
 ## M0 已交付
 
@@ -15,6 +15,16 @@ C++17 + Win32 + WebView2，前端为原生 HTML/CSS/JS，无 Node 构建步骤�
 - 配置写入 `%APPDATA%\Silkit\settings.json`（原子替换），日志按天写入 `%APPDATA%\Silkit\logs\`
 - 自检入口：顶栏「自检」跑一次 3 步异步任务，可在执行中取消
 - `tools/contrast_check.py`：校验五套主题的关键配色对比度（WCAG 2.1）
+
+## M1 已交付
+
+- **SQLite 驱动**：连接参数（只读 / busy timeout / 外键 / `journal_mode` 白名单 / `init_sql`）、参数化执行、流式分批、跨线程取消、错误位置定位
+- **Session 模型**：一个连接一条专用线程 + 任务队列；重连保持 `sessionId`、事务状态、运行时只读切换、`session.closed` 事件
+- **IPC 命令**：`conn.*`（test/open/close/reconnect/ping/stats/set_database/set_readonly）、`meta.*`（children/detail/ddl/search/refresh）、`query.*`（execute/cancel/explain）
+- **查询执行**：`sql_splitter` 拆分多语句并按序执行、`statement`/`batch` 流式事件、错误定位、`continueOnError`、`maxRows` 截断
+- **前端**：连接对话框与文件选择、对象树懒加载/右键菜单（重连、只读）、查询标签、虚拟滚动结果网格、TSV 复制、长文本/BLOB 单元格查看器、最近查询
+- **安全**：DPAPI 保存密码、`conn.list` 脱敏、驱动层拦截写语句、标识符引用与值参数化
+- **测试**：`silkit_smoke`（纯逻辑/内存库/会话）与 `sqlite_driver`（驱动健壮性与会话状态回归），均由 CTest 运行
 
 ## 构建
 
@@ -90,13 +100,16 @@ Silkit/
 ├─ src/
 │  ├─ main.cpp                 # WinMain、单实例、窗口/路由/配置装配
 │  ├─ app/version.h            # 名称与版本
-│  ├─ core/                    # 路径、日志、设置、JSON 合并、profiles 占位
-│  └─ ipc/                     # AsyncRouter（worker 池）+ M0 命令
+│  ├─ core/                    # 路径、日志、设置、profiles、DPAPI 密码
+│  ├─ db/                      # 驱动抽象、SQL 分割/引用/类型、Session/Manager
+│  │  └─ drivers/sqlite_driver.cpp
+│  ├─ ipc/                     # AsyncRouter（worker 池）+ app/conn/meta/query 命令
+│  └─ util/                    # base64 等
 ├─ frontend/
 │  ├─ index.html               # 外壳 + 首帧防闪脚本
-│  ├─ css/                     # tokens / base / layout + themes/*.css
-│  └─ js/                      # bridge / api / themes / app / icons / mock
-├─ tests/                      # CTest 冒烟测试（JSON 合并、默认配置）
+│  ├─ css/                     # tokens / base / layout / workbench + themes/*.css
+│  └─ js/                      # bridge / api / state / themes / views / components / mock
+├─ tests/                      # silkit_smoke + sqlite_driver（CTest）
 ├─ tools/contrast_check.py     # WCAG 对比度检查
 ├─ TauriCPP/                   # Win32 + WebView2 框架（内置）
 ├─ CODEPLAN.md                 # 完整产品/技术/里程碑计划
@@ -110,12 +123,19 @@ Silkit/
 - **事件回传**：worker 通过 `Bridge::Emit("ipc.event", …)` 投递到 JS 队列，由 `Window::ExecuteJsFromQueue` 在 UI 线程执行。
 - **防白闪**：`index.html` 内联脚本先读 `localStorage` 设置 `data-theme`，再加载 CSS；C++ 侧在窗口创建时把类背景刷与 WebView2 `DefaultBackgroundColor` 设为主题底色。
 - **配置**：`settings.set` 递归合并后原子写盘；前端只提交 patch。
+- **驱动隔离**：`db/Connection` 抽象 + `DriverRegistry`，UI 只认统一模型；M2/M3 只需新增驱动。
+- **会话亲和**：每个连接一条 Session 线程，驱动对象不跨线程使用；`Cancel()` 单独设计，可跨线程调用。
+- **流式结果**：`query.execute` 按语句发 `statement` / `batch`，首批携带列元数据，达到 `maxRows` 后标记 `truncated`。
 
-## 已知限制（M0）
+## 已知限制（v0.1.0）
 
-- SQL 编辑器是带行号的 `textarea`，CodeMirror 在 M4 接入
-- 对象树为静态演示数据，M1 接入真实元数据
-- 仅 `app.*` / `settings.*` / `theme.*` 命令；连接、查询、导出尚未实现
+- 仅 SQLite 驱动可用；MySQL / MariaDB（M2）、PostgreSQL（M3）尚未接入
+- SQL 编辑器仍是带行号的 `textarea`；CodeMirror、自动补全、SQL 文件与片段在 M4 接入
+- 对象树搜索为已加载节点的本地过滤；后端 `meta.search` 已就绪，前端结果渲染并入 M4
+- 表数据只读（结果网格可复制/查看）；CRUD、筛选、分页、表设计器在 M5 / M6
+- 导入 / 导出 / 转储、结果导出向导在 M7
+- 查询历史暂由前端 `localStorage` + `settings.json` 持久化，M4 迁移到后端 `history.jsonl`
+- `query.ack` 背压、`ui_state.*` 会话恢复尚未实现
 - DevMode 下需把 `frontend/` 放在 exe 同级目录（或 `build\Release\..\..\frontend`）
 
 ## 许可

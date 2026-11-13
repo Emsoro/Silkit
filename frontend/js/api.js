@@ -1,12 +1,16 @@
 // IPC 客户端：把 `ipc.call` + `ipc.event` 包装成 Promise。
 //
 //   ipc.call  →  { ok: true, reqId }            立即返回，不阻塞 UI 线程
-//   ipc.event →  { reqId, type: progress|result|error|cancelled, data|error }
+//   ipc.event →  { reqId, type, data|error }
+//
+// 标准事件：progress / result / error / cancelled。
+// 业务事件（query.execute 的 statement / batch）通过 options.onEvent 透传。
 //
 // 用法：
-//   const task = SilkitApi.start('app.ping', { steps: 3 }, { onProgress });
+//   const task = SilkitApi.queryExecute(sessionId, sql, {
+//       onEvent: (type, data) => { if (type === 'batch') ...; }
+//   });
 //   task.promise.then(...).catch(...); task.cancel();
-//   SilkitApi.call('settings.get').then(...)
 (function () {
     'use strict';
 
@@ -14,9 +18,22 @@
     const pending = new Map();
     let seq = 0;
 
-    function Error_(code, message) {
-        const error = new Error(message || code);
-        error.code = code || 'unknown';
+    // 保留后端 error 对象里的所有结构化字段（statementIndex/position/sql/offset...）。
+    function makeError(detail, fallbackCode, fallbackMessage) {
+        const data = detail && typeof detail === 'object' ? detail : {};
+        const code = data.code || fallbackCode || 'unknown';
+        const message = data.message || fallbackMessage || code;
+        const error = new Error(message);
+        error.code = code;
+        error.details = data;
+        if (data.sqlState) error.sqlState = data.sqlState;
+        if (data.detail) error.detail = data.detail;
+        if (data.hint) error.hint = data.hint;
+        if (typeof data.position === 'number') error.position = data.position;
+        if (typeof data.statementIndex === 'number') error.statementIndex = data.statementIndex;
+        if (typeof data.offset === 'number') error.offset = data.offset;
+        if (typeof data.elapsedMs === 'number') error.elapsedMs = data.elapsedMs;
+        if (typeof data.sql === 'string') error.sql = data.sql;
         return error;
     }
 
@@ -44,6 +61,7 @@
             settled: false,
             timer: 0,
             onProgress: typeof opts.onProgress === 'function' ? opts.onProgress : null,
+            onEvent: typeof opts.onEvent === 'function' ? opts.onEvent : null,
             resolve: null,
             reject: null
         };
@@ -57,7 +75,8 @@
 
         if (opts.timeoutMs && opts.timeoutMs > 0) {
             entry.timer = setTimeout(function () {
-                settle(reqId, entry.reject, Error_('timeout', command + ' 超时（' + opts.timeoutMs + ' ms）'));
+                settle(reqId, entry.reject,
+                    makeError({ code: 'timeout', message: command + ' 超时（' + opts.timeoutMs + ' ms）' }));
             }, opts.timeoutMs);
         }
 
@@ -65,7 +84,8 @@
             .then(function (ack) {
                 if (!ack || ack.ok === true) return;
                 const detail = ack.error || {};
-                settle(reqId, entry.reject, Error_(detail.code || 'rejected', detail.message || '请求被拒绝'));
+                settle(reqId, entry.reject,
+                    makeError(detail, 'rejected', detail.message || '请求被拒绝'));
             })
             .catch(function (error) {
                 settle(reqId, entry.reject, error);
@@ -106,23 +126,41 @@
             case 'result':
                 settle(payload.reqId, entry.resolve, payload.data);
                 break;
-            case 'error': {
-                const detail = payload.error || {};
+            case 'error':
                 settle(payload.reqId, entry.reject,
-                    Error_(detail.code || 'error', detail.message || 'IPC 执行失败'));
+                    makeError(payload.error, 'error', 'IPC 执行失败'));
                 break;
-            }
             case 'cancelled':
-                settle(payload.reqId, entry.reject, Error_('cancelled', '已取消'));
+                settle(payload.reqId, entry.reject,
+                    makeError({ code: 'cancelled', message: '已取消' }));
                 break;
             default:
+                // 业务事件：statement / batch / 未来的 progress 变体。
+                if (entry.onEvent) {
+                    try {
+                        entry.onEvent(payload.type, payload.data || {}, payload);
+                    } catch (error) {
+                        console.error('[silkit] event handler ' + payload.type, error);
+                    }
+                }
                 break;
         }
     });
 
+    // 非请求型事件（例如 session.closed）转成 DOM 事件，视图层不必直接依赖桥。
+    bridge.listen('session.closed', function (payload) {
+        window.dispatchEvent(new CustomEvent('silkit:session-closed', { detail: payload || {} }));
+    });
+
+    // ---------------------------------------------------------------- 命令封装
+    function listen(command, args, options) {
+        return start(command, args, options);
+    }
+
     window.SilkitApi = {
         start: start,
         call: call,
+        listen: listen,
         pendingCount: function () { return pending.size; },
 
         info: function () { return call('app.info'); },
@@ -131,6 +169,7 @@
             return call('app.log', { level: level, message: message });
         },
         quit: function () { return call('app.quit'); },
+        pickFile: function (args) { return call('app.pick_file', args || {}); },
 
         settingsGet: function () { return call('settings.get'); },
         settingsSet: function (patch) { return call('settings.set', { patch: patch }); },
@@ -138,6 +177,82 @@
         themeList: function () { return call('theme.list'); },
         themeSet: function (theme, persist) {
             return call('theme.set', { theme: theme, persist: persist !== false });
+        },
+
+        // ------------------------------------------------------------ 连接
+        connList: function () { return call('conn.list'); },
+        connSave: function (profile, password, savePassword) {
+            return call('conn.save', {
+                profile: profile,
+                password: password || '',
+                savePassword: !!savePassword
+            });
+        },
+        connDelete: function (id) { return call('conn.delete', { id: id }); },
+        connTest: function (profile, password) {
+            return call('conn.test', { profile: profile, password: password || '' });
+        },
+        connOpen: function (profile, password) {
+            return call('conn.open', { profile: profile, password: password || '' });
+        },
+        connClose: function (sessionId) {
+            return call('conn.close', { sessionId: sessionId });
+        },
+        connReconnect: function (sessionId, args) {
+            return call('conn.reconnect', Object.assign({ sessionId: sessionId }, args || {}));
+        },
+        connPing: function (sessionId) {
+            return call('conn.ping', { sessionId: sessionId });
+        },
+        connStats: function (sessionId) {
+            return call('conn.stats', { sessionId: sessionId });
+        },
+        connSetDatabase: function (sessionId, database) {
+            return call('conn.set_database', { sessionId: sessionId, database: database });
+        },
+        connSetReadonly: function (sessionId, readOnly) {
+            return call('conn.set_readonly', { sessionId: sessionId, readOnly: !!readOnly });
+        },
+
+        // ------------------------------------------------------------ 元数据
+        metaChildren: function (sessionId, parent) {
+            return call('meta.children', { sessionId: sessionId, parent: parent || {} });
+        },
+        metaDetail: function (sessionId, ref) {
+            return call('meta.detail', { sessionId: sessionId, ref: ref || {} });
+        },
+        metaDdl: function (sessionId, ref) {
+            return call('meta.ddl', { sessionId: sessionId, ref: ref || {} });
+        },
+        metaRefresh: function (sessionId) {
+            return call('meta.refresh', { sessionId: sessionId });
+        },
+        metaSearch: function (sessionId, keyword, options) {
+            const opts = options || {};
+            return call('meta.search', {
+                sessionId: sessionId,
+                keyword: keyword || '',
+                kinds: opts.kinds || [],
+                limit: opts.limit || 200
+            });
+        },
+
+        // ------------------------------------------------------------ 查询
+        queryExecute: function (sessionId, sql, options) {
+            const opts = options || {};
+            const args = { sessionId: sessionId, sql: sql };
+            // 只把契约里允许的查询参数透传给后端，回调仍由 start() 消费。
+            if (typeof opts.maxRows === 'number') args.maxRows = opts.maxRows;
+            if (typeof opts.fetchSize === 'number') args.fetchSize = opts.fetchSize;
+            if (typeof opts.maxCellBytes === 'number') args.maxCellBytes = opts.maxCellBytes;
+            if (opts.continueOnError) args.continueOnError = true;
+            return start('query.execute', args, opts);
+        },
+        queryCancel: function (sessionId) {
+            return call('query.cancel', { sessionId: sessionId });
+        },
+        queryExplain: function (sessionId, sql) {
+            return call('query.explain', { sessionId: sessionId, sql: sql });
         }
     };
 })();

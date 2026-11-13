@@ -1,7 +1,9 @@
 {
   "name": "silkit",
-  "version-string": "0.0.1",
+  "version-string": "0.1.0",
+  "builtin-baseline": "2016b657d396495d7365498c106d305b4463ea02",
   "dependencies": [
-    "webview2"
+    "webview2",
+    "sqlite3"
   ]
 }

@@ -1,12 +1,13 @@
 // Silkit —— 跨库数据库工作台（MySQL / PostgreSQL / SQLite）
 //
-// M0 目标：可构建、可启动、异步 IPC 往返、五套主题与切换器。
-// UI 全部在前端；C++ 负责窗口、异步任务路由、配置与日志。
+// M1：SQLite 连接 → 对象树 → 查询 → 流式结果的端到端工作台。
+// UI 全部在前端；C++ 负责窗口、异步任务路由、数据库会话、配置与日志。
 #include "app/version.h"
 #include "core/logger.h"
 #include "core/paths.h"
 #include "core/profiles.h"
 #include "core/settings.h"
+#include "db/session_manager.h"
 #include "ipc/async_router.h"
 #include "ipc/commands.h"
 
@@ -64,7 +65,10 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
     silkit::Settings settings;
     settings.Load(silkit::Paths::SettingsFile());
-    silkit::EnsureProfilesFile(silkit::Paths::ProfilesFile());
+
+    silkit::ProfileStore profiles(silkit::Paths::ProfilesFile());
+    profiles.Load();
+    silkit::session::SessionManager sessions;
 
     const auto snapshot = settings.Snapshot();
     const std::string theme = snapshot["ui"].value("theme", std::string{"bloom"});
@@ -85,14 +89,15 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     // 窗口在 App::Run() 内部创建，因此命令注册必须放进 OnSetup。
     // 窗口类背景与 WebView2 DefaultBackgroundColor 已在 Window::CreateNativeWindow /
     // SetWebViewBackgroundColor 中按 config.bg_color 设置，启动阶段不会闪白。
-    app.OnSetup([&router, &settings](tauricpp::App& instance) {
-        silkit::ipc::RegisterCommands(router, instance.GetWindow(), settings);
+    app.OnSetup([&router, &settings, &profiles, &sessions](tauricpp::App& instance) {
+        silkit::ipc::RegisterCommands(router, instance.GetWindow(), settings, profiles, sessions);
     });
 
     silkit::LogInfo("Silkit 窗口已创建，主题=" + theme);
     const int rc = app.Run();
 
     router.Shutdown();
+    sessions.Shutdown();
     settings.Flush();
     silkit::LogInfo("Silkit 退出");
     silkit::Logger::Instance().Shutdown();

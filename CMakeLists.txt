@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(Silkit VERSION 0.0.1 LANGUAGES CXX)
+project(Silkit VERSION 0.1.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -28,48 +28,26 @@ if(NOT EXISTS "${NLOHMANN_INCLUDE_DIR}/nlohmann/json.hpp")
     message(FATAL_ERROR "缺少 nlohmann/json.hpp: ${NLOHMANN_INCLUDE_DIR}")
 endif()
 
-set(WEBVIEW2_SEARCH_PATHS
-    "$ENV{VCPKG_ROOT}/installed/x64-windows-static"
-    "$ENV{VCPKG_ROOT}/installed/x64-windows"
-    "C:/vcpkg/installed/x64-windows-static"
-    "C:/vcpkg/installed/x64-windows"
-)
+# WebView2 / SQLite 都由 vcpkg manifest 安装，使用官方导出的 imported target，
+# 避免手工 find_library 在 Debug/Release 配置间选错库。
+find_package(unofficial-webview2 CONFIG REQUIRED)
+find_package(unofficial-sqlite3 CONFIG REQUIRED)
 
-find_path(WEBVIEW2_INCLUDE_DIR
-    NAMES WebView2.h
-    PATH_SUFFIXES include
-    PATHS ${WEBVIEW2_SEARCH_PATHS}
-)
-
-find_library(WEBVIEW2_LIBRARY
-    NAMES WebView2LoaderStatic WebView2Loader.dll.lib
-    PATH_SUFFIXES lib
-    PATHS ${WEBVIEW2_SEARCH_PATHS}
-)
-
-if(NOT WEBVIEW2_INCLUDE_DIR OR NOT WEBVIEW2_LIBRARY)
-    message(FATAL_ERROR
-        "未找到 WebView2 SDK。\n"
-        "请执行: vcpkg install webview2:x64-windows-static --classic\n"
-        "或设置 VCPKG_ROOT 环境变量。")
-endif()
-
-message(STATUS "WebView2 include: ${WEBVIEW2_INCLUDE_DIR}")
-message(STATUS "WebView2 library: ${WEBVIEW2_LIBRARY}")
+message(STATUS "WebView2 target: unofficial::webview2::webview2")
+message(STATUS "SQLite target: unofficial::sqlite3::sqlite3")
 
 file(GLOB TAURICPP_SOURCES CONFIGURE_DEPENDS "${TAURICPP_DIR}/src/*.cpp")
 add_library(tauricpp STATIC ${TAURICPP_SOURCES})
 target_include_directories(tauricpp PUBLIC
     "${TAURICPP_DIR}/include"
     "${NLOHMANN_INCLUDE_DIR}"
-    "${WEBVIEW2_INCLUDE_DIR}"
 )
 target_link_libraries(tauricpp PUBLIC
     shlwapi
     shell32
     comdlg32
     ole32
-    ${WEBVIEW2_LIBRARY}
+    unofficial::webview2::webview2
 )
 
 # ============================================================================
@@ -79,24 +57,46 @@ set(FRONTEND_DIR "${CMAKE_SOURCE_DIR}/frontend")
 set(GEN_DIR "${CMAKE_BINARY_DIR}/generated")
 file(MAKE_DIRECTORY "${GEN_DIR}")
 set(RESOURCES_RC "${GEN_DIR}/resources.rc")
+set(RESOURCE_IDS_H "${GEN_DIR}/resource_ids.h")
 set(RESOURCE_MAP_CPP "${GEN_DIR}/resource_map.cpp")
+set(FRONTEND_PACK_SCRIPT "${CMAKE_SOURCE_DIR}/tools/pack_resources_cmake.cmake")
 
 find_package(Python3 COMPONENTS Interpreter)
 
-if(EMBED_FRONTEND AND Python3_Interpreter_FOUND)
+if(EMBED_FRONTEND)
     file(GLOB_RECURSE FRONTEND_FILES CONFIGURE_DEPENDS "${FRONTEND_DIR}/*")
-    add_custom_command(
-        OUTPUT "${RESOURCES_RC}" "${RESOURCE_MAP_CPP}"
-        COMMAND ${Python3_EXECUTABLE} "${TAURICPP_DIR}/tools/pack_resources.py"
-                "${FRONTEND_DIR}" -o "${RESOURCES_RC}" -t "TAURI_RES"
-        DEPENDS "${TAURICPP_DIR}/tools/pack_resources.py" ${FRONTEND_FILES}
-        COMMENT "Packing frontend resources into .rc"
-        VERBATIM
-    )
+
+    if(Python3_Interpreter_FOUND)
+        message(STATUS "前端打包：TauriCPP pack_resources.py")
+        add_custom_command(
+            OUTPUT "${RESOURCES_RC}" "${RESOURCE_MAP_CPP}" "${RESOURCE_IDS_H}"
+            COMMAND ${Python3_EXECUTABLE} "${TAURICPP_DIR}/tools/pack_resources.py"
+                    "${FRONTEND_DIR}" -o "${RESOURCES_RC}" -t "TAURI_RES"
+            DEPENDS "${TAURICPP_DIR}/tools/pack_resources.py" ${FRONTEND_FILES}
+            COMMENT "Packing frontend resources into .rc"
+            VERBATIM
+        )
+    else()
+        # 没有可用的 Python 时使用内置 CMake 打包器，保证单文件构建开箱可用。
+        message(STATUS "前端打包：未找到 Python3，使用 CMake 内置打包器")
+        add_custom_command(
+            OUTPUT "${RESOURCES_RC}" "${RESOURCE_MAP_CPP}" "${RESOURCE_IDS_H}"
+            COMMAND ${CMAKE_COMMAND}
+                    "-DFRONTEND_DIR=${FRONTEND_DIR}"
+                    "-DGEN_DIR=${GEN_DIR}"
+                    "-DRESOURCE_TYPE=TAURI_RES"
+                    -P "${FRONTEND_PACK_SCRIPT}"
+            DEPENDS "${FRONTEND_PACK_SCRIPT}" ${FRONTEND_FILES}
+            COMMENT "Packing frontend resources into .rc (CMake)"
+            VERBATIM
+        )
+    endif()
 else()
     file(WRITE "${RESOURCES_RC}" "// Auto-generated: frontend not embedded\n")
+    file(WRITE "${RESOURCE_IDS_H}" "// Auto-generated: frontend not embedded (dev mode)\n")
     file(WRITE "${RESOURCE_MAP_CPP}"
         "// Auto-generated: frontend not embedded (dev mode)\n"
+        "#include \"tauricpp/virtual_fs.hpp\"\n"
         "#include <Windows.h>\n\n"
         "namespace tauricpp {\n"
         "void VirtualFS::LoadFromResources(HMODULE) {}\n"
@@ -178,8 +178,23 @@ set(SILKIT_SOURCES
     src/core/json_merge.cpp
     src/core/settings.cpp
     src/core/profiles.cpp
+    src/core/secrets.cpp
+    src/db/types.cpp
+    src/db/driver_registry.cpp
+    src/db/sql_splitter.cpp
+    src/db/sql_util.cpp
+    src/db/identifier.cpp
+    src/db/type_map.cpp
+    src/db/session.cpp
+    src/db/session_manager.cpp
+    src/db/drivers/sqlite_driver.cpp
     src/ipc/async_router.cpp
     src/ipc/commands.cpp
+    src/ipc/commands_db_common.cpp
+    src/ipc/commands_conn.cpp
+    src/ipc/commands_meta.cpp
+    src/ipc/commands_query.cpp
+    src/util/base64.cpp
 )
 
 add_executable(Silkit WIN32
@@ -200,6 +215,7 @@ endif()
 
 target_link_libraries(Silkit PRIVATE
     tauricpp
+    unofficial::sqlite3::sqlite3
     crypt32
     ws2_32
     secur32

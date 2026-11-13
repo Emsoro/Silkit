@@ -25,6 +25,7 @@
     <link rel="stylesheet" href="css/themes/mint.css">
     <link rel="stylesheet" href="css/base.css">
     <link rel="stylesheet" href="css/layout.css">
+    <link rel="stylesheet" href="css/workbench.css">
 </head>
 <body>
 <div class="app">
@@ -32,15 +33,16 @@
         <div class="brand">
             <span class="brand-mark">S</span>
             <span class="brand-name">Silkit</span>
-            <span class="brand-tag">M0</span>
+            <span class="brand-tag">M1</span>
         </div>
 
         <div class="topbar-actions">
-            <button class="btn btn-ghost" type="button" data-icon="plug">新建连接</button>
-            <button class="btn btn-ghost" type="button" data-icon="terminal">新建查询</button>
-            <button class="btn btn-ghost" type="button" data-icon="folder">打开 SQL</button>
+            <button id="newConnBtn" class="btn btn-ghost" type="button" data-icon="plug">新建连接</button>
+            <button id="newQueryBtn" class="btn btn-ghost" type="button" data-icon="terminal">新建查询</button>
+            <button id="openSqlBtn" class="btn btn-ghost" type="button" data-icon="folder">打开 SQL</button>
             <span class="topbar-sep"></span>
-            <button class="btn btn-ghost" type="button" data-icon="history">最近</button>
+            <button id="historyBtn" class="btn btn-ghost" type="button" data-icon="history"
+                    aria-haspopup="dialog" aria-expanded="false">最近</button>
         </div>
 
         <div class="topbar-right">
@@ -53,7 +55,7 @@
                 <span id="themeLabel">主题·晨樱</span>
                 <span class="chev" data-icon="chevron"></span>
             </button>
-            <span class="version-chip" id="versionChip">v0.0.1</span>
+            <span class="version-chip" id="versionChip">v0.1.0</span>
         </div>
     </header>
 
@@ -63,118 +65,51 @@
                 <span data-icon="search"></span>
                 <input id="treeFilter" type="search" placeholder="搜索对象…" autocomplete="off" spellcheck="false">
                 <kbd>Ctrl+B</kbd>
+                <button id="treeRefresh" class="icon-btn" type="button" data-icon="refresh"
+                        aria-label="刷新对象树" title="刷新对象树"></button>
             </div>
 
             <div class="sidebar-body" id="objectTree">
-                <div class="tree-group">
-                    <button class="tree-node tree-root" type="button" data-depth="0">
-                        <span class="caret open" data-icon="chevron"></span>
-                        <span class="db-dot" style="--dot:#C2255C"></span>
-                        <span class="node-label">本地 SQLite</span>
-                        <span class="node-badge">演示</span>
+                <div class="tree-empty" id="treeEmpty">
+                    <span class="tree-empty-icon" data-icon="database"></span>
+                    <p>还没有连接</p>
+                    <p class="muted">打开一个 SQLite <code>.db</code> 文件开始</p>
+                    <button class="btn btn-soft" type="button" data-tree-action="new">
+                        <span data-icon="plug"></span> 打开 SQLite 数据库
                     </button>
-                    <div class="tree-children">
-                        <button class="tree-node" type="button" data-depth="1">
-                            <span class="caret open" data-icon="chevron"></span>
-                            <span data-icon="database"></span>
-                            <span class="node-label">main</span>
-                        </button>
-                        <div class="tree-children">
-                            <button class="tree-node" type="button" data-depth="2">
-                                <span class="caret" data-icon="chevron"></span>
-                                <span data-icon="table"></span>
-                                <span class="node-label">users</span>
-                                <span class="node-badge">6</span>
-                            </button>
-                            <button class="tree-node" type="button" data-depth="2">
-                                <span class="caret" data-icon="chevron"></span>
-                                <span data-icon="table"></span>
-                                <span class="node-label">orders</span>
-                                <span class="node-badge">12</span>
-                            </button>
-                            <button class="tree-node" type="button" data-depth="2">
-                                <span class="caret" data-icon="chevron"></span>
-                                <span data-icon="table"></span>
-                                <span class="node-label">products</span>
-                            </button>
-                        </div>
-                    </div>
                 </div>
-
-                <div class="tree-group">
-                    <button class="tree-node tree-root" type="button" data-depth="0">
-                        <span class="caret" data-icon="chevron"></span>
-                        <span class="db-dot" style="--dot:#7C5CD6"></span>
-                        <span class="node-label">本地 MySQL</span>
-                    </button>
-                    <div class="tree-children" hidden>
-                        <button class="tree-node" type="button" data-depth="1">
-                            <span class="caret" data-icon="chevron"></span>
-                            <span data-icon="database"></span>
-                            <span class="node-label">silkit</span>
-                        </button>
-                    </div>
-                </div>
-
-                <div class="tree-group">
-                    <button class="tree-node tree-root" type="button" data-depth="0">
-                        <span class="caret" data-icon="chevron"></span>
-                        <span class="db-dot" style="--dot:#237668"></span>
-                        <span class="node-label">测试 PostgreSQL</span>
-                    </button>
-                    <div class="tree-children" hidden>
-                        <button class="tree-node" type="button" data-depth="1">
-                            <span class="caret" data-icon="chevron"></span>
-                            <span data-icon="database"></span>
-                            <span class="node-label">public</span>
-                        </button>
-                    </div>
-                </div>
+                <div id="treeRoots"></div>
             </div>
 
             <div class="sidebar-foot">
-                <span class="status-dot"></span>
-                <span>对象树将在 M1 接入真实元数据</span>
+                <span class="status-dot" id="treeDot"></span>
+                <span id="treeStatus">尚未连接</span>
             </div>
         </aside>
 
         <main class="main">
-            <div class="tabbar" role="tablist" aria-label="工作区">
-                <button class="tab active" type="button" role="tab" aria-selected="true">
-                    <span data-icon="terminal"></span>
-                    <span class="tab-label">查询 1</span>
-                    <span class="tab-dot"></span>
-                </button>
-                <button class="tab" type="button" role="tab" aria-selected="false">
-                    <span data-icon="table"></span>
-                    <span class="tab-label">表: users</span>
-                </button>
-                <button class="tab-add" type="button" data-icon="plus" aria-label="新建标签"></button>
+            <div class="tabbar" id="tabbar" role="tablist" aria-label="工作区">
+                <button class="tab-add" id="tabAdd" type="button" data-icon="plus"
+                        aria-label="新建查询标签" title="新建查询（Ctrl+N）"></button>
             </div>
 
             <section class="editor-pane" id="editorPane">
                 <div class="editor-head">
                     <span class="win-dots" aria-hidden="true"><i></i><i></i><i></i></span>
-                    <span class="editor-title">查询 1</span>
-                    <span class="editor-sub">演示 · 尚未连接数据库</span>
+                    <span class="editor-title" id="editorTitle">查询 1</span>
+                    <span class="editor-sub" id="editorSub">未连接 · 打开连接后即可执行</span>
                     <span class="spacer"></span>
-                    <button class="btn btn-mini" type="button" data-icon="play" id="runBtn">运行</button>
+                    <button class="btn btn-mini" type="button" id="runBtn" data-icon="play"
+                            title="执行当前 SQL（Ctrl+Enter / F5）">运行</button>
+                    <button class="btn btn-mini btn-danger-soft" type="button" id="cancelBtn" data-icon="stop"
+                            title="取消执行（Esc）" hidden>取消</button>
                 </div>
                 <div class="editor-body">
-                    <div class="line-gutter" aria-hidden="true">1
-2
-3
-4
-5
-6</div>
+                    <div class="line-gutter" id="lineGutter" aria-hidden="true">1</div>
                     <textarea id="sqlEditor" spellcheck="false" autocomplete="off"
-                              aria-label="SQL 编辑器">-- Silkit M0：主题系统与异步 IPC
--- 连上数据库后这里会换成 CodeMirror 5（M4）
-SELECT u.id, u.name, u.email, u.created_at
-FROM users AS u
-WHERE u.status = 'active'
-ORDER BY u.created_at DESC
-LIMIT 100;</textarea>
+                              aria-label="SQL 编辑器">-- Silkit M1 · SQLite
+-- 打开一个 .db 文件后，Ctrl+Enter 或 F5 执行查询
+</textarea>
                 </div>
             </section>
 
@@ -185,70 +120,207 @@ LIMIT 100;</textarea>
                 <div class="result-tabs" role="tablist" aria-label="结果">
                     <button class="rtab active" type="button" role="tab" data-target="resultGrid" aria-selected="true">
                         <span data-icon="grid"></span> 结果
-                        <span class="rtab-count">6</span>
                     </button>
                     <button class="rtab" type="button" role="tab" data-target="messageLog" aria-selected="false">
                         <span data-icon="message"></span> 消息
                         <span class="rtab-count" id="msgCount" hidden>0</span>
                     </button>
                     <span class="spacer"></span>
-                    <span class="result-meta" id="resultMeta">演示数据 · 12 ms</span>
+                    <select class="result-select" id="resultSetSelect" aria-label="结果集" hidden></select>
+                    <button class="btn btn-mini" type="button" id="resultCopyBtn" data-icon="copy"
+                            title="复制当前结果集为 TSV（含表头）" aria-label="复制结果" disabled></button>
+                    <span class="result-meta" id="resultMeta"></span>
+                </div>
+
+                <div class="result-error" id="resultError" hidden>
+                    <span data-icon="warning"></span>
+                    <span class="result-error-text" id="resultErrorText"></span>
+                    <span class="result-error-pos" id="resultErrorPos"></span>
                 </div>
 
                 <div class="result-body">
-                    <div id="resultGrid" class="grid-wrap" role="tabpanel">
-                        <table class="data-grid">
-                            <thead>
-                            <tr>
-                                <th class="col-num">id</th>
-                                <th>name</th>
-                                <th>email</th>
-                                <th>status</th>
-                                <th>created_at</th>
-                            </tr>
-                            </thead>
-                            <tbody>
-                            <tr><td class="col-num">1</td><td>林知夏</td><td>zhixia@example.com</td><td><span class="pill pill-ok">active</span></td><td>2026-11-02 09:14:20</td></tr>
-                            <tr><td class="col-num">2</td><td>Alice Chen</td><td>alice@example.com</td><td><span class="pill pill-ok">active</span></td><td>2026-11-03 14:02:11</td></tr>
-                            <tr><td class="col-num">3</td><td>Mika</td><td>mika@example.com</td><td><span class="pill pill-muted">pending</span></td><td>2026-11-05 18:40:07</td></tr>
-                            <tr><td class="col-num">4</td><td>苏晚</td><td>suwan@example.com</td><td><span class="pill pill-ok">active</span></td><td>2026-11-07 08:21:33</td></tr>
-                            <tr><td class="col-num">5</td><td>Nora</td><td>nora@example.com</td><td><span class="pill pill-warn">review</span></td><td>2026-11-09 11:55:02</td></tr>
-                            <tr><td class="col-num">6</td><td>陈见月</td><td>jianyue@example.com</td><td><span class="pill pill-ok">active</span></td><td>2026-11-11 20:13:45</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
+                    <div id="resultGrid" class="grid-wrap" role="tabpanel" aria-label="查询结果"></div>
 
                     <div id="messageLog" class="log-wrap" role="tabpanel" hidden>
-                        <div class="log-empty">
+                        <div class="log-empty" id="logEmpty">
                             <span data-icon="pulse"></span>
                             <p>还没有消息</p>
-                            <p class="muted">点击顶栏「自检」运行一次异步 IPC 往返：3 条进度 + 1 条结果。</p>
+                            <p class="muted">执行 SQL 后，这里显示语句耗时、行数与错误定位。</p>
                         </div>
                         <ol class="log-list" id="logList"></ol>
                     </div>
                 </div>
 
                 <div class="result-foot">
-                    <span>6 行</span>
+                    <span id="resultFootRows">0 行</span>
                     <span class="dot-sep"></span>
-                    <span>UTF-8</span>
+                    <span id="resultFootEncoding">UTF-8</span>
+                    <span class="dot-sep"></span>
+                    <span id="resultFootState">就绪</span>
+                    <span id="resultFootTrunc" class="foot-warn" hidden>结果已截断</span>
                     <span class="spacer"></span>
-                    <span class="hint"><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>T</kbd> 主题面板</span>
+                    <span class="hint">双击单元格查看全文 · Ctrl+C 复制选区</span>
                 </div>
             </section>
         </main>
     </div>
 
     <footer class="statusbar">
-        <span class="status-item"><i class="dot dot-muted"></i>未连接</span>
-        <span class="status-item">M0 · 主题与异步 IPC</span>
+        <span class="status-item"><i class="dot dot-muted" id="connStatus"></i><span id="connLabel">未连接</span></span>
+        <span class="status-item" id="statusMode">M1 · 等待连接</span>
         <span class="spacer"></span>
         <span class="status-item" id="ipcStatus">IPC 就绪</span>
         <span class="status-item" id="statusTheme">晨樱</span>
-        <span class="status-item" id="statusVersion">v0.0.1</span>
+        <span class="status-item" id="statusVersion">v0.1.0</span>
     </footer>
 </div>
 
+<!-- ---------------------------------------------------------------- 连接对话框 -->
+<div id="connDialog" class="modal" hidden>
+    <div class="modal-dialog modal-wide" role="dialog" aria-modal="true" aria-labelledby="connTitle">
+        <div class="modal-head">
+            <div class="modal-title">
+                <span data-icon="plug"></span>
+                <span id="connTitle">新建 SQLite 连接</span>
+            </div>
+            <button id="connDialogClose" class="icon-btn" type="button" data-icon="close" aria-label="关闭"></button>
+        </div>
+
+        <div class="conn-layout">
+            <aside class="conn-side">
+                <div class="conn-side-head">
+                    <span>已保存的连接</span>
+                    <span class="muted">双击直接连接</span>
+                </div>
+                <div id="connList" class="conn-list"></div>
+                <div id="connEmptyList" class="conn-empty">还没有保存的连接</div>
+            </aside>
+
+            <section class="conn-form">
+                <div id="connError" class="form-error" hidden></div>
+
+                <label class="field">
+                    <span class="field-label">连接名称</span>
+                    <input id="connName" class="input" type="text" placeholder="本地示例库" autocomplete="off">
+                </label>
+
+                <label class="field">
+                    <span class="field-label">数据库引擎</span>
+                    <select id="connEngine" class="input" disabled>
+                        <option value="sqlite">SQLite</option>
+                        <option value="mysql">MySQL（M2）</option>
+                        <option value="postgres">PostgreSQL（M3）</option>
+                    </select>
+                </label>
+
+                <div id="sqliteFields">
+                    <div class="field">
+                        <span class="field-label">数据库文件</span>
+                        <div class="field-row">
+                            <input id="connFile" class="input mono" type="text" placeholder="D:\data\sample.db"
+                                   autocomplete="off" spellcheck="false">
+                            <button id="connBrowse" class="btn btn-mini" type="button" data-icon="folder">打开…</button>
+                            <button id="connNewFile" class="btn btn-mini" type="button" data-icon="plus">新建…</button>
+                        </div>
+                        <span class="field-hint">文件不存在时会以读写模式自动创建（新建… 可选择保存位置）。</span>
+                    </div>
+
+                    <label class="check-row">
+                        <input id="connReadOnly" type="checkbox">
+                        <span>只读打开（拒绝写语句）</span>
+                    </label>
+                </div>
+
+                <details id="connAdvanced" class="advanced">
+                    <summary>高级选项</summary>
+                    <div class="advanced-grid">
+                        <label class="field">
+                            <span class="field-label">busy_timeout（ms）</span>
+                            <input id="connBusyTimeout" class="input mono" type="number" min="0" step="500" value="5000">
+                        </label>
+                        <label class="field">
+                            <span class="field-label">journal_mode</span>
+                            <select id="connJournal" class="input">
+                                <option value="">默认（不修改）</option>
+                                <option value="WAL">WAL</option>
+                                <option value="DELETE">DELETE</option>
+                                <option value="TRUNCATE">TRUNCATE</option>
+                                <option value="PERSIST">PERSIST</option>
+                                <option value="MEMORY">MEMORY</option>
+                                <option value="OFF">OFF</option>
+                            </select>
+                        </label>
+                        <label class="check-row advanced-check">
+                            <input id="connForeignKeys" type="checkbox" checked>
+                            <span>启用 foreign_keys</span>
+                        </label>
+                    </div>
+                </details>
+
+                <div id="connTestStatus" class="conn-status" hidden></div>
+            </section>
+        </div>
+
+        <div class="modal-foot">
+            <button id="connDelete" class="btn btn-mini btn-danger-soft" type="button" data-icon="trash"
+                    hidden>删除配置</button>
+            <span class="spacer"></span>
+            <button id="connCloseX" class="btn" type="button">取消</button>
+            <button id="connTest" class="btn" type="button" data-icon="pulse">测试连接</button>
+            <button id="connSaveBtn" class="btn" type="button" data-icon="save">保存</button>
+            <button id="connConnectBtn" class="btn btn-primary" type="button" data-icon="plug">连接</button>
+        </div>
+    </div>
+</div>
+
+<!-- ---------------------------------------------------------------- 单元格查看器 -->
+<div id="cellViewer" class="modal" hidden>
+    <div class="modal-dialog modal-cell" role="dialog" aria-modal="true" aria-labelledby="cellViewerTitle">
+        <div class="modal-head">
+            <div class="modal-title" id="cellViewerTitle">单元格</div>
+            <button id="cellViewerClose" class="icon-btn" type="button" data-icon="close" aria-label="关闭"></button>
+        </div>
+        <div class="cell-viewer-meta" id="cellViewerMeta"></div>
+        <div class="cell-viewer-body" id="cellViewerBody"></div>
+        <div class="modal-foot">
+            <span class="spacer"></span>
+            <button id="cellViewerCopy" class="btn" type="button" data-icon="copy">复制内容</button>
+        </div>
+    </div>
+</div>
+
+<!-- ---------------------------------------------------------------- 对象详情 -->
+<div id="detailDialog" class="modal" hidden>
+    <div class="modal-dialog modal-wide modal-detail" role="dialog" aria-modal="true" aria-labelledby="detailTitle">
+        <div class="modal-head">
+            <div class="modal-title" id="detailTitle">对象详情</div>
+            <button id="detailClose" class="icon-btn" type="button" data-icon="close" aria-label="关闭"></button>
+        </div>
+        <div class="detail-sub" id="detailSub"></div>
+        <div class="detail-body" id="detailBody"></div>
+        <div class="modal-foot">
+            <span class="muted" id="detailKind"></span>
+            <span class="spacer"></span>
+            <button id="detailCopy" class="btn" type="button" data-icon="copy" hidden>复制 DDL</button>
+        </div>
+    </div>
+</div>
+
+<!-- ---------------------------------------------------------------- 右键菜单 / 历史 -->
+<div id="treeMenu" class="context-menu" role="menu" hidden></div>
+
+<div id="historyPanel" class="history-panel" role="dialog" aria-label="最近查询" hidden>
+    <div class="history-head">
+        <span>最近查询</span>
+        <span class="muted">成功执行后自动记录</span>
+        <span class="spacer"></span>
+        <button id="historyClear" class="btn btn-mini" type="button">清空</button>
+    </div>
+    <div id="historyEmpty" class="history-empty">还没有查询历史</div>
+    <div id="historyList" class="history-list"></div>
+</div>
+
+<!-- ---------------------------------------------------------------- 主题面板 -->
 <div id="themePanel" class="theme-panel" role="dialog" aria-modal="false" aria-label="主题选择" hidden>
     <div class="theme-panel-head">
         <span>外观</span>
@@ -269,6 +341,17 @@ LIMIT 100;</textarea>
 <script src="js/api.js"></script>
 <script src="js/icons.js"></script>
 <script src="js/themes.js"></script>
+<script src="js/util.js"></script>
+<script src="js/state.js"></script>
+<script src="js/components/grid.js"></script>
+<script src="js/views/results.js"></script>
+<script src="js/views/query.js"></script>
+<script src="js/views/tabs.js"></script>
+<script src="js/views/tree.js"></script>
+<script src="js/views/connection.js"></script>
+<script src="js/views/detail.js"></script>
+<script src="js/views/history.js"></script>
+<script src="js/workbench.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

@@ -6,7 +6,7 @@
 >
 > **产品名**：**Silkit**（silk + kit，“丝滑的数据库工具箱”）｜ 构建产物 `Silkit.exe` ｜ 数据目录 `%APPDATA%\Silkit` ｜ 代码目录 `D:\Work\CPlusPlus\Silkit`
 >
-> **规划日期**：2026-11-13 ｜ **当前版本**：v0.0.0（未开工）｜ **文档状态**：实施基线
+> **规划日期**：2026-11-13 ｜ **当前版本**：v0.1.0（M1 已交付，准备进入 M2）｜ **文档状态**：实施基线 + 进度回写
 
 ---
 
@@ -19,8 +19,8 @@
 
 | 里程碑 | 内容 | 状态 | 估算 | 版本 |
 |---|---|---|---|---|
-| M0 | 工程骨架、构建、异步 IPC、UI 外壳与主题切换 | ⬜ | 4–5 d | v0.0.1 |
-| M1 | SQLite 垂直切片（连接→树→查询→结果） | ⬜ | 5–6 d | v0.1.0 |
+| M0 | 工程骨架、构建、异步 IPC、UI 外壳与主题切换 | ✅ | 4–5 d | v0.0.1 |
+| M1 | SQLite 垂直切片（连接→树→查询→结果） | 🟡 | 5–6 d | v0.1.0 |
 | M2 | MySQL / MariaDB 驱动 | ⬜ | 6–7 d | v0.2.0 |
 | M3 | PostgreSQL 驱动 | ⬜ | 6–7 d | v0.3.0 |
 | M4 | 查询工作区（编辑器/多结果/历史/补全） | ⬜ | 6–7 d | v0.4.0 |
@@ -30,13 +30,21 @@
 | M8 | 设置、主题、会话恢复、安全与打磨 | ⬜ | 5–6 d | v0.8.0 |
 | M9 | 发布 1.0（图标/文档/兼容性/安装包） | ⬜ | 3–4 d | v1.0.0 |
 
+> 2026-11-13 回写：M0 全部交付；M1 的「连接 → 对象树 → 查询 → 结果」链路已端到端跑通，本轮补齐重连、只读切换、对象搜索/刷新、驱动健壮性与测试拆分，当前 `v0.1.0`。M1 剩余项为性能验收（10 万行滚动、取消 < 500ms）与浏览器端搜索结果渲染（并入 M4）。下一里程碑为 **M2（MySQL / MariaDB 驱动）**。
+
 **总量**：约 56–68 个开发日（单人，含自测），按每周 5.5 天计约 **10–12 周**。
 
 ### 0.2 偏差记录
 
 | 日期 | 计划 | 实际 | 原因 | 处理 |
 |---|---|---|---|---|
-| — | — | — | — | — |
+| 2026-11-13 | §8.5 标注 `app.info`/`settings.get`/`conn.list` 等为同步命令 | 全部统一走 `ipc.call` → worker → `ipc.event` | Bridge handler 在 UI 线程，统一异步更安全，前端 `api.call` 已适配 | 保持实现；同步命令仅 `ipc.call` / `ipc.cancel` 两个入口 |
+| 2026-11-13 | §8.4 错误 `code` 为数字（-32601/-32602/-32000） | 命令层用字符串 `code`，DB 错误用原生数字码 | 前端已按字符串处理，且两类错误混用同一字段会冲突 | 命令层错误额外附 `numericCode`，两者并存 |
+| 2026-11-13 | §6.7 `query.ack` 背压 | 未实现 | M1 优先打通链路，背压需前端节流与 router 同步命令配合 | 并入 M4 查询工作区 |
+| 2026-11-13 | §9.5 未加载节点触发 `meta.search` | 后端命令已实现，前端仍只做已加载节点的本地过滤 | 搜索结果节点渲染属于 M4 编辑器/树联动 | 后端先行，前端并入 M4 |
+| 2026-11-13 | `conn.set_database` 语义为切库 | SQLite 仅允许切换到 `PRAGMA database_list` 中已 ATTACH 的库 | SQLite 没有 `USE`；未附加时给出 ATTACH 提示 | 记录语义差异，M2/M3 驱动按各自语义实现 |
+| 2026-11-13 | M1-9 后端 `query.history.*` | 前端 `localStorage` + `settings.json` 持久化最近查询 | 历史面板已在 M1 可用，后端历史体系属 M4 | M4 迁移到 `history.jsonl`，保留前端数据导入 |
+| 2026-11-13 | §3.2 事务状态 | `conn.stats` 原为硬编码 `autocommit` | 本轮已按 `BEGIN/COMMIT/ROLLBACK` 更新 Session 状态 | 状态栏展示并入 M4 |
 
 ### 0.3 版本标识位置
 
@@ -1788,19 +1796,19 @@ INSERT INTO `users` (`name`, `age`) VALUES (?, ?);
 
 **目标**：能构建、能启动、能完成一次异步 IPC 往返，UI 骨架可见，五套主题与切换器可用。
 
-- [ ] M0-1 复制 `StepDraw\TauriCPP` 到本项目的 `TauriCPP\`（排除 `build/.git`），记录来源 commit。
-- [ ] M0-2 `CMakeLists.txt`：C++17、`/utf-8`、`/W4`、`/permissive-`、静态 CRT、TauriCPP、前端打包、版本/图标/manifest。
-- [ ] M0-3 `vcpkg.json` + `build.ps1`（toolchain、triplet、`-DevMode`）。
-- [ ] M0-4 `src/main.cpp`：窗口 1440×900、窗口底色 `#FFF7F9`、DevTools、标题、单实例。
-- [ ] M0-5 `util/logger`、`store/paths`、`store/settings`、`store/profiles` 骨架。
-- [ ] M0-6 `ipc/async_router`：线程池、reqId、`ipc.call`/`ipc.cancel`、`ipc.event`、关闭流程。
-- [ ] M0-7 `frontend` 外壳：顶栏/侧栏/标签栏/编辑区/结果区/状态栏（静态即可）；bloom token 落位。
-- [ ] M0-8 `bridge.js`/`api.js`：原生桥 + 浏览器 mock 回退；`app.info`、`app.ping`（带进度事件）。
-- [ ] M0-9 构建脚本输出 `build\Release\Silkit.exe`；首次启动无白屏、F12 可用、关闭不卡死。
-- [ ] M0-10 `ctest` 占位 + README 骨架 + `.clang-format`。
-- [ ] M0-11 主题系统：`css/tokens.css` 语义 token + `css/themes/{bloom,noir,lilac,mocha,mint}.css` 五套调色板；`js/themes.js` 负责应用、`prefers-color-scheme` 监听、首帧防闪；`theme.set` 同步 WebView2 窗口底色。
-- [ ] M0-12 顶栏主题切换器：`主题·晨樱 ▾` 按钮 + 下拉面板（5 套色卡 × 明暗标签）；快捷键 `Ctrl+Shift+T` 开关面板、`Ctrl+Shift+L` 明暗切换、面板内 `1`–`5` 快选；选择写回 `settings.json`。
-- [ ] M0-13 `tools/contrast_check.py`：校验 5 套主题「正文/次要文本/图标」关键配对，可在 CI 直接运行。
+- [x] M0-1 复制 `StepDraw\TauriCPP` 到本项目的 `TauriCPP\`（排除 `build/.git`），记录来源 commit。
+- [x] M0-2 `CMakeLists.txt`：C++17、`/utf-8`、`/W4`、`/permissive-`、静态 CRT、TauriCPP、前端打包、版本/图标/manifest。
+- [x] M0-3 `vcpkg.json` + `build.ps1`（toolchain、triplet、`-DevMode`）。
+- [x] M0-4 `src/main.cpp`：窗口 1440×900、窗口底色 `#FFF7F9`、DevTools、标题、单实例。
+- [x] M0-5 `util/logger`、`store/paths`、`store/settings`、`store/profiles` 骨架。
+- [x] M0-6 `ipc/async_router`：线程池、reqId、`ipc.call`/`ipc.cancel`、`ipc.event`、关闭流程。
+- [x] M0-7 `frontend` 外壳：顶栏/侧栏/标签栏/编辑区/结果区/状态栏（静态即可）；bloom token 落位。
+- [x] M0-8 `bridge.js`/`api.js`：原生桥 + 浏览器 mock 回退；`app.info`、`app.ping`（带进度事件）。
+- [x] M0-9 构建脚本输出 `build\Release\Silkit.exe`；首次启动无白屏、F12 可用、关闭不卡死。
+- [x] M0-10 `ctest` 占位 + README 骨架 + `.clang-format`。
+- [x] M0-11 主题系统：`css/tokens.css` 语义 token + `css/themes/{bloom,noir,lilac,mocha,mint}.css` 五套调色板；`js/themes.js` 负责应用、`prefers-color-scheme` 监听、首帧防闪；`theme.set` 同步 WebView2 窗口底色。
+- [x] M0-12 顶栏主题切换器：`主题·晨樱 ▾` 按钮 + 下拉面板（5 套色卡 × 明暗标签）；快捷键 `Ctrl+Shift+T` 开关面板、`Ctrl+Shift+L` 明暗切换、面板内 `1`–`5` 快选；选择写回 `settings.json`。
+- [x] M0-13 `tools/contrast_check.py`：校验 5 套主题「正文/次要文本/图标」关键配对，可在 CI 直接运行。
 
 **验收**
 - 干净目录执行 `build.ps1` 成功；exe < 35MB。
@@ -1812,18 +1820,20 @@ INSERT INTO `users` (`name`, `age`) VALUES (?, ?);
 
 ### M1 SQLite 垂直切片（5–6 d）→ v0.1.0
 
+> 状态：功能项已交付（2026-11-13）；M1-9 以偏差记录中的前端持久化方式实现，性能验收与浏览器端搜索渲染仍待补，见 §0.1 / §0.2。
+
 **目标**：从打开 `.db` 文件到执行 SQL、浏览结果，端到端可用。
 
-- [ ] M1-1 `db/types.h`、`driver.h`、`driver_registry`。
-- [ ] M1-2 `SqliteConnection`：open/ping/execute/stream/cancel/close；PRAGMA 初始化。
-- [ ] M1-3 `Session`/`SessionManager`：线程亲和、任务队列、关闭/重连。
-- [ ] M1-4 `conn.*` 命令 + SQLite 连接对话框 + 文件选择。
-- [ ] M1-5 `meta.children`/`meta.detail`/`meta.ddl`（SQLite 版）。
-- [ ] M1-6 `query.execute` 流式 + `query.cancel` + 错误定位。
-- [ ] M1-7 对象树（SQLite）+ 标签页 + 只读结果网格。
-- [ ] M1-8 结果网格虚拟滚动、列宽、复制 TSV、单元格查看器（文本/BLOB）。
-- [ ] M1-9 历史记录（SQLite 会话）与设置持久化。
-- [ ] M1-10 单元测试：SQLite 内存库 CRUD/类型/取消；`test_sqlite_driver`。
+- [x] M1-1 `db/types.h`、`driver.h`、`driver_registry`。
+- [x] M1-2 `SqliteConnection`：open/ping/execute/stream/cancel/close；PRAGMA 初始化。
+- [x] M1-3 `Session`/`SessionManager`：线程亲和、任务队列、关闭/重连。
+- [x] M1-4 `conn.*` 命令 + SQLite 连接对话框 + 文件选择。
+- [x] M1-5 `meta.children`/`meta.detail`/`meta.ddl`（SQLite 版）。
+- [x] M1-6 `query.execute` 流式 + `query.cancel` + 错误定位。
+- [x] M1-7 对象树（SQLite）+ 标签页 + 只读结果网格。
+- [x] M1-8 结果网格虚拟滚动、列宽、复制 TSV、单元格查看器（文本/BLOB）。
+- [x] M1-9 历史记录（SQLite 会话）与设置持久化。
+- [x] M1-10 单元测试：SQLite 内存库 CRUD/类型/取消；`test_sqlite_driver`。
 
 **验收**
 - 打开示例库，树显示表/视图/索引/触发器；双击表出数据。

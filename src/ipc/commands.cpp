@@ -3,7 +3,11 @@
 #include "app/version.h"
 #include "core/logger.h"
 #include "core/paths.h"
+#include "ipc/commands_conn.h"
+#include "ipc/commands_meta.h"
+#include "ipc/commands_query.h"
 
+#include <tauricpp/dialog.hpp>
 #include <tauricpp/window.hpp>
 
 #include <Windows.h>
@@ -15,6 +19,8 @@
 #include <string>
 #include <thread>
 #include <unordered_map>
+#include <utility>
+#include <vector>
 
 namespace silkit::ipc {
 namespace {
@@ -84,7 +90,11 @@ void SetWindowBackground(tauricpp::Window& window, const std::string& theme_id) 
     ApplyWindowBackground(window.GetHwnd(), ThemeBackground(theme_id));
 }
 
-void RegisterCommands(AsyncRouter& router, tauricpp::Window& window, Settings& settings) {
+void RegisterCommands(AsyncRouter& router,
+                      tauricpp::Window& window,
+                      Settings& settings,
+                      ProfileStore& profiles,
+                      session::SessionManager& sessions) {
     router.Register("app.info", [](const json&, TaskContext&) -> json {
         return json{
             {"ok", true},
@@ -92,7 +102,8 @@ void RegisterCommands(AsyncRouter& router, tauricpp::Window& window, Settings& s
             {"version", kVersion},
             {"build", std::string(__DATE__) + " " + __TIME__},
             {"platform", "windows"},
-            {"engines", json::array({"sqlite", "mysql", "postgres"})},
+            {"engines", json::array({"sqlite"})},
+            {"plannedEngines", json::array({"mysql", "postgres"})},
             {"dataDir", Paths::ToUtf8(Paths::Root())},
         };
     });
@@ -173,6 +184,46 @@ void RegisterCommands(AsyncRouter& router, tauricpp::Window& window, Settings& s
         LogInfo(std::string("theme: 切换到 ") + theme->id);
         return json{{"ok", true}, {"theme", theme->id}, {"windowBg", theme->bg}};
     });
+
+    router.Register("app.pick_file", [&window](const json& args, TaskContext&) -> json {
+        const std::string kind = args.value("kind", std::string{"sqlite"});
+        const bool save = args.value("save", false);
+        const std::string default_name = args.value("defaultName", std::string{});
+        const std::string default_path = args.value("defaultPath", std::string{});
+
+        std::vector<tauricpp::Dialog::FileFilter> filters;
+        if (kind == "sqlite") {
+            filters = {{"SQLite 数据库", "*.db;*.sqlite;*.sqlite3;*.db3"}, {"所有文件", "*.*"}};
+        } else if (kind == "sql") {
+            filters = {{"SQL 文件", "*.sql"}, {"所有文件", "*.*"}};
+        } else if (kind == "csv") {
+            filters = {{"CSV 文件", "*.csv"}, {"所有文件", "*.*"}};
+        } else {
+            filters = {{"所有文件", "*.*"}};
+        }
+
+        if (save) {
+            tauricpp::Dialog::SaveOptions options;
+            options.title = kind == "sqlite" ? "新建 SQLite 数据库" : "保存文件";
+            options.default_path = default_path;
+            options.default_filename = default_name;
+            options.filters = std::move(filters);
+            const auto path = tauricpp::Dialog::SaveFile(window.GetHwnd(), options);
+            return json{{"ok", true}, {"path", path.value_or(std::string{})}};
+        }
+
+        tauricpp::Dialog::OpenOptions options;
+        options.title = kind == "sqlite" ? "打开 SQLite 数据库" : "打开文件";
+        options.default_path = default_path;
+        options.filters = std::move(filters);
+        const auto paths = tauricpp::Dialog::OpenFile(window.GetHwnd(), options);
+        return json{{"ok", true},
+                    {"path", paths.empty() ? std::string{} : paths.front()}};
+    });
+
+    RegisterConnectionCommands(router, profiles, sessions);
+    RegisterMetadataCommands(router, sessions);
+    RegisterQueryCommands(router, sessions, settings);
 }
 
 }  // namespace silkit::ipc

@@ -5,6 +5,14 @@
 #include <utility>
 
 namespace silkit::ipc {
+namespace {
+
+/// 保留现有字符串 code（前端按字符串处理），同时补上 §8.4 约定的数字错误码。
+json ErrorObject(const char* code, int numeric_code, const std::string& message) {
+    return json{{"code", code}, {"numericCode", numeric_code}, {"message", message}};
+}
+
+}  // namespace
 
 AsyncRouter::AsyncRouter(tauricpp::Bridge& bridge, size_t worker_count) : bridge_(bridge) {
     bridge_.RegisterCommand("ipc.call", [this](const json& args) -> json { return HandleCall(args); });
@@ -32,7 +40,8 @@ bool AsyncRouter::Has(const std::string& command) const {
 
 json AsyncRouter::HandleCall(const json& args) {
     if (!args.is_object()) {
-        return json{{"ok", false}, {"error", {{"code", "bad_args"}, {"message", "args 必须是对象"}}}};
+        return json{{"ok", false},
+                    {"error", ErrorObject("bad_args", -32602, "args 必须是对象")}};
     }
 
     const std::string command = args.value("cmd", std::string{});
@@ -41,17 +50,17 @@ json AsyncRouter::HandleCall(const json& args) {
 
     if (command.empty() || req_id.empty()) {
         return json{{"ok", false},
-                    {"error", {{"code", "bad_args"}, {"message", "缺少 cmd 或 reqId"}}}};
+                    {"error", ErrorObject("bad_args", -32602, "缺少 cmd 或 reqId")}};
     }
 
     if (!Has(command)) {
         return json{{"ok", false},
-                    {"error", {{"code", "unknown_command"}, {"message", "未知命令: " + command}}}};
+                    {"error", ErrorObject("unknown_command", -32601, "未知命令: " + command)}};
     }
 
     if (!Submit(command, std::move(call_args), req_id)) {
         return json{{"ok", false},
-                    {"error", {{"code", "rejected"}, {"message", "任务被拒绝: " + command}}}};
+                    {"error", ErrorObject("rejected", -32000, "任务被拒绝: " + command)}};
     }
     return json{{"ok", true}, {"reqId", req_id}};
 }
@@ -75,27 +84,49 @@ bool AsyncRouter::Submit(const std::string& command, json args, const std::strin
     ctx->progress = [this, req_id](json data) {
         Emit(json{{"reqId", req_id}, {"type", "progress"}, {"data", std::move(data)}});
     };
+    ctx->emit = [this, req_id](const std::string& type, json data) {
+        Emit(json{{"reqId", req_id}, {"type", type}, {"data", std::move(data)}});
+    };
+    ctx->emitNamed = [this](const std::string& event, json data) {
+        bridge_.Emit(event, std::move(data));
+    };
 
     {
         std::lock_guard<std::mutex> lock(mutex_);
         inflight_[req_id] = ctx;
     }
 
+    bool accepted = true;
     {
         std::lock_guard<std::mutex> lock(queue_mutex_);
-        if (stopping_.load(std::memory_order_relaxed)) return false;
-        queue_.push(Task{command, std::move(args), req_id, std::move(ctx)});
-        ++submitted_;
+        if (stopping_.load(std::memory_order_relaxed)) {
+            accepted = false;
+        } else {
+            queue_.push(Task{command, std::move(args), req_id, std::move(ctx)});
+            ++submitted_;
+        }
+    }
+    if (!accepted) {
+        // 关闭窗口时不能留下永远等不到结果的 reqId。
+        std::lock_guard<std::mutex> lock(mutex_);
+        inflight_.erase(req_id);
+        return false;
     }
     cv_.notify_one();
     return true;
 }
 
 bool AsyncRouter::Cancel(const std::string& req_id) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    const auto it = inflight_.find(req_id);
-    if (it == inflight_.end()) return false;
-    it->second->cancelled.store(true, std::memory_order_relaxed);
+    std::shared_ptr<TaskContext> ctx;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        const auto it = inflight_.find(req_id);
+        if (it == inflight_.end()) return false;
+        ctx = it->second;
+        ctx->cancelled.store(true, std::memory_order_relaxed);
+    }
+    // 钩子可能触发驱动中断，放在锁外执行，避免与任务线程互相等待。
+    ctx->InvokeCancelHook();
     LogInfo("ipc: 取消请求 " + req_id);
     return true;
 }
@@ -121,6 +152,7 @@ void AsyncRouter::WorkerLoop() {
         }
 
         if (task.ctx->IsCancelled()) {
+            task.ctx->ClearCancelHook();
             Emit(json{{"reqId", task.req_id}, {"type", "cancelled"}});
             Finish(task.req_id);
             continue;
@@ -134,9 +166,10 @@ void AsyncRouter::WorkerLoop() {
         }
 
         if (!handler) {
+            task.ctx->ClearCancelHook();
             Emit(json{{"reqId", task.req_id},
                       {"type", "error"},
-                      {"error", {{"code", "unknown_command"}, {"message", task.command}}}});
+                      {"error", ErrorObject("unknown_command", -32601, task.command)}});
             Finish(task.req_id);
             continue;
         }
@@ -148,17 +181,32 @@ void AsyncRouter::WorkerLoop() {
             } else {
                 Emit(json{{"reqId", task.req_id}, {"type", "result"}, {"data", std::move(result)}});
             }
+        } catch (const IpcError& e) {
+            if (task.ctx->IsCancelled()) {
+                Emit(json{{"reqId", task.req_id}, {"type", "cancelled"}});
+            } else {
+                Emit(json{{"reqId", task.req_id}, {"type", "error"}, {"error", e.error}});
+            }
         } catch (const std::exception& e) {
-            LogError(std::string("ipc: ") + task.command + " 异常: " + e.what());
-            Emit(json{{"reqId", task.req_id},
-                      {"type", "error"},
-                      {"error", {{"code", "exception"}, {"message", e.what()}}}});
+            if (task.ctx->IsCancelled()) {
+                Emit(json{{"reqId", task.req_id}, {"type", "cancelled"}});
+            } else {
+                LogError(std::string("ipc: ") + task.command + " 异常: " + e.what());
+                Emit(json{{"reqId", task.req_id},
+                          {"type", "error"},
+                          {"error", ErrorObject("exception", -32000, e.what())}});
+            }
         } catch (...) {
-            LogError("ipc: " + task.command + " 未知异常");
-            Emit(json{{"reqId", task.req_id},
-                      {"type", "error"},
-                      {"error", {{"code", "exception"}, {"message", "未知异常"}}}});
+            if (task.ctx->IsCancelled()) {
+                Emit(json{{"reqId", task.req_id}, {"type", "cancelled"}});
+            } else {
+                LogError("ipc: " + task.command + " 未知异常");
+                Emit(json{{"reqId", task.req_id},
+                          {"type", "error"},
+                          {"error", ErrorObject("exception", -32000, "未知异常")}});
+            }
         }
+        task.ctx->ClearCancelHook();
         Finish(task.req_id);
     }
 }

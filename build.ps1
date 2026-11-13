@@ -35,22 +35,47 @@ if (-not $vsPath) {
 }
 Write-Ok "Visual Studio: $vsPath"
 
+# CMake/CTest：优先 PATH，其次 VS 自带，最后独立安装目录。
+$cmakeExe = $null
+$ctestExe = $null
+$cmakeCommand = Get-Command cmake.exe -ErrorAction SilentlyContinue
+if ($cmakeCommand) {
+    $cmakeExe = $cmakeCommand.Source
+} else {
+    $cmakeCandidates = @(
+        (Join-Path $vsPath "Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe"),
+        "C:\Program Files\CMake\bin\cmake.exe",
+        "C:\Program Files (x86)\CMake\bin\cmake.exe"
+    )
+    foreach ($candidate in $cmakeCandidates) {
+        if (Test-Path $candidate) { $cmakeExe = $candidate; break }
+    }
+}
+if (-not $cmakeExe) {
+    throw "未找到 cmake.exe，请安装 CMake 或在 Visual Studio Installer 中勾选 C++ CMake 工具。"
+}
+$ctestExe = Join-Path (Split-Path -Parent $cmakeExe) "ctest.exe"
+if (-not (Test-Path $ctestExe)) { $ctestExe = "ctest.exe" }
+Write-Ok "CMake: $cmakeExe"
+
 if (-not (Test-Path "$VcpkgRoot\scripts\buildsystems\vcpkg.cmake")) {
     throw "未找到 vcpkg: $VcpkgRoot（设置 VCPKG_ROOT 环境变量或安装到 C:\vcpkg）"
 }
 Write-Ok "vcpkg: $VcpkgRoot"
 
 $wv2Include = "$VcpkgRoot\installed\$Triplet\include\WebView2.h"
-if (-not (Test-Path $wv2Include)) {
-    Write-Warn "缺少 WebView2 SDK，正在安装（首次需要几分钟）..."
-    & "$VcpkgRoot\vcpkg.exe" install "webview2:$Triplet" --classic
-    if ($LASTEXITCODE -ne 0) { throw "vcpkg install webview2:$Triplet 失败" }
+if (Test-Path $wv2Include) {
+    Write-Ok "WebView2 SDK: $wv2Include"
+} else {
+    Write-Warn "WebView2 SDK 将由 vcpkg manifest 在 CMake 配置阶段安装。"
 }
-Write-Ok "WebView2 SDK: $wv2Include"
 
 $py = (Get-Command python -ErrorAction SilentlyContinue)
-if (-not $py) { throw "未找到 python，前端资源打包需要 Python 3。" }
-Write-Ok "Python: $($py.Source)"
+if ($py) {
+    Write-Ok "Python: $($py.Source)"
+} else {
+    Write-Warn "未找到 Python，前端资源将使用 CMake 内置打包器。"
+}
 
 # ---------------------------------------------------------------- 配置
 Write-Step "配置 CMake（$Generator / $Arch / $Config）"
@@ -72,18 +97,18 @@ if ($DevMode) {
     $cmakeArgs += "-DEMBED_FRONTEND=ON"
 }
 
-& cmake @cmakeArgs
+& $cmakeExe @cmakeArgs
 if ($LASTEXITCODE -ne 0) { throw "CMake 配置失败" }
 
 # ---------------------------------------------------------------- 编译
 Write-Step "编译 $Config"
-& cmake --build $BuildDir --config $Config --parallel
+& $cmakeExe --build $BuildDir --config $Config --parallel
 if ($LASTEXITCODE -ne 0) { throw "编译失败" }
 
 # ---------------------------------------------------------------- 测试
 if (-not $SkipTests) {
     Write-Step "运行 CTest"
-    & ctest --test-dir $BuildDir -C $Config --output-on-failure
+    & $ctestExe --test-dir $BuildDir -C $Config --output-on-failure
     if ($LASTEXITCODE -ne 0) { throw "测试失败" }
 }
 

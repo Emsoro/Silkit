@@ -10,6 +10,7 @@
 #include <memory>
 #include <mutex>
 #include <queue>
+#include <stdexcept>
 #include <string>
 #include <thread>
 #include <unordered_map>
@@ -19,13 +20,60 @@ namespace silkit::ipc {
 
 using json = nlohmann::json;
 
-/// 交给异步处理函数的上下文：进度回传 + 取消标记。
+/// 处理函数抛出此异常时，Router 以 `type=error` 结束请求，并原样透传 error 对象
+/// （用于携带 statementIndex/position/sqlState 等结构化错误）。
+class IpcError : public std::runtime_error {
+public:
+    explicit IpcError(json payload)
+        : std::runtime_error(payload.value("message", std::string{"IPC 执行失败"})),
+          error(std::move(payload)) {}
+
+    json error;
+};
+
+/// 交给异步处理函数的上下文：进度回传、自定义事件、取消标记。
 struct TaskContext {
     std::atomic<bool> cancelled{false};
 
+    /// type=progress 的快捷方式。
     std::function<void(json)> progress;
 
+    /// 发送任意类型的事件（batch/statement/progress...），最终事件仍由 Router 发送。
+    std::function<void(const std::string&, json)> emit;
+
+    /// 发送自定义 Bridge 事件（非 ipc.event），例如 session.closed。
+    std::function<void(const std::string&, json)> emitNamed;
+
     bool IsCancelled() const { return cancelled.load(std::memory_order_relaxed); }
+
+    /// 注册取消钩子（例如 sqlite3_interrupt）。可在任务运行中调用。
+    void SetCancelHook(std::function<void()> hook) {
+        std::lock_guard<std::mutex> lock(hook_mutex_);
+        on_cancel_ = std::move(hook);
+    }
+
+    void ClearCancelHook() {
+        std::lock_guard<std::mutex> lock(hook_mutex_);
+        on_cancel_ = nullptr;
+    }
+
+    void InvokeCancelHook() {
+        std::function<void()> hook;
+        {
+            std::lock_guard<std::mutex> lock(hook_mutex_);
+            hook = on_cancel_;
+        }
+        if (!hook) return;
+        try {
+            hook();
+        } catch (...) {
+            // 取消钩子不允许把异常抛回 Router。
+        }
+    }
+
+private:
+    std::mutex hook_mutex_;
+    std::function<void()> on_cancel_;
 };
 
 /// 异步任务路由：Bridge handler 在 UI 线程同步执行，这里只负责入队并立即返回，
