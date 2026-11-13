@@ -106,8 +106,11 @@
             if (window.Icons) caret.innerHTML = window.Icons.svg('chevron', 11);
             const dot = U.el('span', 'db-dot');
             dot.style.setProperty('--dot', 'var(--accent)');
-            const label = U.el('span', 'node-label', (session.profile && session.profile.name) || 'SQLite');
-            const badge = U.el('span', 'node-badge', 'SQLite');
+            const engine = (session.profile && session.profile.engine) || session.engine || 'sqlite';
+            const engineLabel = engine === 'mysql' ? 'MySQL' :
+                (engine === 'postgres' ? 'PostgreSQL' : 'SQLite');
+            const label = U.el('span', 'node-label', (session.profile && session.profile.name) || engineLabel);
+            const badge = U.el('span', 'node-badge', engineLabel);
             const spinner = U.el('span', 'node-spinner');
             spinner.hidden = true;
 
@@ -239,6 +242,8 @@
             const database = item.database || (parentNode && parentNode.getAttribute('data-database')) || 'main';
             let table = item.table || (parentNode && parentNode.getAttribute('data-table')) || '';
             if (!table && (kind === 'table' || kind === 'view')) table = name;
+            const schema = item.schema ||
+                (parentNode && parentNode.getAttribute('data-schema')) || '';
             const hasChildren = item.hasChildren != null ? !!item.hasChildren :
                 (kind === 'connection' || kind === 'database' || kind === 'folder' ||
                     kind === 'table' || kind === 'view');
@@ -250,6 +255,7 @@
             node.setAttribute('data-kind', kind);
             node.setAttribute('data-name', name);
             node.setAttribute('data-database', database);
+            node.setAttribute('data-schema', schema);
             node.setAttribute('data-table', table);
             node.setAttribute('data-has-children', hasChildren ? '1' : '0');
             if (!hasChildren) node.setAttribute('data-loaded', '1');
@@ -296,6 +302,7 @@
                 kind: kind,
                 name: node.getAttribute('data-name') || '',
                 database: node.getAttribute('data-database') || 'main',
+                schema: node.getAttribute('data-schema') || '',
                 table: node.getAttribute('data-table') || ''
             };
             return parent;

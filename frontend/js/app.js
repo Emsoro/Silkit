@@ -349,9 +349,7 @@
         try {
             const info = await api.info();
             const version = 'v' + (info.version || '0.1.0');
-            if ($('versionChip')) $('versionChip').textContent = version;
             if ($('statusVersion')) $('statusVersion').textContent = version;
-            if ($('versionChip') && info.dataDir) $('versionChip').title = '数据目录：' + info.dataDir;
         } catch (error) {
             if ($('ipcStatus')) $('ipcStatus').textContent = 'IPC 不可用';
             toast('IPC 初始化失败：' + (error.message || error.code), 'error');

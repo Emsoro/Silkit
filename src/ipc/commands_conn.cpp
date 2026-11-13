@@ -3,9 +3,11 @@
 #include "core/logger.h"
 #include "core/secrets.h"
 #include "db/driver_registry.h"
+#include "db/engine_dialect.h"
 #include "db/identifier.h"
 #include "db/session.h"
 #include "ipc/commands_db_common.h"
+#include "ipc/commands_meta_engine.h"
 
 #include <algorithm>
 #include <chrono>
@@ -222,9 +224,16 @@ void RegisterConnectionCommands(AsyncRouter& router,
         return session->RunSync([&session]() -> json {
             auto& conn = session->Conn();
             std::string charset;
-            auto encoding = dbutil::RunRows(conn, "PRAGMA encoding");
-            if (encoding.ok() && !encoding.rows.empty() && !encoding.rows.front().empty()) {
-                charset = dbutil::CellText(encoding.rows.front().front());
+            std::string timezone;
+            if (IsRelationalEngine(conn.EngineKind())) {
+                const auto stats = EngineServerStats(conn);
+                charset = stats.first;
+                timezone = stats.second;
+            } else {
+                auto encoding = dbutil::RunRows(conn, "PRAGMA encoding");
+                if (encoding.ok() && !encoding.rows.empty() && !encoding.rows.front().empty()) {
+                    charset = dbutil::CellText(encoding.rows.front().front());
+                }
             }
             return json{{"threadId", conn.ThreadId()},
                         {"serverVersion", conn.ServerVersion()},
@@ -232,7 +241,7 @@ void RegisterConnectionCommands(AsyncRouter& router,
                         {"tx", session::TxStateName(session->Tx())},
                         {"readOnly", session->IsReadOnly()},
                         {"charset", charset},
-                        {"timezone", ""},
+                        {"timezone", timezone},
                         {"capabilities", dbutil::CapabilitiesJson(conn.Caps())}};
         });
     });
@@ -245,9 +254,28 @@ void RegisterConnectionCommands(AsyncRouter& router,
             dbutil::ThrowCommandError("bad_args", "数据库名不合法");
         }
 
+        // PostgreSQL 切换数据库必须新建连接；重连会关闭旧 Session，不能在 RunSync 内执行。
+        if (session->Params().engine == db::Engine::Postgres) {
+            db::ConnectParams params = session->Params();
+            params.database = target;
+            session::OpenOutcome outcome;
+            db::DbError error;
+            if (!sessions.Reconnect(session->Id(), params, outcome, error)) {
+                throw IpcError(dbutil::ErrorJson(error));
+            }
+            return json{{"ok", true}, {"currentDb", target}};
+        }
+
         return session->RunSync([&]() -> json {
+            auto& conn = session->Conn();
+            if (conn.EngineKind() == db::Engine::MySql) {
+                auto rows = dbutil::RunRows(conn, db::SwitchDatabaseSql(db::Engine::MySql, target));
+                if (!rows.ok()) throw IpcError(dbutil::ErrorJson(rows.result.error));
+                session->SetCurrentDatabase(target);
+                return json{{"ok", true}, {"currentDb", target}};
+            }
             // SQLite 没有 USE，只能切换到已 ATTACH 的库；名字必须来自目录。
-            auto rows = dbutil::RunRows(session->Conn(), "PRAGMA database_list");
+            auto rows = dbutil::RunRows(conn, "PRAGMA database_list");
             if (!rows.ok()) throw IpcError(dbutil::ErrorJson(rows.result.error));
             bool attached = false;
             for (const auto& row : rows.rows) {
@@ -258,7 +286,7 @@ void RegisterConnectionCommands(AsyncRouter& router,
             }
             if (!attached) {
                 dbutil::ThrowCommandError("database_not_attached",
-                                         "数据库未附加：" + target + "（可用 ATTACH DATABASE 添加）");
+                                          "数据库未附加：" + target + "（可用 ATTACH DATABASE 添加）");
             }
             session->SetCurrentDatabase(target);
             return json{{"ok", true}, {"currentDb", target}};

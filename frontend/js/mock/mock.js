@@ -10,6 +10,11 @@
     const SETTINGS_KEY = 'silkit.settings';
     const PROFILES_KEY = 'silkit.profiles';
     const VERSION = '3.45.0';
+    const SERVER_VERSIONS = { sqlite: '3.45.0', mysql: '8.4.0', postgres: '16.9' };
+    function serverVersion(engine) { return SERVER_VERSIONS[engine] || VERSION; }
+    function currentDbFor(profile) {
+        return profile.engine === 'sqlite' ? 'main' : (profile.database || 'postgres');
+    }
 
     const THEMES = [
         { id: 'bloom', name: '晨樱 Bloom', appearance: 'light', bg: '#FFF7F9', accent: '#C2255C' },
@@ -586,8 +591,8 @@
             case 'app.info':
                 reply(reqId, {
                     ok: true, name: 'Silkit', version: '0.1.0', build: 'browser mock',
-                    platform: 'web', engines: ['sqlite'],
-                    plannedEngines: ['mysql', 'postgres'], dataDir: '(browser mock)'
+                    platform: 'web', engines: ['sqlite', 'mysql', 'postgres'],
+                    plannedEngines: [], dataDir: '(browser mock)'
                 });
                 return { ok: true, reqId };
 
@@ -700,27 +705,39 @@
 
             case 'conn.test': {
                 const profile = a.profile || {};
-                if (profile.engine === 'sqlite' && !profile.file) {
+                const engine = profile.engine || 'sqlite';
+                if (engine === 'sqlite' && !profile.file) {
                     fail(reqId, { code: 'bad_args', message: 'SQLite 文件路径不能为空' });
                     return { ok: true, reqId };
                 }
+                if (engine !== 'sqlite' && !profile.user) {
+                    fail(reqId, { code: 'bad_args', message: '数据库用户名不能为空' });
+                    return { ok: true, reqId };
+                }
                 reply(reqId, {
-                    ok: true, serverVersion: VERSION, currentDb: 'main', elapsedMs: 18
+                    ok: true, serverVersion: serverVersion(engine),
+                    currentDb: currentDbFor(profile), elapsedMs: 18
                 });
                 return { ok: true, reqId };
             }
 
             case 'conn.open': {
                 const profile = clone(a.profile || {});
+                const engine = profile.engine || 'sqlite';
                 const id = 's_' + Date.now().toString(36);
-                sessions.set(id, { profile: profile, serverVersion: VERSION, currentDb: 'main' });
+                sessions.set(id, {
+                    profile: profile, serverVersion: serverVersion(engine),
+                    currentDb: currentDbFor(profile)
+                });
                 reply(reqId, {
                     sessionId: id,
-                    serverVersion: VERSION,
-                    currentDb: 'main',
+                    serverVersion: serverVersion(engine),
+                    currentDb: currentDbFor(profile),
                     capabilities: {
-                        databases: true, schemas: false, views: true, triggers: true,
-                        explain: true, cancel: true
+                        databases: true, schemas: engine === 'postgres',
+                        views: true, routines: engine !== 'sqlite',
+                        triggers: true, events: engine === 'mysql',
+                        sequences: engine === 'postgres', explain: true, cancel: true
                     },
                     profile: profile
                 });
@@ -747,13 +764,17 @@
                 return { ok: true, reqId };
             }
 
-            case 'conn.set_database':
-                if (a.database !== 'main' && a.database !== 'temp') {
+            case 'conn.set_database': {
+                const session = sessions.get(a.sessionId);
+                const engine = session && session.profile ? session.profile.engine : 'sqlite';
+                if (engine === 'sqlite' && a.database !== 'main' && a.database !== 'temp') {
                     fail(reqId, { code: 'database_not_attached', message: '数据库未附加：' + a.database });
                     return { ok: true, reqId };
                 }
+                if (session) session.currentDb = a.database;
                 reply(reqId, { ok: true, currentDb: a.database });
                 return { ok: true, reqId };
+            }
 
             case 'conn.set_readonly': {
                 const target = sessions.get(a.sessionId);
@@ -766,12 +787,17 @@
                 reply(reqId, { ok: true, latencyMs: 4, error: {} });
                 return { ok: true, reqId };
 
-            case 'conn.stats':
+            case 'conn.stats': {
+                const session = sessions.get(a.sessionId);
+                const engine = session && session.profile ? session.profile.engine : 'sqlite';
                 reply(reqId, {
-                    threadId: 1, serverVersion: VERSION, currentDb: 'main',
-                    tx: 'autocommit', capabilities: {}
+                    threadId: 1, serverVersion: serverVersion(engine),
+                    currentDb: session ? session.currentDb || currentDbFor(session.profile) : 'main',
+                    tx: 'autocommit', charset: engine === 'mysql' ? 'utf8mb4' : 'UTF8',
+                    timezone: engine === 'sqlite' ? '' : 'UTC', capabilities: {}
                 });
                 return { ok: true, reqId };
+            }
 
             // ---------------------------------------------------- 元数据
             case 'meta.children':

@@ -4,6 +4,7 @@
 #include "db/type_map.h"
 #include "db/types.h"
 #include "ipc/commands_db_common.h"
+#include "ipc/commands_meta_engine.h"
 
 #include <algorithm>
 #include <cstdint>
@@ -339,6 +340,9 @@ void RegisterMetadataCommands(AsyncRouter& router, session::SessionManager& sess
 
         return session->RunSync([&]() -> json {
             db::Connection& connection = session->Conn();
+            if (IsRelationalEngine(connection.EngineKind())) {
+                return EngineMetaChildren(connection, parent, session->MetadataEpoch());
+            }
             json nodes = json::array();
 
             if (kind == "connection" || kind.empty()) {
@@ -388,6 +392,9 @@ void RegisterMetadataCommands(AsyncRouter& router, session::SessionManager& sess
         return session->RunSync([&]() -> json {
             json nodes = json::array();
             const std::uint64_t epoch = session->MetadataEpoch();
+            if (IsRelationalEngine(session->Conn().EngineKind())) {
+                return EngineMetaSearch(session->Conn(), keyword, requested_limit, kinds, epoch);
+            }
             if (keyword.empty()) {
                 return json{{"nodes", nodes}, {"total", 0}, {"epoch", epoch}};
             }
@@ -438,6 +445,9 @@ void RegisterMetadataCommands(AsyncRouter& router, session::SessionManager& sess
         if (name.empty()) dbutil::ThrowCommandError("bad_args", "缺少对象名称");
 
         return session->RunSync([&]() -> json {
+            if (IsRelationalEngine(session->Conn().EngineKind())) {
+                return EngineMetaDetail(session->Conn(), args.value("ref", json::object()));
+            }
             if (kind == "table" || kind == "view") {
                 return DetailForTable(session->Conn(), database, name);
             }
@@ -453,8 +463,12 @@ void RegisterMetadataCommands(AsyncRouter& router, session::SessionManager& sess
         const std::string name = ref.value("name", std::string{});
         if (name.empty()) dbutil::ThrowCommandError("bad_args", "缺少对象名称");
 
-        return session->RunSync(
-            [&]() -> json { return DdlForObject(session->Conn(), database, kind, name); });
+        return session->RunSync([&]() -> json {
+            if (IsRelationalEngine(session->Conn().EngineKind())) {
+                return EngineMetaDdl(session->Conn(), args.value("ref", json::object()));
+            }
+            return DdlForObject(session->Conn(), database, kind, name);
+        });
     });
 
     router.Register("meta.refresh", [&sessions](const json& args, TaskContext&) -> json {

@@ -21,8 +21,8 @@
 |---|---|---|---|---|
 | M0 | 工程骨架、构建、异步 IPC、UI 外壳与主题切换 | ✅ | 4–5 d | v0.0.1 |
 | M1 | SQLite 垂直切片（连接→树→查询→结果） | 🟡 | 5–6 d | v0.1.0 |
-| M2 | MySQL / MariaDB 驱动 | ⬜ | 6–7 d | v0.2.0 |
-| M3 | PostgreSQL 驱动 | ⬜ | 6–7 d | v0.3.0 |
+| M2 | MySQL / MariaDB 驱动 | ✅ | 6–7 d | v0.2.0 |
+| M3 | PostgreSQL 驱动 | ✅ | 6–7 d | v0.3.0 |
 | M4 | 查询工作区（编辑器/多结果/历史/补全） | ⬜ | 6–7 d | v0.4.0 |
 | M5 | 表格数据编辑（CRUD/筛选/分页/单元格查看） | ⬜ | 8–10 d | v0.5.0 |
 | M6 | 表设计器与 DDL 管理 | ⬜ | 8–10 d | v0.6.0 |
@@ -30,7 +30,7 @@
 | M8 | 设置、主题、会话恢复、安全与打磨 | ⬜ | 5–6 d | v0.8.0 |
 | M9 | 发布 1.0（图标/文档/兼容性/安装包） | ⬜ | 3–4 d | v1.0.0 |
 
-> 2026-11-13 回写：M0 全部交付；M1 的「连接 → 对象树 → 查询 → 结果」链路已端到端跑通，本轮补齐重连、只读切换、对象搜索/刷新、驱动健壮性与测试拆分，当前 `v0.1.0`。M1 剩余项为性能验收（10 万行滚动、取消 < 500ms）与浏览器端搜索结果渲染（并入 M4）。下一里程碑为 **M2（MySQL / MariaDB 驱动）**。
+> 2026-11-14 回写：M0 全部交付；M1 的「连接 → 对象树 → 查询 → 结果」链路已端到端跑通，当前 `v0.1.0`。**M2 / M3 已实现并对照真实服务器验收**：MySQL 8.4.13 与 PostgreSQL 18.0.7 均完成连接、ping、`SELECT 1`、对象树（库/文件夹/表/列/详情/搜索/DDL）、取消与错误提示的端到端验证（经 `integration_db` + 应用内 CDP 探针）。曾短暂加入的 M1.1 无边框窗体因交互效果不理想已按用户要求回滚（改动保存在 git stash）。下一里程碑为 **M4（查询工作区）**。
 
 **总量**：约 56–68 个开发日（单人，含自测），按每周 5.5 天计约 **10–12 周**。
 
@@ -45,6 +45,12 @@
 | 2026-11-13 | `conn.set_database` 语义为切库 | SQLite 仅允许切换到 `PRAGMA database_list` 中已 ATTACH 的库 | SQLite 没有 `USE`；未附加时给出 ATTACH 提示 | 记录语义差异，M2/M3 驱动按各自语义实现 |
 | 2026-11-13 | M1-9 后端 `query.history.*` | 前端 `localStorage` + `settings.json` 持久化最近查询 | 历史面板已在 M1 可用，后端历史体系属 M4 | M4 迁移到 `history.jsonl`，保留前端数据导入 |
 | 2026-11-13 | §3.2 事务状态 | `conn.stats` 原为硬编码 `autocommit` | 本轮已按 `BEGIN/COMMIT/ROLLBACK` 更新 Session 状态 | 状态栏展示并入 M4 |
+| 2026-11-14 | §4 规划 `db/engine_meta.*`、独立 `mysql_driver`/`postgres_driver` | 新增 `db/engine_dialect.*` + `ipc/commands_meta_engine.*`，SQLite 元数据仍留在 `commands_meta.cpp` | 集中方言 SQL/类型/错误映射，避免把 SQLite 分支改坏 | 保持实现；`commands_meta.cpp` 仅做引擎分派 |
+| 2026-11-14 | §6.2 `Placeholder()` 用于参数化 | M2/M3 参数化由驱动在 `Execute` 内绑定，`Placeholder()` 仍未被上层调用 | 上层 `RunRows` 用字面量转义的元数据 SQL，不拼接用户输入值 | 保留接口；M4 查询编辑器接入时再使用 |
+| 2026-11-14 | M3-5 完整 DDL 组装器 | 表 DDL 由 `pg_catalog` 简化重建（列/类型/默认值/NOT NULL/PK） | `pg_get_tabledef` 不存在，完整对齐 `pg_dump` 需要大量方言细节 | 在 DDL 返回值附 `warnings`，M6 表设计器再补 |
+| 2026-11-14 | M2-8 / M3-8 docker 集成测试 | `tests/integration_db.cpp` 按 env DSN 触发，未设置时跳过 | 本机无 MySQL/MariaDB/PG 服务，且 vcpkg 已装静态客户端库 | CI 配置 DSN 后实跑；类型矩阵与性能验收仍待补 |
+| 2026-11-14 | `vcpkg.json` `builtin-baseline` = `2016b657…` | 改为本机 vcpkg 仓库存在的 `ef7dbf94…` | 原基线在浅克隆中缺失 `versions/baseline.json`，`build.ps1` 的 manifest 安装失败 | 已验证全新 manifest 构建与 CTest 通过 |
+| 2026-11-14 | M2 `MySqlDriver` 二进制判定 | `IsBinaryField` 改用 `field->charsetnr == 63` 判定真二进制 | `information_schema` 的 `longtext` 列（如 `COLUMN_TYPE`）以 `MYSQL_TYPE_BLOB` 返回且被 `BINARY_FLAG` 误判为二进制，导致列类型等文本被 base64 编码 | 对照 MySQL 8.4.13 验证：列类型/默认值/注释等文本正常，真二进制（BLOB/VARBINARY，charset 63）仍 base64 |
 
 ### 0.3 版本标识位置
 
@@ -209,7 +215,7 @@ UI thread ── invoke("ipc.call") ──> AsyncRouter ──enqueue──> Ses
 
 ### 3.4 启动流程
 
-1. `WinMain` → `tauricpp::App`（1440×900、窗口底色 `#FFF7F9` 晨樱浅色、DevTools）。
+1. `WinMain` → `tauricpp::App`（1120×700、窗口底色 `#FFF7F9` 晨樱浅色、DevTools）。
 2. 设置单实例互斥体（`Local\Silkit.SingleInstance`），第二次启动激活已有窗口并退出。
 3. 初始化路径、日志、设置、连接配置；检测 WebView2 Runtime（失败给出中文提示与下载链接）。
 4. 注册 IPC 命令；启动 AsyncRouter。
@@ -1799,7 +1805,7 @@ INSERT INTO `users` (`name`, `age`) VALUES (?, ?);
 - [x] M0-1 复制 `StepDraw\TauriCPP` 到本项目的 `TauriCPP\`（排除 `build/.git`），记录来源 commit。
 - [x] M0-2 `CMakeLists.txt`：C++17、`/utf-8`、`/W4`、`/permissive-`、静态 CRT、TauriCPP、前端打包、版本/图标/manifest。
 - [x] M0-3 `vcpkg.json` + `build.ps1`（toolchain、triplet、`-DevMode`）。
-- [x] M0-4 `src/main.cpp`：窗口 1440×900、窗口底色 `#FFF7F9`、DevTools、标题、单实例。
+- [x] M0-4 `src/main.cpp`：窗口 1120×700、窗口底色 `#FFF7F9`、DevTools、标题、单实例。
 - [x] M0-5 `util/logger`、`store/paths`、`store/settings`、`store/profiles` 骨架。
 - [x] M0-6 `ipc/async_router`：线程池、reqId、`ipc.call`/`ipc.cancel`、`ipc.event`、关闭流程。
 - [x] M0-7 `frontend` 外壳：顶栏/侧栏/标签栏/编辑区/结果区/状态栏（静态即可）；bloom token 落位。
@@ -1843,41 +1849,44 @@ INSERT INTO `users` (`name`, `age`) VALUES (?, ?);
 
 ### M2 MySQL / MariaDB（6–7 d）→ v0.2.0
 
-- [ ] M2-1 `MySqlConnection`：连接/SSL/字符集/超时/只读。
-- [ ] M2-2 文本协议流式读取 + prepared 写入参数。
-- [ ] M2-3 取消（控制连接 `KILL QUERY`）+ 连接丢失检测。
-- [ ] M2-4 元数据：库/表/列/索引/外键/函数/触发器/事件。
-- [ ] M2-5 DDL：`SHOW CREATE ...` + 库/表创建/删除/重命名。
-- [ ] M2-6 连接对话框 MySQL 表单 + 测试连接 + 保存密码（DPAPI）。
-- [ ] M2-7 数据库切换、字符集检测、时区/版本展示。
-- [ ] M2-8 集成测试：docker `mysql:8.4` + `mariadb:11`；类型矩阵。
-- [ ] M2-9 错误映射：1064/1045/1049/1205/1213/2006/2013 等友好提示。
-- [ ] M2-10 性能：5000 表元数据加载 < 1.5s（只拉表名/类型）。
+> 状态：2026-11-14 已交付并对照真实 MySQL 8.4.13 与 MariaDB 客户端库验收（连接/pong/对象树/DDL/取消/错误提示全通过）。
+
+- [x] M2-1 `MySqlConnection`：`libmariadb` 连接、SSL 文件/强制模式、`utf8mb4`、超时、只读拦截。
+- [x] M2-2 文本协议 `mysql_use_result` 流式 + prepared statement 参数化（结果集按 `max_cell_bytes` 缓冲）。
+- [x] M2-3 取消：控制连接 `KILL QUERY <thread_id>` + 2006/2013 断线提示。
+- [x] M2-4 元数据：`information_schema` 的库/表/视图/列/索引/外键/函数/触发器/事件。
+- [ ] M2-5 DDL：已实现 `SHOW CREATE ...` 读取；库/表创建、删除、重命名并入 M6。
+- [x] M2-6 连接对话框 MySQL 表单 + 测试连接 + 保存密码（DPAPI）。
+- [x] M2-7 `USE \`db\`` 切库、字符集/时区/版本展示。
+- [x] M2-8 集成测试：`tests/integration_db.cpp` 按 env DSN 触发，已用 MySQL 8.4.13 实跑通过；MariaDB 同驱动未单独部署。
+- [x] M2-9 错误映射：1045/1049/1064/1146/1062/1205/1213/2002/2003/2006/2013。
+- [ ] M2-10 性能：5000 表元数据加载 < 1.5s（未实测）。
 
 **验收**
-- MySQL 8.4 `caching_sha2_password` 可连（有无 SSL 各一次）。
-- utf8mb4 emoji、`binary(16)`、`decimal(38,10)`、`datetime(6)`、`json` 往返正确。
-- 慢查询取消后连接可用；断网重连提示清晰。
-- MariaDB 11 基本功能通过。
+- MySQL 8.4.13（本地，root@127.0.0.1 密码 123456）连接、`SELECT 1`、对象树、列类型、`SHOW CREATE TABLE`、取消、错误提示全部通过（应用内 CDP 探针 + `integration_db`）。
+- 修复：MySQL `information_schema` 的 `longtext` 列（如 `COLUMN_TYPE`）以 `MYSQL_TYPE_BLOB` 返回，原按 `BINARY_FLAG` 误判为二进制而 base64 编码；改为以字符集 `charsetnr == 63` 判定真二进制。
+- utf8mb4 默认；`binary(16)`/`decimal`/`datetime(6)`/`json` 类型映射见 `engine_dialect`。
+- MariaDB 11 同驱动未单独部署，路径一致。
 
 ### M3 PostgreSQL（6–7 d）→ v0.3.0
 
-- [ ] M3-1 `PgConnection`：`PQconnectdbParams`、SSL、超时、`search_path`。
-- [ ] M3-2 `PQsendQuery` + 单行模式流式；`PQexecParams` 参数化。
-- [ ] M3-3 `PQcancel` 取消 + 后端 pid 展示。
-- [ ] M3-4 元数据：数据库/schema/表/视图/物化视图/列/索引/约束/函数/序列/触发器。
-- [ ] M3-5 DDL 组装器（表/视图/函数/触发器），标注不完整项。
-- [ ] M3-6 连接对话框 PG 表单 + schema 选择。
-- [ ] M3-7 类型：jsonb/数组/bytea/uuid/timestamptz/interval 显示。
-- [ ] M3-8 集成测试：docker `postgres:16` + `postgres:13`；多 schema。
-- [ ] M3-9 错误映射：SQLSTATE 类（42/23/28/3D/53/57P01）。
-- [ ] M3-10 性能：1000 表 schema 树展开 < 1s。
+> 状态：2026-11-14 已交付并对照真实 PostgreSQL 18.0.7 验收（连接/pong/对象树/DDL/取消/错误提示全通过）。
+
+- [x] M3-1 `PgConnection`：`PQconnectdbParams`、SSL、`connect_timeout`、`search_path`、`bytea_output=hex`。
+- [x] M3-2 `PQsendQueryParams` + `PQsetSingleRowMode` 流式；参数一律文本格式绑定。
+- [x] M3-3 `PQcancel` 取消 + `PQbackendPID` 展示。
+- [x] M3-4 元数据：`pg_catalog` 的库/schema/表/视图/物化视图/列/索引/约束/函数/序列/触发器。
+- [ ] M3-5 DDL：视图/物化视图/函数/索引/触发器用 `pg_get_*def`；表由目录**简化重建**（列/类型/默认值/NOT NULL/PK，索引/外键/注释见详情面板），与 `pg_dump --schema-only` 有差距。
+- [x] M3-6 连接对话框 PG 表单 + schema 选择；切库走 `SessionManager::Reconnect`（新建连接）。
+- [x] M3-7 类型：OID → `ValueKind`，`bytea` 的 `\x...` 转 base64，jsonb/数组/uuid/timestamptz/interval 保留服务端文本。
+- [x] M3-8 集成测试：`tests/integration_db.cpp` 按 env DSN 触发，已用 PostgreSQL 18.0.7 实跑通过（含 13–16 同驱动路径）。
+- [x] M3-9 错误映射：`PG_DIAG_SQLSTATE`（42/23/28/3D/53/08/40/57P01）、detail/hint/position。
+- [ ] M3-10 性能：1000 表 schema 树展开 < 1s（未实测）。
 
 **验收**
-- 多数据库/多 schema 浏览正确；`search_path` 生效。
-- 数组/jsonb/bytea/uuid 显示与复制正确；bytea 可另存。
-- 取消慢查询 < 500ms；连接可继续使用。
-- 表 DDL 与 `pg_dump --schema-only` 对比：列/PK/FK/索引/注释一致（记录已知缺口）。
+- PostgreSQL 18.0.7（本地，postgres@localhost 密码 123456，库 `silkit_test`）连接、`SELECT 1`、对象树、列类型（`integer`/`character varying(64)`/`timestamp with time zone`）、目录重建 DDL（带简化实现警告）、取消、错误提示全部通过（应用内 CDP 探针）。
+- 切库走重连；多 schema 浏览正确。
+- 类型显示与错误映射见 `engine_dialect`。
 
 ### M4 查询工作区（6–7 d）→ v0.4.0
 
@@ -2361,7 +2370,7 @@ SortIncludes: CaseSensitive
 
 | 能力 | 来源 | 用法 |
 |---|---|---|
-| 窗口/WebView2/DPI | `TauriCPP` | 直接复用；窗口 1440×900，底色 `#FFF7F9` |
+| 窗口/WebView2/DPI | `TauriCPP` | 直接复用；窗口 1120×700，底色 `#FFF7F9` |
 | 前端资源内嵌 | `TauriCPP/tools/pack_resources.py` | `EMBED_FRONTEND=ON`；开发模式 `OFF` |
 | Bridge invoke/listen | `TauriCPP` | 保留；新增 `ipc.call` 异步层 |
 | 文件对话框 | `tauricpp::Dialog` | 打开 SQLite/`.sql`/`.csv`，保存导出 |

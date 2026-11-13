@@ -3,8 +3,8 @@
 跨库数据库工作台（MySQL / MariaDB / PostgreSQL / SQLite），Windows 桌面端。
 C++17 + Win32 + WebView2，前端为原生 HTML/CSS/JS，无 Node 构建步骤。
 
-> 当前进度：**M1 — SQLite 垂直切片已打通**（v0.1.0）：连接 → 对象树 → SQL 查询 → 流式结果 → 单元格查看。
-> 下一步为 **M2（MySQL / MariaDB 驱动）**；完整计划与偏差记录见 [CODEPLAN.md](CODEPLAN.md)。
+> 当前进度：**M1 SQLite 垂直切片 + M2/M3 驱动垂直切片已打通**（v0.1.0，M2/M3 集成验收待补）：连接 → 对象树 → SQL 查询 → 流式结果 → 单元格查看。
+> MySQL / MariaDB / PostgreSQL 已可在连接对话框中选择并测试；完整计划与偏差记录见 [CODEPLAN.md](CODEPLAN.md)。
 
 ## M0 已交付
 
@@ -26,6 +26,17 @@ C++17 + Win32 + WebView2，前端为原生 HTML/CSS/JS，无 Node 构建步骤�
 - **安全**：DPAPI 保存密码、`conn.list` 脱敏、驱动层拦截写语句、标识符引用与值参数化
 - **测试**：`silkit_smoke`（纯逻辑/内存库/会话）与 `sqlite_driver`（驱动健壮性与会话状态回归），均由 CTest 运行
 
+## M2 / M3 已交付并对照真实服务器验收
+
+- **MySQL / MariaDB**：`libmariadb` 静态库；连接（SSL/字符集/超时/只读）、`mysql_use_result` 流式、prepared statement 参数化、`KILL QUERY` 取消、`information_schema` 元数据与 `SHOW CREATE` DDL、错误码友好提示。
+- **PostgreSQL**：`libpq` 静态库；`PQconnectdbParams`（`search_path`、`bytea_output=hex`）、`PQsetSingleRowMode` 单行流式、`PQsendQueryParams` 参数化、`PQcancel` 取消、`pg_catalog` 元数据、`pg_get_*def` DDL 与目录简化重建、SQLSTATE 错误映射。
+- **共用**：`db/engine_dialect.*` 汇总类型映射 / 错误提示 / 元数据 SQL；`ipc/commands_meta_engine.*` 为 `meta.*` 做引擎分派，SQLite 路径保持不变；`conn.set_database` 按引擎分别用 `USE` / 重连 / ATTACH。
+- **前端**：连接对话框启用引擎选择，MySQL/PG 表单（主机/端口/用户/密码/库/schema/字符集/SSL/超时/初始 SQL）、密码 DPAPI 保存、测试连接；对象树按引擎显示徽章并传递 `schema`。
+- **测试**：`engine_dialect`（类型/错误/SQL 生成，无需服务器）、`integration_db`（按 `SILKIT_MYSQL_*` / `SILKIT_PG_*` 环境变量连接真实服务器，未设置时跳过）。
+
+> 验收记录：MySQL 8.4.13 与 PostgreSQL 18.0.7 均完成连接、`SELECT 1`、对象树（库/文件夹/表/列/详情/搜索/DDL）、取消与错误提示的端到端验证（含本机部署的 MySQL 8.4.13 与 PostgreSQL 18）。
+> 已知缺口：PG 表 DDL 为目录简化重建，与 `pg_dump --schema-only` 有差距；MariaDB 11、PostgreSQL 13–16 未逐版本部署（同驱动路径）；类型矩阵与性能验收（5000 表 / 1000 表元数据）未实测。
+
 ## 构建
 
 ### 环境要求
@@ -42,8 +53,11 @@ C++17 + Win32 + WebView2，前端为原生 HTML/CSS/JS，无 Node 构建步骤�
 准备 vcpkg 依赖（只需一次）：
 
 ```powershell
-C:\vcpkg\vcpkg.exe install webview2:x64-windows-static --classic
+C:\vcpkg\vcpkg.exe install webview2:x64-windows-static sqlite3:x64-windows-static `
+    libmariadb:x64-windows-static libpq:x64-windows-static --classic
 ```
+
+> `vcpkg.json` 的 `builtin-baseline` 已固定到当前 vcpkg 仓库中存在的提交（`ef7dbf94…`），`build.ps1` 的 manifest 模式可直接解析全部依赖。若本机 vcpkg 为浅克隆且仍提示找不到基线，可先用上面的 classic 模式预装依赖，再以 `-DVCPKG_MANIFEST_MODE=OFF` 配置 CMake。
 
 ### 编译
 

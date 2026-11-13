@@ -76,8 +76,8 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 
     tauricpp::App::Config config;
     config.window_config.title = "Silkit";
-    config.window_config.width = 1440;
-    config.window_config.height = 900;
+    config.window_config.width = 1120;
+    config.window_config.height = 700;
     config.window_config.center = true;
     config.window_config.resizable = true;
     config.window_config.devtools = true;

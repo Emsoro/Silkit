@@ -102,8 +102,8 @@ void RegisterCommands(AsyncRouter& router,
             {"version", kVersion},
             {"build", std::string(__DATE__) + " " + __TIME__},
             {"platform", "windows"},
-            {"engines", json::array({"sqlite"})},
-            {"plannedEngines", json::array({"mysql", "postgres"})},
+            {"engines", json::array({"sqlite", "mysql", "postgres"})},
+            {"plannedEngines", json::array()},
             {"dataDir", Paths::ToUtf8(Paths::Root())},
         };
     });

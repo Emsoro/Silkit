@@ -13,11 +13,14 @@ set(SILKIT_TEST_LIB_SOURCES
     "${CMAKE_SOURCE_DIR}/src/db/driver_registry.cpp"
     "${CMAKE_SOURCE_DIR}/src/db/identifier.cpp"
     "${CMAKE_SOURCE_DIR}/src/db/type_map.cpp"
+    "${CMAKE_SOURCE_DIR}/src/db/engine_dialect.cpp"
     "${CMAKE_SOURCE_DIR}/src/db/sql_splitter.cpp"
     "${CMAKE_SOURCE_DIR}/src/db/sql_util.cpp"
     "${CMAKE_SOURCE_DIR}/src/db/session.cpp"
     "${CMAKE_SOURCE_DIR}/src/db/session_manager.cpp"
     "${CMAKE_SOURCE_DIR}/src/db/drivers/sqlite_driver.cpp"
+    "${CMAKE_SOURCE_DIR}/src/db/drivers/mysql_driver.cpp"
+    "${CMAKE_SOURCE_DIR}/src/db/drivers/postgres_driver.cpp"
     "${CMAKE_SOURCE_DIR}/src/util/base64.cpp"
 )
 
@@ -36,9 +39,13 @@ target_compile_definitions(silkit_test_lib PUBLIC
 
 target_link_libraries(silkit_test_lib PUBLIC
     unofficial::sqlite3::sqlite3
+    unofficial::libmariadb
+    PostgreSQL::PostgreSQL
     crypt32
     shell32
     ole32
+    ws2_32
+    secur32
 )
 
 if(MSVC)
@@ -54,3 +61,13 @@ add_executable(test_sqlite_driver test_sqlite_driver.cpp)
 target_link_libraries(test_sqlite_driver PRIVATE silkit_test_lib)
 add_test(NAME sqlite_driver COMMAND test_sqlite_driver)
 set_tests_properties(sqlite_driver PROPERTIES TIMEOUT 30)
+
+add_executable(test_engine_dialect test_engine_dialect.cpp)
+target_link_libraries(test_engine_dialect PRIVATE silkit_test_lib)
+add_test(NAME engine_dialect COMMAND test_engine_dialect)
+set_tests_properties(engine_dialect PROPERTIES TIMEOUT 30)
+
+add_executable(integration_db integration_db.cpp)
+target_link_libraries(integration_db PRIVATE silkit_test_lib)
+add_test(NAME integration_db COMMAND integration_db)
+set_tests_properties(integration_db PROPERTIES TIMEOUT 90)

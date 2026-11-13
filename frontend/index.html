@@ -55,7 +55,6 @@
                 <span id="themeLabel">主题·晨樱</span>
                 <span class="chev" data-icon="chevron"></span>
             </button>
-            <span class="version-chip" id="versionChip">v0.1.0</span>
         </div>
     </header>
 
@@ -206,12 +205,83 @@
 
                 <label class="field">
                     <span class="field-label">数据库引擎</span>
-                    <select id="connEngine" class="input" disabled>
+                    <select id="connEngine" class="input">
                         <option value="sqlite">SQLite</option>
-                        <option value="mysql">MySQL（M2）</option>
-                        <option value="postgres">PostgreSQL（M3）</option>
+                        <option value="mysql">MySQL / MariaDB</option>
+                        <option value="postgres">PostgreSQL</option>
                     </select>
                 </label>
+
+                <div id="serverFields" hidden>
+                    <label class="field">
+                        <span class="field-label">主机 / 端口</span>
+                        <div class="field-row">
+                            <input id="connHost" class="input" type="text" placeholder="127.0.0.1" autocomplete="off">
+                            <input id="connPort" class="input mono" type="text" inputmode="numeric" placeholder="3306" style="max-width:110px">
+                        </div>
+                    </label>
+
+                    <div class="field-row">
+                        <label class="field" style="flex:1">
+                            <span class="field-label">用户名</span>
+                            <input id="connUser" class="input" type="text" autocomplete="off">
+                        </label>
+                        <label class="field" style="flex:1">
+                            <span class="field-label">密码</span>
+                            <input id="connPassword" class="input" type="password" autocomplete="new-password">
+                        </label>
+                    </div>
+
+                    <div class="field-row">
+                        <label class="field" style="flex:1">
+                            <span class="field-label">数据库</span>
+                            <input id="connDatabase" class="input" type="text" placeholder="留空使用默认库" autocomplete="off">
+                        </label>
+                        <label class="field" id="connSchemaField" style="flex:1" hidden>
+                            <span class="field-label">Schema / search_path</span>
+                            <input id="connSchema" class="input" type="text" placeholder="public" autocomplete="off">
+                        </label>
+                    </div>
+
+                    <div class="field-row">
+                        <label class="field" style="flex:1">
+                            <span class="field-label">字符集 / SSL</span>
+                            <div class="field-row">
+                                <input id="connCharset" class="input mono" type="text" placeholder="utf8mb4">
+                                <select id="connSslMode" class="input" style="max-width:130px">
+                                    <option value="prefer">prefer</option>
+                                    <option value="disable">disable</option>
+                                    <option value="require">require</option>
+                                    <option value="verify-ca">verify-ca</option>
+                                    <option value="verify-full">verify-full</option>
+                                </select>
+                            </div>
+                        </label>
+                    </div>
+
+                    <label class="check-row">
+                        <input id="connServerReadOnly" type="checkbox">
+                        <span>只读连接（拒绝写语句）</span>
+                    </label>
+                    <label class="check-row">
+                        <input id="connSavePassword" type="checkbox">
+                        <span>保存密码（Windows DPAPI 加密）</span>
+                    </label>
+
+                    <details class="advanced">
+                        <summary>高级选项</summary>
+                        <div class="advanced-grid">
+                            <label class="field">
+                                <span class="field-label">连接超时（ms）</span>
+                                <input id="connConnectTimeout" class="input mono" type="number" min="1000" step="1000" value="8000">
+                            </label>
+                            <label class="field">
+                                <span class="field-label">初始 SQL（可选）</span>
+                                <input id="connInitSql" class="input mono" type="text" placeholder="SET ...">
+                            </label>
+                        </div>
+                    </details>
+                </div>
 
                 <div id="sqliteFields">
                     <div class="field">

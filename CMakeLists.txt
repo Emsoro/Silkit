@@ -32,9 +32,13 @@ endif()
 # 避免手工 find_library 在 Debug/Release 配置间选错库。
 find_package(unofficial-webview2 CONFIG REQUIRED)
 find_package(unofficial-sqlite3 CONFIG REQUIRED)
+find_package(unofficial-libmariadb CONFIG REQUIRED)
+find_package(PostgreSQL REQUIRED)
 
 message(STATUS "WebView2 target: unofficial::webview2::webview2")
 message(STATUS "SQLite target: unofficial::sqlite3::sqlite3")
+message(STATUS "MariaDB target: unofficial::libmariadb")
+message(STATUS "PostgreSQL target: PostgreSQL::PostgreSQL")
 
 file(GLOB TAURICPP_SOURCES CONFIGURE_DEPENDS "${TAURICPP_DIR}/src/*.cpp")
 add_library(tauricpp STATIC ${TAURICPP_SOURCES})
@@ -185,14 +189,18 @@ set(SILKIT_SOURCES
     src/db/sql_util.cpp
     src/db/identifier.cpp
     src/db/type_map.cpp
+    src/db/engine_dialect.cpp
     src/db/session.cpp
     src/db/session_manager.cpp
     src/db/drivers/sqlite_driver.cpp
+    src/db/drivers/mysql_driver.cpp
+    src/db/drivers/postgres_driver.cpp
     src/ipc/async_router.cpp
     src/ipc/commands.cpp
     src/ipc/commands_db_common.cpp
     src/ipc/commands_conn.cpp
     src/ipc/commands_meta.cpp
+    src/ipc/commands_meta_engine.cpp
     src/ipc/commands_query.cpp
     src/util/base64.cpp
 )
@@ -216,6 +224,8 @@ endif()
 target_link_libraries(Silkit PRIVATE
     tauricpp
     unofficial::sqlite3::sqlite3
+    unofficial::libmariadb
+    PostgreSQL::PostgreSQL
     crypt32
     ws2_32
     secur32

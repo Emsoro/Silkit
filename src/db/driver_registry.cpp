@@ -1,6 +1,8 @@
 #include "db/driver_registry.h"
 
 #include "core/logger.h"
+#include "db/drivers/mysql_driver.h"
+#include "db/drivers/postgres_driver.h"
 #include "db/drivers/sqlite_driver.h"
 
 namespace silkit::db {
@@ -27,7 +29,9 @@ void RegisterBuiltinDrivers() {
     static std::once_flag once;
     std::call_once(once, [] {
         DriverRegistry::Instance().Register(std::make_unique<SqliteDriver>());
-        LogInfo("db: 已注册内置驱动 sqlite");
+        DriverRegistry::Instance().Register(std::make_unique<MySqlDriver>());
+        DriverRegistry::Instance().Register(std::make_unique<PostgresDriver>());
+        LogInfo("db: 已注册内置驱动 sqlite/mysql/postgres");
     });
 }
 

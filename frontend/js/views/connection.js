@@ -22,7 +22,10 @@
                 'connFile', 'connBrowse', 'connNewFile', 'connReadOnly', 'connBusyTimeout',
                 'connForeignKeys', 'connJournal', 'connError', 'connTestStatus', 'connList',
                 'connTest', 'connSaveBtn', 'connConnectBtn', 'connDelete', 'sqliteFields',
-                'connEmptyList', 'connAdvanced'
+                'connEmptyList', 'connAdvanced', 'serverFields', 'connHost', 'connPort',
+                'connUser', 'connPassword', 'connDatabase', 'connSchemaField', 'connSchema',
+                'connCharset', 'connSslMode', 'connServerReadOnly', 'connSavePassword',
+                'connConnectTimeout', 'connInitSql'
             ].forEach(function (id) { dom[id] = byId(id); });
 
             if (!dom.connDialog) return;
@@ -54,6 +57,10 @@
                 clearError();
             });
             dom.connName.addEventListener('input', clearError);
+            dom.connEngine.addEventListener('change', function () {
+                updateEngineFields(true);
+                clearError();
+            });
 
             dom.connList.addEventListener('click', function (event) {
                 const del = event.target.closest('.conn-item-delete');
@@ -160,18 +167,53 @@
             dom.connTestStatus.classList.toggle('is-ok', !!ok);
         }
 
+        const ENGINE_LABELS = { sqlite: 'SQLite', mysql: 'MySQL / MariaDB', postgres: 'PostgreSQL' };
+        const DEFAULT_PORTS = { mysql: '3306', postgres: '5432' };
+
+        function updateEngineFields(resetDefaults) {
+            const engine = dom.connEngine.value;
+            const isSqlite = engine === 'sqlite';
+            dom.sqliteFields.hidden = !isSqlite;
+            dom.serverFields.hidden = isSqlite;
+            dom.connAdvanced.hidden = !isSqlite;
+            dom.connSchemaField.hidden = engine !== 'postgres';
+            dom.connPort.placeholder = DEFAULT_PORTS[engine] || '3306';
+            dom.connCharset.placeholder = engine === 'mysql' ? 'utf8mb4' : 'UTF8';
+            if (resetDefaults) {
+                dom.connPort.value = DEFAULT_PORTS[engine] || '';
+                if (!dom.connHost.value) dom.connHost.value = '127.0.0.1';
+            }
+        }
+
         function fill(profile) {
             editingId = profile && profile.id ? profile.id : '';
             clearError();
             setStatus('', false);
-            dom.connName.value = profile && profile.name || '';
-            dom.connFile.value = profile && profile.file || '';
-            dom.connReadOnly.checked = !!(profile && profile.readOnly);
-            const options = (profile && profile.options) || {};
+            const p = profile || {};
+            const options = p.options || {};
+            const ssl = p.ssl || {};
+            dom.connEngine.value = ENGINE_LABELS[p.engine] ? p.engine : 'sqlite';
+            dom.connName.value = p.name || '';
+            dom.connFile.value = p.file || '';
+            dom.connReadOnly.checked = !!p.readOnly;
             dom.connBusyTimeout.value = options.busyTimeoutMs != null ? options.busyTimeoutMs : 5000;
             dom.connForeignKeys.checked = options.foreignKeys !== false;
             dom.connJournal.value = options.journalMode || '';
-            if (dom.connTitle) dom.connTitle.textContent = editingId ? '编辑连接' : '新建 SQLite 连接';
+            dom.connHost.value = p.host || '127.0.0.1';
+            dom.connPort.value = p.port || DEFAULT_PORTS[dom.connEngine.value] || '';
+            dom.connUser.value = p.user || '';
+            dom.connPassword.value = '';
+            dom.connDatabase.value = p.database || '';
+            dom.connSchema.value = p.schema || '';
+            dom.connCharset.value = p.charset || '';
+            dom.connSslMode.value = ssl.mode || 'prefer';
+            dom.connServerReadOnly.checked = !!p.readOnly;
+            dom.connSavePassword.checked = !!(p.secret && p.secret.save);
+            dom.connConnectTimeout.value = options.connectTimeoutMs != null ? options.connectTimeoutMs : 8000;
+            dom.connInitSql.value = options.initSql || '';
+            updateEngineFields(false);
+            if (dom.connTitle) dom.connTitle.textContent = editingId ? '编辑连接' :
+                '新建 ' + (ENGINE_LABELS[dom.connEngine.value] || 'SQLite') + ' 连接';
             if (dom.connConnectBtn) dom.connConnectBtn.textContent = editingId ? '重新连接' : '连接';
             if (dom.connDelete) dom.connDelete.hidden = !editingId;
             renderProfiles();
@@ -182,6 +224,10 @@
             fill(null);
             dom.connName.value = '';
             dom.connFile.value = '';
+            dom.connDatabase.value = '';
+            dom.connSchema.value = '';
+            dom.connPassword.value = '';
+            dom.connSavePassword.checked = false;
         }
 
         function openDialog(profile) {
@@ -222,31 +268,72 @@
 
         function collect() {
             clearError();
-            const file = dom.connFile.value.trim();
-            if (!file) {
-                setError('请选择 SQLite 数据库文件');
-                dom.connFile.focus();
-                return null;
-            }
-            let name = dom.connName.value.trim();
-            if (!name) {
-                name = U.stripExtension(U.basename(file)) || 'SQLite';
-                dom.connName.value = name;
-            }
-            const busyTimeout = Number(dom.connBusyTimeout.value);
-            const profile = {
-                name: name,
-                engine: 'sqlite',
-                file: file,
-                readOnly: !!dom.connReadOnly.checked,
-                options: {
-                    busyTimeoutMs: Number.isFinite(busyTimeout) && busyTimeout >= 0 ? busyTimeout : 5000,
-                    foreignKeys: !!dom.connForeignKeys.checked,
-                    journalMode: dom.connJournal.value || ''
+            const engine = dom.connEngine.value;
+            let profile;
+
+            if (engine === 'sqlite') {
+                const file = dom.connFile.value.trim();
+                if (!file) {
+                    setError('请选择 SQLite 数据库文件');
+                    dom.connFile.focus();
+                    return null;
                 }
-            };
+                let name = dom.connName.value.trim();
+                if (!name) {
+                    name = U.stripExtension(U.basename(file)) || 'SQLite';
+                    dom.connName.value = name;
+                }
+                const busyTimeout = Number(dom.connBusyTimeout.value);
+                profile = {
+                    name: name,
+                    engine: 'sqlite',
+                    file: file,
+                    readOnly: !!dom.connReadOnly.checked,
+                    options: {
+                        busyTimeoutMs: Number.isFinite(busyTimeout) && busyTimeout >= 0 ? busyTimeout : 5000,
+                        foreignKeys: !!dom.connForeignKeys.checked,
+                        journalMode: dom.connJournal.value || ''
+                    }
+                };
+            } else {
+                const host = dom.connHost.value.trim() || '127.0.0.1';
+                const port = dom.connPort.value.trim() || DEFAULT_PORTS[engine] || '';
+                const user = dom.connUser.value.trim();
+                if (!user) {
+                    setError('请输入数据库用户名');
+                    dom.connUser.focus();
+                    return null;
+                }
+                let name = dom.connName.value.trim();
+                if (!name) {
+                    name = dom.connDatabase.value.trim() || (user + '@' + host);
+                    dom.connName.value = name;
+                }
+                const timeout = Number(dom.connConnectTimeout.value);
+                profile = {
+                    name: name,
+                    engine: engine,
+                    host: host,
+                    port: port,
+                    user: user,
+                    database: dom.connDatabase.value.trim(),
+                    schema: engine === 'postgres' ? dom.connSchema.value.trim() : '',
+                    charset: dom.connCharset.value.trim(),
+                    readOnly: !!dom.connServerReadOnly.checked,
+                    ssl: { mode: dom.connSslMode.value },
+                    options: {
+                        connectTimeoutMs: Number.isFinite(timeout) && timeout > 0 ? timeout : 8000,
+                        initSql: dom.connInitSql.value.trim()
+                    }
+                };
+            }
+
             if (editingId) profile.id = editingId;
-            return profile;
+            return {
+                profile: profile,
+                password: dom.connPassword.value,
+                savePassword: !!dom.connSavePassword.checked
+            };
         }
 
         async function pickFile(save) {
@@ -270,10 +357,11 @@
         }
 
         async function saveProfile(showToast) {
-            const profile = collect();
-            if (!profile) return null;
+            const data = collect();
+            if (!data) return null;
+            const profile = data.profile;
             try {
-                const result = await api.connSave(profile, '', false);
+                const result = await api.connSave(profile, data.password, data.savePassword);
                 if (result && result.id) {
                     editingId = result.id;
                     profile.id = result.id;
@@ -290,14 +378,16 @@
 
         async function testConnection() {
             if (busy) return;
-            const profile = collect();
-            if (!profile) return;
+            const data = collect();
+            if (!data) return;
             setBusy(true);
             setStatus('正在连接…', false);
             try {
-                const result = await api.connTest(profile);
+                const result = await api.connTest(data.profile, data.password);
                 const parts = [];
-                if (result && result.serverVersion) parts.push('SQLite ' + result.serverVersion);
+                if (result && result.serverVersion) {
+                    parts.push((ENGINE_LABELS[data.profile.engine] || '') + ' ' + result.serverVersion);
+                }
                 if (result && result.currentDb) parts.push(result.currentDb);
                 if (result && typeof result.elapsedMs === 'number') parts.push(result.elapsedMs + ' ms');
                 setStatus('连接成功 · ' + parts.join(' · '), true);
@@ -314,15 +404,16 @@
 
         async function connect() {
             if (busy) return;
-            const profile = collect();
-            if (!profile) return;
+            const data = collect();
+            if (!data) return;
+            const profile = data.profile;
             setBusy(true);
             setStatus('正在打开数据库…', false);
             try {
                 if (dom.connSaveBtn && !dom.connSaveBtn.hidden) {
                     // 已保存连接在「连接」时自动落盘（保持列表可复用）。
                     try {
-                        const saved = await api.connSave(profile, '', false);
+                        const saved = await api.connSave(profile, data.password, data.savePassword);
                         if (saved && saved.id) {
                             profile.id = saved.id;
                             editingId = saved.id;
@@ -333,18 +424,18 @@
                     }
                 }
 
-                const opened = await api.connOpen(profile);
+                const opened = await api.connOpen(profile, data.password);
                 const session = {
                     id: opened.sessionId,
                     profile: opened.profile || profile,
                     serverVersion: opened.serverVersion || '',
-                    currentDb: opened.currentDb || 'main',
+                    currentDb: opened.currentDb || (profile.engine === 'sqlite' ? 'main' : profile.database || ''),
                     capabilities: opened.capabilities || {},
-                    engine: (opened.profile && opened.profile.engine) || 'sqlite'
+                    engine: (opened.profile && opened.profile.engine) || profile.engine
                 };
                 closeDialog();
-                toast('已连接 ' + (session.profile.name || 'SQLite') +
-                    (session.serverVersion ? ' · SQLite ' + session.serverVersion : ''));
+                toast('已连接 ' + (session.profile.name || ENGINE_LABELS[session.engine] || '数据库') +
+                    (session.serverVersion ? ' · ' + session.serverVersion : ''));
                 await loadProfiles();
                 if (ctx.onOpen) ctx.onOpen(session);
             } catch (error) {

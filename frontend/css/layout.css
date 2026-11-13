@@ -88,16 +88,6 @@
     gap: 8px;
 }
 
-.version-chip {
-    font-family: var(--font-mono);
-    font-size: 10.5px;
-    color: var(--text-faint);
-    padding: 2px 7px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-pill);
-    white-space: nowrap;
-}
-
 /* ---------------------------------------------------------------- 按钮 */
 .btn {
     display: inline-flex;

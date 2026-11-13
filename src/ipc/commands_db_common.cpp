@@ -1,5 +1,6 @@
 #include "ipc/commands_db_common.h"
 
+#include "db/engine_dialect.h"
 #include "db/identifier.h"
 #include "db/types.h"
 
@@ -92,8 +93,18 @@ db::ConnectParams ParamsFromProfile(const json& profile, const std::string& pass
     params.foreign_keys = BoolValue(options, "foreignKeys", true);
     params.journal_mode = StringValue(options, "journalMode");
 
-    if (params.engine == db::Engine::Sqlite && params.file.empty()) {
-        error = "SQLite 文件路径不能为空";
+    if (params.engine == db::Engine::Sqlite) {
+        if (params.file.empty()) error = "SQLite 文件路径不能为空";
+    } else {
+        if (params.host.empty()) params.host = "127.0.0.1";
+        if (params.port.empty()) params.port = db::DefaultPort(params.engine);
+        if (params.database.empty() && params.engine == db::Engine::Postgres) {
+            params.database = db::DefaultDatabase(params.engine);
+        }
+        if (params.schema.empty() && params.engine == db::Engine::Postgres) {
+            params.schema = "public";
+        }
+        if (params.user.empty()) error = "数据库用户名不能为空";
     }
     return params;
 }
