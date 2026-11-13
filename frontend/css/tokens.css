@@ -1,0 +1,59 @@
+/* 语义 token 的“骨架”部分：与颜色无关的尺寸、字体、动效。
+   颜色 token 由 css/themes/<id>.css 按 data-theme 提供。 */
+:root {
+    --radius-xs: 6px;
+    --radius-sm: 8px;
+    --radius-md: 10px;
+    --radius-lg: 14px;
+    --radius-pill: 999px;
+
+    --topbar-h: 48px;
+    --status-h: 26px;
+    --sidebar-w: 264px;
+    --tabbar-h: 38px;
+
+    --font-ui: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", "PingFang SC", system-ui, sans-serif;
+    --font-mono: "Cascadia Code", "JetBrains Mono", "Consolas", "SFMono-Regular", monospace;
+
+    --dur-fast: 120ms;
+    --dur: 160ms;
+    --ease: cubic-bezier(.2, .8, .2, 1);
+
+    /* 兜底：bloom 浅色（主题文件会覆盖） */
+    --bg-0: #FFF7F9;
+    --bg-1: #FFFFFF;
+    --bg-2: #FCEFF3;
+    --bg-3: #F8E1E8;
+    --bg-stripe: #FEFAFB;
+    --border: #F1DEE5;
+    --border-strong: #B07F95;
+    --text: #3B2A33;
+    --text-dim: #7F6775;
+    --text-faint: #947E8A;
+    --accent: #C2255C;
+    --accent-hover: #A81D4E;
+    --accent-soft: #FCE7EF;
+    --on-accent: #FFFFFF;
+    --accent-2: #7C5CD6;
+    --accent-2-soft: #F2EDFC;
+    --success: #197A50;
+    --warning: #A15C00;
+    --danger: #C92A2A;
+    --info: #1C64B0;
+    --focus-ring: rgba(194, 37, 92, .30);
+    --selection: #F9D3E0;
+    --shadow-1: 0 1px 2px rgba(92, 35, 55, .06);
+    --shadow-2: 0 10px 30px rgba(92, 35, 55, .12);
+    --scroll-thumb: #E4C6D1;
+    --scroll-track: transparent;
+
+    --syntax-keyword: #A61E5A;
+    --syntax-string: #1F6F5C;
+    --syntax-number: #6D4FC4;
+    --syntax-comment: #7F6775;
+    --syntax-function: #96543C;
+    --syntax-type: #1C64B0;
+    --syntax-operator: #5C4652;
+    --syntax-null: #A15C00;
+    --syntax-line: #FFF0F5;
+}

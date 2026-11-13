@@ -1,0 +1,44 @@
+/* 薰衣草 Lilac */
+:root[data-theme="lilac"] {
+    color-scheme: light;
+
+    --bg-0: #FAF7FF;
+    --bg-1: #FFFFFF;
+    --bg-2: #F3EDFC;
+    --bg-3: #EBE1F9;
+    --bg-stripe: #FDFBFF;
+    --border: #EDE3F7;
+    --border-strong: #9A7BC4;
+
+    --text: #2F2438;
+    --text-dim: #6F5F80;
+    --text-faint: #8C7C9D;
+
+    --accent: #6D4FC4;
+    --accent-hover: #5B3FB0;
+    --accent-soft: #F0EBFB;
+    --on-accent: #FFFFFF;
+    --accent-2: #C2255C;
+    --accent-2-soft: #FCE7EF;
+
+    --success: #197A50;
+    --warning: #A15C00;
+    --danger: #C92A2A;
+    --info: #1C64B0;
+
+    --focus-ring: rgba(109, 79, 196, .30);
+    --selection: #E4D8F8;
+    --shadow-1: 0 1px 2px rgba(60, 40, 90, .07);
+    --shadow-2: 0 10px 30px rgba(60, 40, 90, .14);
+    --scroll-thumb: #D6C5EC;
+
+    --syntax-keyword: #6D28A8;
+    --syntax-string: #1F6F5C;
+    --syntax-number: #A61E5A;
+    --syntax-comment: #6F5F80;
+    --syntax-function: #96543C;
+    --syntax-type: #1C64B0;
+    --syntax-operator: #5B4A66;
+    --syntax-null: #A15C00;
+    --syntax-line: #F6F0FE;
+}

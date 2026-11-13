@@ -1,0 +1,44 @@
+/* 薄荷 Mint */
+:root[data-theme="mint"] {
+    color-scheme: light;
+
+    --bg-0: #F5FBF9;
+    --bg-1: #FFFFFF;
+    --bg-2: #EAF6F2;
+    --bg-3: #DDF0E9;
+    --bg-stripe: #FBFEFD;
+    --border: #DFEFE9;
+    --border-strong: #6B9488;
+
+    --text: #22302C;
+    --text-dim: #5C726D;
+    --text-faint: #7C9089;
+
+    --accent: #237668;
+    --accent-hover: #1B6357;
+    --accent-soft: #E4F4EF;
+    --on-accent: #FFFFFF;
+    --accent-2: #6D4FC4;
+    --accent-2-soft: #F0EBFB;
+
+    --success: #197A50;
+    --warning: #A15C00;
+    --danger: #C92A2A;
+    --info: #1C64B0;
+
+    --focus-ring: rgba(35, 118, 104, .30);
+    --selection: #CDE9E1;
+    --shadow-1: 0 1px 2px rgba(30, 70, 60, .07);
+    --shadow-2: 0 10px 30px rgba(30, 70, 60, .14);
+    --scroll-thumb: #C3E0D7;
+
+    --syntax-keyword: #146B5D;
+    --syntax-string: #1F6F5C;
+    --syntax-number: #6D4FC4;
+    --syntax-comment: #5F7570;
+    --syntax-function: #9A5B42;
+    --syntax-type: #1C64B0;
+    --syntax-operator: #3E514C;
+    --syntax-null: #A15C00;
+    --syntax-line: #EFFAF6;
+}

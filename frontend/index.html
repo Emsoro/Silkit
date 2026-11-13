@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="bloom" data-appearance="light">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <title>Silkit</title>
+    <script>
+        // 首帧防闪：在样式加载前确定主题（C++ 侧窗口底色也用同一份配置）
+        (function () {
+            try {
+                var theme = localStorage.getItem('silkit.theme') || 'bloom';
+                var appearance = localStorage.getItem('silkit.appearance') ||
+                    (theme === 'noir' ? 'dark' : 'light');
+                document.documentElement.dataset.theme = theme;
+                document.documentElement.dataset.appearance = appearance;
+            } catch (e) { /* ignore */ }
+        })();
+    </script>
+    <link rel="stylesheet" href="css/tokens.css">
+    <link rel="stylesheet" href="css/themes/bloom.css">
+    <link rel="stylesheet" href="css/themes/noir.css">
+    <link rel="stylesheet" href="css/themes/lilac.css">
+    <link rel="stylesheet" href="css/themes/mocha.css">
+    <link rel="stylesheet" href="css/themes/mint.css">
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/layout.css">
+</head>
+<body>
+<div class="app">
+    <header class="topbar">
+        <div class="brand">
+            <span class="brand-mark">S</span>
+            <span class="brand-name">Silkit</span>
+            <span class="brand-tag">M0</span>
+        </div>
+
+        <div class="topbar-actions">
+            <button class="btn btn-ghost" type="button" data-icon="plug">新建连接</button>
+            <button class="btn btn-ghost" type="button" data-icon="terminal">新建查询</button>
+            <button class="btn btn-ghost" type="button" data-icon="folder">打开 SQL</button>
+            <span class="topbar-sep"></span>
+            <button class="btn btn-ghost" type="button" data-icon="history">最近</button>
+        </div>
+
+        <div class="topbar-right">
+            <button id="pingBtn" class="btn btn-soft" type="button" data-icon="pulse" aria-pressed="false">
+                <span id="pingLabel">自检</span>
+            </button>
+            <button id="themeBtn" class="btn btn-ghost theme-trigger" type="button"
+                    aria-haspopup="dialog" aria-expanded="false" aria-controls="themePanel">
+                <span class="theme-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+                <span id="themeLabel">主题·晨樱</span>
+                <span class="chev" data-icon="chevron"></span>
+            </button>
+            <span class="version-chip" id="versionChip">v0.0.1</span>
+        </div>
+    </header>
+
+    <div class="workspace">
+        <aside class="sidebar">
+            <div class="sidebar-search">
+                <span data-icon="search"></span>
+                <input id="treeFilter" type="search" placeholder="搜索对象…" autocomplete="off" spellcheck="false">
+                <kbd>Ctrl+B</kbd>
+            </div>
+
+            <div class="sidebar-body" id="objectTree">
+                <div class="tree-group">
+                    <button class="tree-node tree-root" type="button" data-depth="0">
+                        <span class="caret open" data-icon="chevron"></span>
+                        <span class="db-dot" style="--dot:#C2255C"></span>
+                        <span class="node-label">本地 SQLite</span>
+                        <span class="node-badge">演示</span>
+                    </button>
+                    <div class="tree-children">
+                        <button class="tree-node" type="button" data-depth="1">
+                            <span class="caret open" data-icon="chevron"></span>
+                            <span data-icon="database"></span>
+                            <span class="node-label">main</span>
+                        </button>
+                        <div class="tree-children">
+                            <button class="tree-node" type="button" data-depth="2">
+                                <span class="caret" data-icon="chevron"></span>
+                                <span data-icon="table"></span>
+                                <span class="node-label">users</span>
+                                <span class="node-badge">6</span>
+                            </button>
+                            <button class="tree-node" type="button" data-depth="2">
+                                <span class="caret" data-icon="chevron"></span>
+                                <span data-icon="table"></span>
+                                <span class="node-label">orders</span>
+                                <span class="node-badge">12</span>
+                            </button>
+                            <button class="tree-node" type="button" data-depth="2">
+                                <span class="caret" data-icon="chevron"></span>
+                                <span data-icon="table"></span>
+                                <span class="node-label">products</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="tree-group">
+                    <button class="tree-node tree-root" type="button" data-depth="0">
+                        <span class="caret" data-icon="chevron"></span>
+                        <span class="db-dot" style="--dot:#7C5CD6"></span>
+                        <span class="node-label">本地 MySQL</span>
+                    </button>
+                    <div class="tree-children" hidden>
+                        <button class="tree-node" type="button" data-depth="1">
+                            <span class="caret" data-icon="chevron"></span>
+                            <span data-icon="database"></span>
+                            <span class="node-label">silkit</span>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="tree-group">
+                    <button class="tree-node tree-root" type="button" data-depth="0">
+                        <span class="caret" data-icon="chevron"></span>
+                        <span class="db-dot" style="--dot:#237668"></span>
+                        <span class="node-label">测试 PostgreSQL</span>
+                    </button>
+                    <div class="tree-children" hidden>
+                        <button class="tree-node" type="button" data-depth="1">
+                            <span class="caret" data-icon="chevron"></span>
+                            <span data-icon="database"></span>
+                            <span class="node-label">public</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar-foot">
+                <span class="status-dot"></span>
+                <span>对象树将在 M1 接入真实元数据</span>
+            </div>
+        </aside>
+
+        <main class="main">
+            <div class="tabbar" role="tablist" aria-label="工作区">
+                <button class="tab active" type="button" role="tab" aria-selected="true">
+                    <span data-icon="terminal"></span>
+                    <span class="tab-label">查询 1</span>
+                    <span class="tab-dot"></span>
+                </button>
+                <button class="tab" type="button" role="tab" aria-selected="false">
+                    <span data-icon="table"></span>
+                    <span class="tab-label">表: users</span>
+                </button>
+                <button class="tab-add" type="button" data-icon="plus" aria-label="新建标签"></button>
+            </div>
+
+            <section class="editor-pane" id="editorPane">
+                <div class="editor-head">
+                    <span class="win-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+                    <span class="editor-title">查询 1</span>
+                    <span class="editor-sub">演示 · 尚未连接数据库</span>
+                    <span class="spacer"></span>
+                    <button class="btn btn-mini" type="button" data-icon="play" id="runBtn">运行</button>
+                </div>
+                <div class="editor-body">
+                    <div class="line-gutter" aria-hidden="true">1
+2
+3
+4
+5
+6</div>
+                    <textarea id="sqlEditor" spellcheck="false" autocomplete="off"
+                              aria-label="SQL 编辑器">-- Silkit M0：主题系统与异步 IPC
+-- 连上数据库后这里会换成 CodeMirror 5（M4）
+SELECT u.id, u.name, u.email, u.created_at
+FROM users AS u
+WHERE u.status = 'active'
+ORDER BY u.created_at DESC
+LIMIT 100;</textarea>
+                </div>
+            </section>
+
+            <div class="splitter" id="splitter" role="separator" aria-orientation="horizontal"
+                 aria-label="调整编辑器高度" tabindex="0"></div>
+
+            <section class="results">
+                <div class="result-tabs" role="tablist" aria-label="结果">
+                    <button class="rtab active" type="button" role="tab" data-target="resultGrid" aria-selected="true">
+                        <span data-icon="grid"></span> 结果
+                        <span class="rtab-count">6</span>
+                    </button>
+                    <button class="rtab" type="button" role="tab" data-target="messageLog" aria-selected="false">
+                        <span data-icon="message"></span> 消息
+                        <span class="rtab-count" id="msgCount" hidden>0</span>
+                    </button>
+                    <span class="spacer"></span>
+                    <span class="result-meta" id="resultMeta">演示数据 · 12 ms</span>
+                </div>
+
+                <div class="result-body">
+                    <div id="resultGrid" class="grid-wrap" role="tabpanel">
+                        <table class="data-grid">
+                            <thead>
+                            <tr>
+                                <th class="col-num">id</th>
+                                <th>name</th>
+                                <th>email</th>
+                                <th>status</th>
+                                <th>created_at</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <tr><td class="col-num">1</td><td>林知夏</td><td>zhixia@example.com</td><td><span class="pill pill-ok">active</span></td><td>2026-11-02 09:14:20</td></tr>
+                            <tr><td class="col-num">2</td><td>Alice Chen</td><td>alice@example.com</td><td><span class="pill pill-ok">active</span></td><td>2026-11-03 14:02:11</td></tr>
+                            <tr><td class="col-num">3</td><td>Mika</td><td>mika@example.com</td><td><span class="pill pill-muted">pending</span></td><td>2026-11-05 18:40:07</td></tr>
+                            <tr><td class="col-num">4</td><td>苏晚</td><td>suwan@example.com</td><td><span class="pill pill-ok">active</span></td><td>2026-11-07 08:21:33</td></tr>
+                            <tr><td class="col-num">5</td><td>Nora</td><td>nora@example.com</td><td><span class="pill pill-warn">review</span></td><td>2026-11-09 11:55:02</td></tr>
+                            <tr><td class="col-num">6</td><td>陈见月</td><td>jianyue@example.com</td><td><span class="pill pill-ok">active</span></td><td>2026-11-11 20:13:45</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div id="messageLog" class="log-wrap" role="tabpanel" hidden>
+                        <div class="log-empty">
+                            <span data-icon="pulse"></span>
+                            <p>还没有消息</p>
+                            <p class="muted">点击顶栏「自检」运行一次异步 IPC 往返：3 条进度 + 1 条结果。</p>
+                        </div>
+                        <ol class="log-list" id="logList"></ol>
+                    </div>
+                </div>
+
+                <div class="result-foot">
+                    <span>6 行</span>
+                    <span class="dot-sep"></span>
+                    <span>UTF-8</span>
+                    <span class="spacer"></span>
+                    <span class="hint"><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>T</kbd> 主题面板</span>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <footer class="statusbar">
+        <span class="status-item"><i class="dot dot-muted"></i>未连接</span>
+        <span class="status-item">M0 · 主题与异步 IPC</span>
+        <span class="spacer"></span>
+        <span class="status-item" id="ipcStatus">IPC 就绪</span>
+        <span class="status-item" id="statusTheme">晨樱</span>
+        <span class="status-item" id="statusVersion">v0.0.1</span>
+    </footer>
+</div>
+
+<div id="themePanel" class="theme-panel" role="dialog" aria-modal="false" aria-label="主题选择" hidden>
+    <div class="theme-panel-head">
+        <span>外观</span>
+        <span class="muted">5 套调色板</span>
+        <kbd>Ctrl+Shift+T</kbd>
+    </div>
+    <div class="theme-list" id="themeList" role="listbox" aria-label="主题列表"></div>
+    <div class="theme-panel-foot">
+        <span>1–5 快选</span><span class="dot-sep"></span><span>Esc 关闭</span>
+        <span class="spacer"></span><span>自动保存</span>
+    </div>
+</div>
+
+<div id="toastHost" class="toast-host" aria-live="polite"></div>
+
+<script src="js/mock/mock.js"></script>
+<script src="js/bridge.js"></script>
+<script src="js/api.js"></script>
+<script src="js/icons.js"></script>
+<script src="js/themes.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

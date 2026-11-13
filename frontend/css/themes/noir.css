@@ -1,0 +1,44 @@
+/* 夜樱 Noir —— 深色主题 */
+:root[data-theme="noir"] {
+    color-scheme: dark;
+
+    --bg-0: #17121A;
+    --bg-1: #1E1722;
+    --bg-2: #271E2C;
+    --bg-3: #332637;
+    --bg-stripe: #1B141F;
+    --border: #3A2C40;
+    --border-strong: #857292;
+
+    --text: #F4E9EF;
+    --text-dim: #B7A2AE;
+    --text-faint: #9A848F;
+
+    --accent: #F06595;
+    --accent-hover: #FF85AC;
+    --accent-soft: #3A2230;
+    --on-accent: #2B0A18;
+    --accent-2: #A78BFA;
+    --accent-2-soft: #2E2440;
+
+    --success: #4AD295;
+    --warning: #F0B24A;
+    --danger: #FF7A85;
+    --info: #7FB3F0;
+
+    --focus-ring: rgba(240, 101, 149, .35);
+    --selection: #4A2334;
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, .35);
+    --shadow-2: 0 14px 40px rgba(0, 0, 0, .50);
+    --scroll-thumb: #4B3A52;
+
+    --syntax-keyword: #FF8FB1;
+    --syntax-string: #7FD6B4;
+    --syntax-number: #C4A9FF;
+    --syntax-comment: #9C8794;
+    --syntax-function: #E8A87C;
+    --syntax-type: #8CC2F5;
+    --syntax-operator: #D6C3CD;
+    --syntax-null: #F0B24A;
+    --syntax-line: #241A29;
+}
