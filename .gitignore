@@ -50,3 +50,7 @@ logs/
 *.part
 Thumbs.db
 
+# Python
+__pycache__/
+*.pyc
+
