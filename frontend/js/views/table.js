@@ -39,6 +39,7 @@
         function init() {
             const ids = ['tablePane', 'tableName', 'tableBadge', 'tableInsertBtn', 'tableDeleteBtn',
                 'tableRevertBtn', 'tableSaveBtn', 'tableReloadBtn', 'tableCountBtn', 'tableTruncateBtn',
+                'tableDesignBtn',
                 'tableSearch', 'tableFilterColumn', 'tableFilterOp', 'tableFilterValue',
                 'tableFilterAdd', 'tableFilterClear', 'tableFilterChips', 'tableGrid', 'tableStatus',
                 'tablePrev', 'tableNext', 'tablePage', 'tablePageSize', 'tableTotal', 'tableError',
@@ -896,25 +897,15 @@
             toast('保存失败，已回滚：' + message, 'error');
         }
 
-        async function truncate(tab) {
+        function truncate(tab) {
             const t = ensure(tab);
             const session = sessionFor(tab);
             if (!session) return;
-            const name = t.ref && t.ref.name;
-            const input = window.prompt(
-                '清空表「' + name + '」将删除全部数据，且无法撤销。\n请输入表名确认：');
-            if (input == null) return;
-            if (input !== name) {
-                toast('表名不匹配，已取消', 'warn');
+            if (ctx.designer) {
+                ctx.designer.openTruncateTable(session, t.ref);
                 return;
             }
-            try {
-                const result = await api.tableTruncate(session.id, t.ref, input);
-                toast('已清空表 · 影响 ' + U.formatNumber(result.affected || 0) + ' 行');
-                load(tab);
-            } catch (error) {
-                toast('清空失败：' + ((error && error.message) || error), 'error');
-            }
+            toast('当前版本不支持清空表', 'warn');
         }
 
         // ------------------------------------------------------------ 工具栏
@@ -961,6 +952,14 @@
                 dom.tableTruncateBtn.addEventListener('click', function () {
                     const tab = state.activeTab();
                     if (tab) truncate(tab);
+                });
+            }
+            if (dom.tableDesignBtn) {
+                dom.tableDesignBtn.addEventListener('click', function () {
+                    const tab = state.activeTab();
+                    if (!tab || tab.kind !== 'table') return;
+                    const session = sessionFor(tab);
+                    if (session && ctx.designer) ctx.designer.openTableDesigner(session, tab.ref);
                 });
             }
             if (dom.tablePrev) {

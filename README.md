@@ -3,7 +3,7 @@
 跨库数据库工作台（MySQL / MariaDB / PostgreSQL / SQLite），Windows 桌面端。
 C++17 + Win32 + WebView2，前端为原生 HTML/CSS/JS，无 Node 构建步骤。
 
-> 当前进度：**M0–M4 已交付验收 + M5 表格数据编辑已交付验收**：连接 → 对象树 → CodeMirror SQL 编辑器 → 流式结果（多结果/CSV·JSON 导出/EXPLAIN）→ 表格数据编辑（分页/筛选/网格内联编辑/事务保存/回滚/单元格查看）→ 历史/片段 → 标签持久化恢复。
+> 当前进度：**M0–M4 已交付验收 + M5 表格数据编辑已交付验收 + M6 表设计器与 DDL 已交付**：连接 → 对象树 → CodeMirror SQL 编辑器 → 流式结果（多结果/CSV·JSON 导出/EXPLAIN）→ 表格数据编辑（分页/筛选/网格内联编辑/事务保存/回滚/单元格查看）→ 表设计器（列/索引/外键/选项/SQL 预览与令牌执行）→ 历史/片段 → 标签持久化恢复。
 > 完整计划与偏差记录见 [CODEPLAN.md](CODEPLAN.md)。
 
 ## M0 已交付
@@ -25,6 +25,16 @@ C++17 + Win32 + WebView2，前端为原生 HTML/CSS/JS，无 Node 构建步骤�
 - **前端**：连接对话框与文件选择、对象树懒加载/右键菜单（重连、只读）、查询标签、虚拟滚动结果网格、TSV 复制、长文本/BLOB 单元格查看器、最近查询
 - **安全**：DPAPI 保存密码、`conn.list` 脱敏、驱动层拦截写语句、标识符引用与值参数化
 - **测试**：`silkit_smoke`（纯逻辑/内存库/会话）与 `sqlite_driver`（驱动健壮性与会话状态回归），均由 CTest 运行
+
+## M6 表设计器与 DDL 已交付
+
+- **三引擎 DDL 生成**：`db/ddl_builder` 生成 SQLite / MySQL / PostgreSQL 的 CREATE / ALTER / DROP / TRUNCATE，覆盖列、主键、自增、默认值、注释、索引、外键与 MySQL 表选项。
+- **表设计器**：对象树「设计表」或工具栏「设计」打开；列/索引/外键可增删与上下移动，选项、类型建议、SQL 预览与警告分面板展示；脏状态阻止误关闭。
+- **统一预览与令牌**：`ddl.preview` 生成 SQL 与 FNV-1a 令牌，`ddl.apply` 校验令牌后执行；DDL 变更即失效，执行失败返回失败语句、已执行条数与是否回滚。
+- **危险操作确认**：删除表 / 清空表 / 删除数据库需输入对象名；MySQL 显示不可回滚警告，PG/SQLite 使用事务或保存点。
+- **SQLite 限制提示**：修改列定义、主键或外键时明确提示「不支持，请重建表」，不静默降级。
+- **库与对象 DDL**：MySQL/PG 新建/删除数据库；视图/函数/触发器在详情面板查看 DDL 并保存为 `.sql`。
+- **测试**：CTest `ddl_builder` 覆盖三引擎 SQL 生成、令牌失效与参数校验；`sqlite_fixture` 校验 `data/silkit_test.db` 夹具的元数据、数据与只读保护，并在临时副本上执行文件库 DDL；`integration_db` 在 SQLite 内存库、真实 MySQL 8.4.13 与 PostgreSQL 18.0.7 上完成建表→改表→重命名→清空→删除→建库/删库全链路。夹具可用 `python tools/make_test_db.py` 重建。
 
 ## M5 表格数据编辑已交付
 

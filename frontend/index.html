@@ -33,7 +33,7 @@
 <div class="app">
     <header class="topbar">
         <div class="brand">
-            <span class="brand-tag">M5</span>
+            <span class="brand-tag">M6</span>
         </div>
 
         <div class="topbar-actions">
@@ -113,6 +113,8 @@
                             title="执行 COUNT(*)，得到精确行数">精确计数</button>
                     <button class="btn btn-mini btn-danger-soft" type="button" id="tableTruncateBtn"
                             title="清空整张表（需输入表名确认）">清空</button>
+                    <button class="btn btn-mini" type="button" id="tableDesignBtn" data-icon="table"
+                            title="打开表设计器（列/索引/外键/DDL 预览）">设计</button>
                     <button class="btn btn-mini" type="button" id="tableViewCellBtn" data-icon="eye"
                             title="查看当前单元格全文（也可双击只读单元格）">查看</button>
                 </div>
@@ -478,6 +480,7 @@
             <span class="muted" id="detailKind"></span>
             <span class="spacer"></span>
             <button id="detailCopy" class="btn" type="button" data-icon="copy" hidden>复制 DDL</button>
+            <button id="detailSave" class="btn" type="button" data-icon="save" hidden>保存为 .sql</button>
         </div>
     </div>
 </div>
@@ -520,6 +523,145 @@
     </div>
 </div>
 
+<!-- ---------------------------------------------------------------- 表设计器（M6） -->
+<div id="designerDialog" class="modal" hidden>
+    <div class="modal-dialog modal-designer" role="dialog" aria-modal="true"
+         aria-labelledby="designerTitle">
+        <div class="modal-head">
+            <div class="modal-title">
+                <span data-icon="table"></span>
+                <span id="designerTitle">表设计器</span>
+                <span class="designer-dirty" id="designerDirty" hidden>未应用</span>
+            </div>
+            <button class="icon-btn" type="button" data-icon="close"
+                    id="designerClose" aria-label="关闭"></button>
+        </div>
+        <div class="designer-sub" id="designerSub"></div>
+        <div class="designer-tabs" role="tablist">
+            <button class="designer-tab is-active" type="button" data-panel="columns">列</button>
+            <button class="designer-tab" type="button" data-panel="indexes">索引</button>
+            <button class="designer-tab" type="button" data-panel="foreign">外键</button>
+            <button class="designer-tab" type="button" data-panel="options">选项</button>
+            <button class="designer-tab" type="button" data-panel="sql">SQL</button>
+        </div>
+        <div class="designer-error" id="designerError" hidden></div>
+        <div class="designer-body">
+            <section class="designer-panel" data-panel="columns">
+                <div class="designer-hint">主键可多选以组成复合主键；修改列名会自动生成重命名语句。</div>
+                <div class="designer-table-wrap">
+                    <table class="designer-grid" id="designerColumns">
+                        <thead>
+                        <tr>
+                            <th>列名</th><th>类型</th><th class="col-flag">非空</th>
+                            <th class="col-flag">主键</th><th class="col-flag">自增</th>
+                            <th>默认值</th><th>注释</th><th class="col-ops">操作</th>
+                        </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <button class="btn btn-mini" type="button" id="designerAddColumn">+ 添加列</button>
+                <datalist id="designerTypeList"></datalist>
+                <datalist id="designerColumnList"></datalist>
+            </section>
+            <section class="designer-panel" data-panel="indexes" hidden>
+                <div class="designer-hint">索引列用英文逗号分隔；留空名称时由后端自动命名。</div>
+                <div class="designer-table-wrap">
+                    <table class="designer-grid" id="designerIndexes">
+                        <thead>
+                        <tr><th>索引名</th><th class="col-flag">唯一</th><th>列（逗号分隔）</th>
+                            <th class="col-ops">操作</th></tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <button class="btn btn-mini" type="button" id="designerAddIndex">+ 添加索引</button>
+            </section>
+            <section class="designer-panel" data-panel="foreign" hidden>
+                <div class="designer-hint">外键列与引用列数量必须一致；SQLite 建表后不能修改外键。</div>
+                <div class="designer-table-wrap">
+                    <table class="designer-grid" id="designerForeignKeys">
+                        <thead>
+                        <tr><th>名称</th><th>本表列</th><th>引用表</th><th>引用列</th>
+                            <th>ON UPDATE</th><th>ON DELETE</th><th class="col-ops">操作</th></tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+                <button class="btn btn-mini" type="button" id="designerAddForeignKey">+ 添加外键</button>
+                <datalist id="designerTableList"></datalist>
+            </section>
+            <section class="designer-panel" data-panel="options" hidden>
+                <div class="designer-form">
+                    <label class="field"><span class="field-label">表名</span>
+                        <input class="input mono" id="designerTableName" autocomplete="off"></label>
+                    <label class="field"><span class="field-label">库 / Schema</span>
+                        <input class="input mono" id="designerScope" readonly></label>
+                    <label class="field"><span class="field-label">存储引擎</span>
+                        <input class="input mono" id="designerEngine" placeholder="InnoDB" autocomplete="off"></label>
+                    <label class="field"><span class="field-label">字符集</span>
+                        <input class="input mono" id="designerCharset" placeholder="utf8mb4" autocomplete="off"></label>
+                    <label class="field"><span class="field-label">排序规则</span>
+                        <input class="input mono" id="designerCollation" placeholder="utf8mb4_general_ci"
+                               autocomplete="off"></label>
+                    <label class="field designer-field-wide"><span class="field-label">表注释</span>
+                        <input class="input" id="designerComment" autocomplete="off"></label>
+                </div>
+                <div class="designer-hint" id="designerOptionHint"></div>
+            </section>
+            <section class="designer-panel" data-panel="sql" hidden>
+                <div class="designer-sql-head">
+                    <span class="designer-hint">执行前必须先生成并确认 SQL；变更后令牌自动失效。</span>
+                    <span class="spacer"></span>
+                    <button class="btn btn-mini" type="button" id="designerPreview2" data-icon="bolt">
+                        重新预览
+                    </button>
+                </div>
+                <pre class="designer-sql" id="designerSql">尚未生成 SQL。点击底部「预览 SQL」。</pre>
+                <div class="designer-warnings" id="designerWarnings"></div>
+            </section>
+        </div>
+        <div class="modal-foot">
+            <span class="designer-foot-note" id="designerFootNote"></span>
+            <span class="spacer"></span>
+            <button class="btn" type="button" id="designerCancel">关闭</button>
+            <button class="btn" type="button" id="designerPreview" data-icon="bolt">预览 SQL</button>
+            <button class="btn btn-primary" type="button" id="designerApply" disabled>执行</button>
+        </div>
+    </div>
+</div>
+
+<!-- ---------------------------------------------------------------- DDL 确认（M6） -->
+<div id="ddlConfirm" class="modal" hidden>
+    <div class="modal-dialog modal-wide modal-preview" role="dialog" aria-modal="true"
+         aria-labelledby="ddlConfirmTitle">
+        <div class="modal-head">
+            <div class="modal-title">
+                <span data-icon="bolt"></span>
+                <span id="ddlConfirmTitle">确认执行 DDL</span>
+            </div>
+            <button class="icon-btn" type="button" data-icon="close"
+                    id="ddlConfirmClose" aria-label="关闭"></button>
+        </div>
+        <div class="preview-sub" id="ddlConfirmSub"></div>
+        <div class="preview-body">
+            <pre class="designer-sql" id="ddlConfirmSql"></pre>
+            <div class="designer-warnings" id="ddlConfirmWarn"></div>
+            <label class="field" id="ddlConfirmNameField">
+                <span class="field-label">输入名称确认</span>
+                <input class="input mono" id="ddlConfirmName" autocomplete="off">
+            </label>
+            <div class="form-error" id="ddlConfirmError" hidden></div>
+        </div>
+        <div class="modal-foot">
+            <span class="muted" id="ddlConfirmNote"></span>
+            <span class="spacer"></span>
+            <button class="btn" type="button" id="ddlConfirmCancel">取消</button>
+            <button class="btn btn-primary" type="button" id="ddlConfirmRun" disabled>执行</button>
+        </div>
+    </div>
+</div>
+
 <div id="toastHost" class="toast-host" aria-live="polite"></div>
 
 <script src="js/mock/mock.js"></script>
@@ -546,6 +688,7 @@
 <script src="js/views/tree.js"></script>
 <script src="js/views/connection.js"></script>
 <script src="js/views/detail.js"></script>
+<script src="js/views/designer.js"></script>
 <script src="js/views/history.js"></script>
 <script src="js/workbench.js"></script>
 <script src="js/app.js"></script>

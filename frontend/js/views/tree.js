@@ -9,6 +9,10 @@
         views: '视图',
         indexes: '索引',
         triggers: '触发器',
+        routines: '例程',
+        events: '事件',
+        sequences: '序列',
+        databases: '数据库',
         columns: '列',
         foreign_keys: '外键'
     };
@@ -78,6 +82,16 @@
         // ------------------------------------------------------------ 会话
         function sessionOf(node) {
             return node ? state.session(node.getAttribute('data-session')) : null;
+        }
+
+        function engineOf(session) {
+            return (session && session.profile && session.profile.engine) ||
+                (session && session.engine) || 'sqlite';
+        }
+
+        function supportsDatabase(session) {
+            const engine = engineOf(session);
+            return engine === 'mysql' || engine === 'postgres';
         }
 
         function addSession(session) {
@@ -216,6 +230,9 @@
             if (kind === 'database') return 'database';
             if (kind === 'table') return 'table';
             if (kind === 'view') return 'eye';
+            if (kind === 'routine') return 'terminal';
+            if (kind === 'event') return 'bolt';
+            if (kind === 'sequence') return 'pulse';
             if (kind === 'index') return 'key';
             if (kind === 'trigger') return 'bolt';
             if (kind === 'column') return 'column';
@@ -225,6 +242,10 @@
                 if (name === 'views') return 'eye';
                 if (name === 'indexes') return 'key';
                 if (name === 'triggers') return 'bolt';
+                if (name === 'routines') return 'terminal';
+                if (name === 'events') return 'bolt';
+                if (name === 'sequences') return 'pulse';
+                if (name === 'databases') return 'database';
                 if (name === 'columns') return 'column';
                 if (name === 'foreign_keys') return 'link';
             }
@@ -418,13 +439,15 @@
             if (!session) return;
             const kind = node.getAttribute('data-kind');
             const name = node.getAttribute('data-name');
-            const database = node.getAttribute('data-database') || 'main';
+            const ref = descriptorFor(node);
             if (kind === 'table' || kind === 'view') {
-                ctx.openTable(session, { kind: kind, name: name, database: database });
+                ctx.openTable(session, { kind: kind, name: name, database: ref.database,
+                    schema: ref.schema });
             } else if (kind === 'connection') {
                 ctx.connections.openForSession(session);
-            } else if (kind === 'index' || kind === 'trigger') {
-                ctx.showDdl(session.id, { kind: kind, name: name, database: database });
+            } else if (kind === 'index' || kind === 'trigger' || kind === 'routine' ||
+                kind === 'event' || kind === 'sequence') {
+                ctx.showDdl(session.id, ref);
             }
         }
 
@@ -442,24 +465,52 @@
             if (kind === 'connection') {
                 items.push({ action: 'refresh', label: '刷新对象树' });
                 items.push({ action: 'reconnect', label: '重新连接' });
+                if (supportsDatabase(session)) {
+                    items.push({ action: 'create-database', label: '新建数据库…' });
+                }
                 items.push({ action: 'toggle-readonly',
                     label: session.readOnly ? '关闭只读模式' : '设为只读模式' });
                 items.push({ action: 'edit', label: '编辑连接…' });
                 items.push({ separator: true });
                 items.push({ action: 'disconnect', label: '断开连接', danger: true });
-            } else if (kind === 'table' || kind === 'view') {
+            } else if (kind === 'table') {
                 items.push({ action: 'open-data', label: '打开数据' });
                 items.push({ action: 'detail', label: '查看结构与索引' });
                 items.push({ action: 'ddl', label: '查看 DDL' });
                 items.push({ action: 'generate-select', label: '生成 SELECT' });
                 items.push({ separator: true });
+                items.push({ action: 'design-table', label: '设计表…' });
+                items.push({ action: 'truncate-table', label: '清空表…', danger: true });
+                items.push({ action: 'drop-table', label: '删除表…', danger: true });
+                items.push({ separator: true });
                 items.push({ action: 'copy-name', label: '复制名称' });
-            } else if (kind === 'index' || kind === 'trigger') {
+            } else if (kind === 'view') {
+                items.push({ action: 'open-data', label: '打开数据' });
+                items.push({ action: 'detail', label: '查看结构' });
+                items.push({ action: 'ddl', label: '查看 DDL' });
+                items.push({ action: 'generate-select', label: '生成 SELECT' });
+                items.push({ separator: true });
+                items.push({ action: 'copy-name', label: '复制名称' });
+            } else if (kind === 'index' || kind === 'trigger' || kind === 'routine' ||
+                kind === 'event' || kind === 'sequence') {
                 items.push({ action: 'ddl', label: '查看 DDL' });
                 items.push({ action: 'copy-name', label: '复制名称' });
             } else if (kind === 'column' || kind === 'foreign_key') {
                 items.push({ action: 'copy-name', label: '复制名称' });
-            } else if (kind === 'database' || kind === 'folder') {
+            } else if (kind === 'database') {
+                items.push({ action: 'create-table', label: '新建表…' });
+                items.push({ action: 'refresh-node', label: '刷新' });
+                items.push({ action: 'copy-name', label: '复制名称' });
+                if (supportsDatabase(session)) {
+                    items.push({ separator: true });
+                    items.push({ action: 'drop-database', label: '删除数据库…', danger: true });
+                }
+            } else if (kind === 'folder') {
+                if (name === 'tables') {
+                    items.push({ action: 'create-table', label: '新建表…' });
+                } else if (name === 'databases' && supportsDatabase(session)) {
+                    items.push({ action: 'create-database', label: '新建数据库…' });
+                }
                 items.push({ action: 'refresh-node', label: '刷新' });
                 items.push({ action: 'copy-name', label: '复制名称' });
             }
@@ -503,10 +554,38 @@
             if (!session) return;
             const kind = node.getAttribute('data-kind');
             const name = node.getAttribute('data-name');
-            const database = node.getAttribute('data-database') || 'main';
-            const ref = { kind: kind, name: name, database: database };
+            const ref = descriptorFor(node);
 
             switch (action) {
+                case 'design-table':
+                    if (ctx.designer) ctx.designer.openTableDesigner(session, ref);
+                    break;
+                case 'create-table':
+                    if (ctx.designer) {
+                        ctx.designer.openTableDesigner(session, {
+                            kind: 'folder',
+                            database: ref.database,
+                            schema: ref.schema
+                        });
+                    }
+                    break;
+                case 'drop-table':
+                    if (ctx.designer) ctx.designer.openDropTable(session, ref);
+                    break;
+                case 'truncate-table':
+                    if (ctx.designer) ctx.designer.openTruncateTable(session, ref);
+                    break;
+                case 'create-database':
+                    if (ctx.designer) ctx.designer.openCreateDatabase(session, ref);
+                    break;
+                case 'drop-database':
+                    if (ctx.designer) {
+                        ctx.designer.openDropDatabase(session, {
+                            database: ref.database && ref.database !== 'main'
+                                ? ref.database : name
+                        });
+                    }
+                    break;
                 case 'refresh':
                 case 'refresh-node':
                     if (kind === 'connection') refreshSession(session.id);

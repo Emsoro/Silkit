@@ -288,11 +288,17 @@ std::string ListIndexesSql(Engine engine, const std::string& scope,
 std::string ListForeignKeysSql(Engine engine, const std::string& scope,
                                const std::string& table) {
     if (engine == Engine::MySql) {
-        return "SELECT CONSTRAINT_NAME, COLUMN_NAME, REFERENCED_TABLE_NAME,"
-               " REFERENCED_COLUMN_NAME, UPDATE_RULE, DELETE_RULE"
-               " FROM information_schema.KEY_COLUMN_USAGE WHERE " + MySqlSchemaFilter(scope) +
-               " AND TABLE_NAME = " + Lit(table) +
-               " AND REFERENCED_TABLE_NAME IS NOT NULL ORDER BY CONSTRAINT_NAME, ORDINAL_POSITION";
+        // MySQL 8 的 KEY_COLUMN_USAGE 没有 UPDATE_RULE/DELETE_RULE，需要关联
+        // REFERENTIAL_CONSTRAINTS 才能拿到级联规则。
+        return "SELECT k.CONSTRAINT_NAME, k.COLUMN_NAME, k.REFERENCED_TABLE_NAME,"
+               " k.REFERENCED_COLUMN_NAME, r.UPDATE_RULE, r.DELETE_RULE"
+               " FROM information_schema.KEY_COLUMN_USAGE k"
+               " JOIN information_schema.REFERENTIAL_CONSTRAINTS r"
+               " ON r.CONSTRAINT_SCHEMA = k.CONSTRAINT_SCHEMA"
+               " AND r.CONSTRAINT_NAME = k.CONSTRAINT_NAME AND r.TABLE_NAME = k.TABLE_NAME"
+               " WHERE k.TABLE_SCHEMA = " + Lit(scope) + " AND k.TABLE_NAME = " + Lit(table) +
+               " AND k.REFERENCED_TABLE_NAME IS NOT NULL"
+               " ORDER BY k.CONSTRAINT_NAME, k.ORDINAL_POSITION";
     }
     return "SELECT con.conname, pg_get_constraintdef(con.oid)"
            " FROM pg_constraint con JOIN pg_class c ON c.oid = con.conrelid"
@@ -392,6 +398,15 @@ std::string DdlSql(Engine engine, const std::string& kind,
         return "SELECT pg_get_functiondef(p.oid) FROM pg_proc p"
                " JOIN pg_namespace n ON n.oid = p.pronamespace"
                " WHERE " + PgSchemaFilter(scope) + " AND p.proname = " + Lit(name) + " LIMIT 1";
+    }
+    if (kind == "sequence") {
+        return "SELECT format('CREATE SEQUENCE %I.%I INCREMENT BY %s MINVALUE %s MAXVALUE %s"
+               " START WITH %s CACHE %s%s;', n.nspname, c.relname, s.seqincrement, s.seqmin,"
+               " s.seqmax, s.seqstart, s.seqcache, CASE WHEN s.seqcycle THEN ' CYCLE' ELSE '' END)"
+               " FROM pg_sequence s"
+               " JOIN pg_class c ON c.oid = s.seqrelid"
+               " JOIN pg_namespace n ON n.oid = c.relnamespace"
+               " WHERE " + PgSchemaFilter(scope) + " AND c.relname = " + Lit(name);
     }
     // PG 没有 SHOW CREATE TABLE：由上层从 pg_catalog 重建（M3-5 简化实现）。
     return {};

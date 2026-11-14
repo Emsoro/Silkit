@@ -19,6 +19,7 @@ set(SILKIT_TEST_LIB_SOURCES
     "${CMAKE_SOURCE_DIR}/src/db/session.cpp"
     "${CMAKE_SOURCE_DIR}/src/db/session_manager.cpp"
     "${CMAKE_SOURCE_DIR}/src/db/table_ops.cpp"
+    "${CMAKE_SOURCE_DIR}/src/db/ddl_builder.cpp"
     "${CMAKE_SOURCE_DIR}/src/db/drivers/sqlite_driver.cpp"
     "${CMAKE_SOURCE_DIR}/src/db/drivers/mysql_driver.cpp"
     "${CMAKE_SOURCE_DIR}/src/db/drivers/postgres_driver.cpp"
@@ -72,6 +73,20 @@ add_executable(test_table_ops test_table_ops.cpp)
 target_link_libraries(test_table_ops PRIVATE silkit_test_lib)
 add_test(NAME table_ops COMMAND test_table_ops)
 set_tests_properties(table_ops PROPERTIES TIMEOUT 30)
+
+add_executable(test_ddl_builder test_ddl_builder.cpp)
+target_link_libraries(test_ddl_builder PRIVATE silkit_test_lib)
+add_test(NAME ddl_builder COMMAND test_ddl_builder)
+set_tests_properties(ddl_builder PROPERTIES TIMEOUT 30)
+
+# SQLite 文件库夹具：data/silkit_test.db 由 tools/make_test_db.py 生成。
+add_executable(test_sqlite_fixture test_sqlite_fixture.cpp)
+target_link_libraries(test_sqlite_fixture PRIVATE silkit_test_lib)
+target_compile_definitions(test_sqlite_fixture PRIVATE
+    SILKIT_TEST_DATA_DIR="${CMAKE_SOURCE_DIR}/data"
+)
+add_test(NAME sqlite_fixture COMMAND test_sqlite_fixture)
+set_tests_properties(sqlite_fixture PROPERTIES TIMEOUT 30)
 
 add_executable(integration_db integration_db.cpp)
 target_link_libraries(integration_db PRIVATE silkit_test_lib)

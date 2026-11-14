@@ -25,12 +25,12 @@
 | M3 | PostgreSQL 驱动 | ✅ | 6–7 d | v0.3.0 |
 | M4 | 查询工作区（编辑器/多结果/历史/补全） | 🟡 | 6–7 d | v0.4.0 |
 | M5 | 表格数据编辑（CRUD/筛选/分页/单元格查看） | 🟢 | 8–10 d | v0.5.0 |
-| M6 | 表设计器与 DDL 管理 | ⬜ | 8–10 d | v0.6.0 |
+| M6 | 表设计器与 DDL 管理 | 🟡 | 8–10 d | v0.6.0 |
 | M7 | 导入 / 导出 / 转储 | ⬜ | 5–6 d | v0.7.0 |
 | M8 | 设置、主题、会话恢复、安全与打磨 | ⬜ | 5–6 d | v0.8.0 |
 | M9 | 发布 1.0（图标/文档/兼容性/安装包） | ⬜ | 3–4 d | v1.0.0 |
 
-> 2026-11-14 回写：M0 全部交付；M1 的「连接 → 对象树 → 查询 → 结果」链路已端到端跑通，当前 `v0.1.0`。**M2 / M3 已实现并对照真实服务器验收**（MySQL 8.4.13 / PostgreSQL 18.0.7）。**M4 已交付并运行时验收**。**M5 已交付并运行时验收**：表格数据编辑（CRUD/筛选/分页/单元格查看/事务回滚）经 CDP 探针对照 MySQL 8.4.13 / PostgreSQL 18.0.7 全绿，CTest `table_ops`（SQLite）通过。期间修复一个影响 M1–M4 的 MySQL 数值列误判为二进制而 base64 编码的潜伏 bug。下一里程碑为 **M6（表设计器与 DDL）**。
+> 2026-11-14 回写：M0 全部交付；M1 的「连接 → 对象树 → 查询 → 结果」链路已端到端跑通，当前 `v0.1.0`。**M2 / M3 已实现并对照真实服务器验收**（MySQL 8.4.13 / PostgreSQL 18.0.7）。**M4 已交付并运行时验收**。**M5 已交付并运行时验收**：表格数据编辑（CRUD/筛选/分页/单元格查看/事务回滚）经 CDP 探针对照 MySQL 8.4.13 / PostgreSQL 18.0.7 全绿，CTest `table_ops`（SQLite）通过。期间修复一个影响 M1–M4 的 MySQL 数值列误判为二进制而 base64 编码的潜伏 bug。**M6 已交付垂直切片**：三引擎 DDL 生成器、表设计器（列/索引/外键/选项/SQL 预览）、`ddl.preview`/`ddl.apply` 令牌确认、删除/清空/新建删除库、视图/函数/触发器 DDL 保存 `.sql`；CTest `ddl_builder` 全绿（SQLite roundtrip + MySQL/PG SQL 断言），Mock 后端经 Node 模拟桥联调通过。下一里程碑为 **M7（导入/导出/转储）**。
 
 **总量**：约 56–68 个开发日（单人，含自测），按每周 5.5 天计约 **10–12 周**。
 
@@ -56,6 +56,11 @@
 | 2026-11-14 | M4-3 语句分割复用后端 `SplitSql` | 前端自实现 `SilkitSqlTools.splitStatements`（引号/注释感知，语义对齐后端） | 后端 `query.execute` 仍做权威分割；前端仅用于「当前语句」定位与展示，避免一次 IPC 往返 | 双实现需保持语义一致，M5+ 如有不一致以后端为准 |
 | 2026-11-14 | MySQL 数值列被 base64 编码（M1–M4 潜伏 bug） | `mysql_driver` 读取结果列时 `real_binary = (charsetnr == 63)`，但 MySQL 数值/日期/时间/枚举/集合/JSON 列的 `charsetnr` 本就是 63，被误判为二进制而 base64 编码（表现为数字显示为乱码、`table.count` 恒为 0） | 结果读取与 `IsBinaryField` 仅在「真正字符串/BLOB 类型（`MYSQL_TYPE_STRING/VAR_STRING/BLOB/GEOMETRY` 等）且 `charsetnr==63`」时判为二进制 | 修复后 MySQL 数值结果正确显示为文本，COUNT/估算正常；同时修正 `table.count` 返回 0 与 `totalEstimate` 为 null 的问题 |
 | 2026-11-14 | M5 后端/前端已实现但未提交 | `commands_table.cpp`/`table_ops.cpp`/`grid.js`/`table.js`/测试等 M5 文件在上一轮开发后处于未提交状态 | 按用户要求开发 M5 并验收、回写文档、推送 | 已补构建、CTest（5/5）、MySQL/PG 双引擎 CRUD 运行时验收 |
+| 2026-11-14 | M6 设计器只覆盖「表」对象 | `ddl.load`/`ddl.preview`/`ddl.apply` 仅接受 `kind=table`；视图/函数/触发器仍走详情面板查看 DDL 并可保存 `.sql` | 修改视图/函数/触发器定义需要各自的编辑器语义，超出表设计器范围 | 后续如需编辑视图定义，另起专用编辑器复用 `ddl.preview` 令牌机制 |
+| 2026-11-14 | M6 三引擎 roundtrip | SQLite/MySQL/PG 均实跑建表→改表→删表/清空；MySQL/PG 通过 `integration_db` 连接真实服务器 | 需要真实服务复测 ALTER 的方言差异 | MySQL 8.4.13 / PostgreSQL 18.0.7 全部通过（0 failures） |
+| 2026-11-14 | MySQL 外键元数据查询失效 | `information_schema.KEY_COLUMN_USAGE` 在 MySQL 8 没有 `UPDATE_RULE/DELETE_RULE`，查询报 1054 被静默忽略，导致外键列表为空 | 需要关联 `REFERENTIAL_CONSTRAINTS` 获取级联规则 | 已修复 `ListForeignKeysSql`；MySQL 外键现可正确加载与展示 |
+| 2026-11-14 | MySQL 外键隐式索引 | 外键无可用索引时 MySQL 自动创建同名索引，被当成用户索引，ALTER 时 `DROP INDEX` 报 1072 | 设计器不应管理外键自动索引 | 加载时过滤「名称与列均与外键一致」的索引；ALTER 顺序改为先删外键再删索引 |
+| 2026-11-14 | M6 ALTER 的 SQLite 能力边界 | 修改列类型/NOT NULL/默认值、调整主键、增删外键在 SQLite 下直接返回明确错误 | SQLite 不支持这些 ALTER 操作，静默降级会误导用户 | 提示「请重建表」；MySQL/PG 走 `MODIFY/CHANGE COLUMN` 与 `ALTER COLUMN` |
 
 ### 0.3 版本标识位置
 
@@ -1939,22 +1944,26 @@ INSERT INTO `users` (`name`, `age`) VALUES (?, ?);
 
 ### M6 表设计器与 DDL（8–10 d）→ v0.6.0
 
-- [ ] M6-1 `ddl_builder`：CREATE/ALTER/DROP/RENAME（三引擎）。
-- [ ] M6-2 表设计器 UI：列/索引/外键/选项/SQL 预览。
-- [ ] M6-3 从元数据加载现有定义；脏状态检测。
-- [ ] M6-4 新建表/删除表/重命名/清空。
-- [ ] M6-5 `ddl.preview`/`ddl.apply` + 警告 + 确认令牌。
-- [ ] M6-6 视图/函数/触发器 DDL 查看 + 复制/保存。
-- [ ] M6-7 三引擎 roundtrip 测试：建表→改表→删表。
-- [ ] M6-8 MySQL 不可回滚警告；PG 事务；SQLite 限制提示。
-- [ ] M6-9 数据库创建/删除（MySQL/PG）。
-- [ ] M6-10 错误恢复：DDL 失败保留设计器状态。
+> 状态：2026-11-14 已交付并验收。CTest `ddl_builder` 79 项检查通过；`integration_db` 在真实 MySQL 8.4.13 与 PostgreSQL 18.0.7 上完成建表→加载→ALTER→重命名→清空→删除→建库/删库全链路；前端设计器与 Mock 后端经 Node 模拟桥联调通过。
+
+- [x] M6-1 `ddl_builder`：CREATE/ALTER/DROP/RENAME（三引擎）。
+- [x] M6-2 表设计器 UI：列/索引/外键/选项/SQL 预览。
+- [x] M6-3 从元数据加载现有定义；脏状态检测。
+- [x] M6-4 新建表/删除表/重命名/清空。
+- [x] M6-5 `ddl.preview`/`ddl.apply` + 警告 + 确认令牌。
+- [x] M6-6 视图/函数/触发器 DDL 查看 + 复制/保存。
+- [x] M6-7 三引擎 roundtrip 测试：SQLite/MySQL/PostgreSQL 均实跑建父表→建子表（PK/自增/唯一索引/外键）→加载→ALTER→重命名→清空→删除→建库/删库。
+- [x] M6-8 MySQL 不可回滚警告；PG 事务；SQLite 限制提示。
+- [x] M6-9 数据库创建/删除（MySQL/PG）。
+- [x] M6-10 错误恢复：DDL 失败保留设计器状态。
 
 **验收**
-- 三引擎建表（含 PK/唯一/索引/FK/注释/默认值）后，刷新元数据一致。
-- ALTER 增删改列、增删索引在支持范围内成功；失败有明确原因。
-- 删除/清空需输入对象名；MySQL 显示不可回滚提示。
-- 视图/函数/触发器 DDL 可查看并保存为 `.sql`。
+- [x] SQLite roundtrip：建父表→建 users（PK/自增/唯一索引/FK）→加载定义→改索引/重命名列/加列/加索引→表重命名→DROP/TRUNCATE，`PRAGMA` 复核一致。
+- [x] MySQL/PG 建表 SQL 含主键、唯一索引、外键、注释、表选项（MySQL），ALTER 含改列/加列/删外键/重命名/表选项。
+- [x] 删除/清空需输入对象名，令牌不匹配或 DDL 变化后拒绝执行；失败返回 `statementIndex`/`statement`/`rolledBack` 并保留设计器状态。
+- [x] 真实 MySQL 8.4.13 / PostgreSQL 18.0.7 上执行 M6 DDL：`integration_db`（`SILKIT_INTEGRATION_WRITE=1`）0 failures。
+- [x] SQLite 文件库夹具 `data/silkit_test.db`（由 `tools/make_test_db.py` 生成）：`sqlite_fixture` 64 项检查通过，覆盖 3 表/1 视图/1 触发器、自增主键、唯一索引、外键级联、只读保护及临时副本上的表/列/索引 DDL。
+- [ ] 视图/函数/触发器保存 `.sql` 在原生桥下的文件对话框未经本轮复测。
 
 ### M7 导入 / 导出 / 转储（5–6 d）→ v0.7.0
 

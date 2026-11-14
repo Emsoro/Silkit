@@ -310,6 +310,23 @@
                 ref: ref || {},
                 confirmName: confirmName
             });
+        },
+
+        // ------------------------------------------------------------ DDL 设计器（M6）
+        ddlTypes: function (args) {
+            return call('ddl.types', args || {});
+        },
+        ddlLoad: function (sessionId, ref) {
+            return call('ddl.load', { sessionId: sessionId, ref: ref || {} });
+        },
+        ddlTables: function (sessionId, ref) {
+            return call('ddl.tables', { sessionId: sessionId, ref: ref || {} });
+        },
+        ddlPreview: function (args) {
+            return call('ddl.preview', args || {});
+        },
+        ddlApply: function (args) {
+            return call('ddl.apply', args || {});
         }
     };
 })();

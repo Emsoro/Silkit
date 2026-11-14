@@ -4,6 +4,7 @@
 #include "core/logger.h"
 #include "core/paths.h"
 #include "ipc/commands_conn.h"
+#include "ipc/commands_ddl.h"
 #include "ipc/commands_meta.h"
 #include "ipc/commands_query.h"
 #include "ipc/commands_table.h"
@@ -301,6 +302,7 @@ void RegisterCommands(AsyncRouter& router,
     RegisterMetadataCommands(router, sessions);
     RegisterQueryCommands(router, sessions, settings);
     RegisterTableCommands(router, sessions, settings);
+    RegisterDdlCommands(router, sessions);
 }
 
 }  // namespace silkit::ipc

@@ -95,7 +95,7 @@
     }
 
     const USER_COLUMNS = [
-        { name: 'id', type: 'INTEGER', kind: 'int', nullable: false, primaryKey: true },
+        { name: 'id', type: 'INTEGER', kind: 'int', nullable: false, primaryKey: true, autoIncrement: true },
         { name: 'name', type: 'TEXT', kind: 'text', nullable: false, primaryKey: false },
         { name: 'email', type: 'TEXT', kind: 'text', nullable: true, primaryKey: false },
         { name: 'status', type: 'TEXT', kind: 'text', nullable: false, primaryKey: false },
@@ -112,7 +112,7 @@
         },
         orders: {
             columns: [
-                { name: 'id', type: 'INTEGER', kind: 'int', nullable: false, primaryKey: true },
+                { name: 'id', type: 'INTEGER', kind: 'int', nullable: false, primaryKey: true, autoIncrement: true },
                 { name: 'user_id', type: 'INTEGER', kind: 'int', nullable: false, primaryKey: false },
                 { name: 'total', type: 'DECIMAL(10,2)', kind: 'decimal', nullable: false, primaryKey: false },
                 { name: 'status', type: 'TEXT', kind: 'text', nullable: false, primaryKey: false },
@@ -123,7 +123,7 @@
         },
         products: {
             columns: [
-                { name: 'id', type: 'INTEGER', kind: 'int', nullable: false, primaryKey: true },
+                { name: 'id', type: 'INTEGER', kind: 'int', nullable: false, primaryKey: true, autoIncrement: true },
                 { name: 'name', type: 'TEXT', kind: 'text', nullable: false, primaryKey: false },
                 { name: 'price', type: 'DECIMAL(10,2)', kind: 'decimal', nullable: false, primaryKey: false },
                 { name: 'stock', type: 'INTEGER', kind: 'int', nullable: false, primaryKey: false },
@@ -157,7 +157,10 @@
     ];
 
     const FOREIGN_KEYS = [
-        { id: 0, seq: 0, table: 'users', from: 'user_id', to: 'id', onUpdate: 'NO ACTION', onDelete: 'NO ACTION', match: 'NONE' }
+        {
+            owner: 'orders', name: 'fk_orders_user_id', id: 0, seq: 0, table: 'users',
+            from: 'user_id', to: 'id', onUpdate: 'NO ACTION', onDelete: 'NO ACTION', match: 'NONE'
+        }
     ];
 
     let profileSeed = [{
@@ -411,6 +414,647 @@
             return { sql: trigger ? trigger.sql : '', warnings: [] };
         }
         throw { code: 'bad_args', message: '该对象没有 DDL: ' + ref.kind };
+    }
+
+    // ---------------------------------------------------------------- M6 DDL（mock）
+    function mockDdlEngine(sessionId) {
+        return sessionEngine(sessionId) || 'sqlite';
+    }
+
+    function mockQuote(engine, name) {
+        if (engine === 'mysql') return '`' + String(name).replace(/`/g, '``') + '`';
+        return '"' + String(name).replace(/"/g, '""') + '"';
+    }
+
+    function mockTableName(engine, scope, name) {
+        const quoted = mockQuote(engine, name);
+        if (engine === 'mysql' && scope && scope !== 'main') {
+            return mockQuote(engine, scope) + '.' + quoted;
+        }
+        if (engine === 'postgres' && scope) {
+            return mockQuote(engine, scope) + '.' + quoted;
+        }
+        return quoted;
+    }
+
+    function mockKind(type) {
+        const text = String(type || '').toLowerCase();
+        if (text.indexOf('int') >= 0) return 'int';
+        if (text.indexOf('bool') >= 0) return 'bool';
+        if (/(decimal|numeric|money)/.test(text)) return 'decimal';
+        if (/(real|float|double)/.test(text)) return 'float';
+        if (/(blob|binary|bytea)/.test(text)) return 'binary';
+        if (text.indexOf('json') >= 0) return 'json';
+        if (/timestamp|datetime/.test(text)) return 'datetime';
+        if (/(^|\W)date(\W|$)/.test(text)) return 'date';
+        if (/(^|\W)time(\W|$)/.test(text)) return 'time';
+        return 'text';
+    }
+
+    function mockDdlDefinition(a) {
+        const ref = a.ref || {};
+        const name = ref.name;
+        if (!name) throw { code: 'bad_args', message: '缺少表名' };
+        if (ref.kind && ref.kind !== 'table') {
+            throw { code: 'bad_args', message: '设计器仅支持表对象' };
+        }
+        const entry = tableEntry({ name: name, kind: 'table' });
+        if (entry.isView) throw { code: 'bad_args', message: '设计器仅支持表对象' };
+        const engine = mockDdlEngine(a.sessionId);
+        return {
+            engine: engine,
+            scope: ref.database || ref.schema || 'main',
+            name: name,
+            exists: true,
+            primaryKeyName: '',
+            columns: entry.def.columns.map(function (column) {
+                return {
+                    name: column.name,
+                    type: column.type,
+                    notNull: column.nullable === false,
+                    primaryKey: !!column.primaryKey,
+                    autoIncrement: !!column.autoIncrement,
+                    hasDefault: column.hasDefault === true || String(column.default || '').trim() !== '',
+                    default: String(column.default || ''),
+                    comment: String(column.comment || ''),
+                    oldName: ''
+                };
+            }),
+            indexes: INDEXES.filter(function (index) {
+                return index.table === name;
+            }).map(function (index) {
+                return { name: index.name, unique: !!index.unique, columns: index.columns.slice() };
+            }),
+            foreignKeys: FOREIGN_KEYS.filter(function (fk) {
+                return fk.owner === name;
+            }).map(function (fk) {
+                return {
+                    name: fk.name || '',
+                    columns: [fk.from],
+                    refTable: fk.table,
+                    refSchema: '',
+                    refColumns: [fk.to],
+                    onUpdate: fk.onUpdate || 'NO ACTION',
+                    onDelete: fk.onDelete || 'NO ACTION'
+                };
+            }),
+            options: { engine: '', charset: '', collation: '', comment: '' }
+        };
+    }
+
+    function mockDdlNormalize(a) {
+        const source = a.definition || {};
+        const ref = a.ref || {};
+        const scope = String(source.scope || ref.database || ref.schema || 'main');
+        const columns = (source.columns || []).map(function (column) {
+            return {
+                name: String(column.name || '').trim(),
+                type: String(column.type || '').trim(),
+                notNull: !!column.notNull,
+                primaryKey: !!column.primaryKey,
+                autoIncrement: !!column.autoIncrement,
+                hasDefault: !!column.hasDefault && String(column.default || '').trim() !== '',
+                default: String(column.default || ''),
+                comment: String(column.comment || ''),
+                oldName: String(column.oldName || '')
+            };
+        }).filter(function (column) { return column.name !== ''; });
+        const indexes = (source.indexes || []).map(function (index) {
+            return {
+                name: String(index.name || '').trim(),
+                unique: !!index.unique,
+                columns: (index.columns || []).filter(Boolean)
+            };
+        }).filter(function (index) { return index.columns.length > 0; });
+        const foreignKeys = (source.foreignKeys || []).map(function (fk) {
+            return {
+                name: String(fk.name || '').trim(),
+                columns: (fk.columns || []).filter(Boolean),
+                refTable: String(fk.refTable || '').trim(),
+                refColumns: (fk.refColumns || []).filter(Boolean),
+                onUpdate: fk.onUpdate || 'NO ACTION',
+                onDelete: fk.onDelete || 'NO ACTION'
+            };
+        }).filter(function (fk) { return fk.columns.length > 0 && fk.refTable !== ''; });
+        return {
+            scope: scope,
+            name: String(source.name || a.newName || ref.name || '').trim(),
+            primaryKeyName: String(source.primaryKeyName || ''),
+            columns: columns,
+            indexes: indexes,
+            foreignKeys: foreignKeys,
+            options: source.options || {}
+        };
+    }
+
+    function mockAssignNames(items, prefix, table) {
+        const used = {};
+        return items.map(function (item) {
+            const base = String(item.name || '').trim() ||
+                (prefix + '_' + table + '_' + item.columns.map(function (column) {
+                    return String(column).replace(/[^A-Za-z0-9_]/g, '_');
+                }).join('_'));
+            let candidate = base;
+            let suffix = 2;
+            while (used[candidate]) {
+                candidate = base + '_' + suffix;
+                suffix += 1;
+            }
+            used[candidate] = true;
+            const copy = {};
+            Object.keys(item).forEach(function (key) { copy[key] = item[key]; });
+            copy.resolvedName = candidate;
+            return copy;
+        });
+    }
+
+    function mockColumnSql(engine, column) {
+        const name = mockQuote(engine, column.name);
+        const type = column.type || 'TEXT';
+        if (engine === 'sqlite' && column.primaryKey && column.autoIncrement) {
+            return name + ' INTEGER PRIMARY KEY AUTOINCREMENT';
+        }
+        if (engine === 'postgres' && column.autoIncrement) {
+            return name + ' ' + type + ' GENERATED BY DEFAULT AS IDENTITY' +
+                (column.notNull ? ' NOT NULL' : '');
+        }
+        const parts = [name, type];
+        if (engine === 'mysql' && column.autoIncrement) parts.push('AUTO_INCREMENT');
+        if (column.notNull && !column.primaryKey) parts.push('NOT NULL');
+        if (column.hasDefault && String(column.default || '').trim() !== '') {
+            parts.push('DEFAULT ' + String(column.default).trim());
+        }
+        return parts.join(' ');
+    }
+
+    function mockForeignKeySql(engine, fk) {
+        const columns = fk.columns.map(function (name) {
+            return mockQuote(engine, name);
+        }).join(', ');
+        const refColumns = fk.refColumns.map(function (name) {
+            return mockQuote(engine, name);
+        }).join(', ');
+        let sql = 'FOREIGN KEY (' + columns + ') REFERENCES ' + mockQuote(engine, fk.refTable) +
+            ' (' + refColumns + ')';
+        if (fk.onUpdate && fk.onUpdate !== 'NO ACTION') sql += ' ON UPDATE ' + fk.onUpdate;
+        if (fk.onDelete && fk.onDelete !== 'NO ACTION') sql += ' ON DELETE ' + fk.onDelete;
+        return sql;
+    }
+
+    function mockCreateSql(engine, scope, definition) {
+        const lines = definition.columns.map(function (column) {
+            return '  ' + mockColumnSql(engine, column);
+        });
+        if (engine !== 'sqlite') {
+            const primary = definition.columns.filter(function (column) { return column.primaryKey; });
+            if (primary.length) {
+                lines.push('  PRIMARY KEY (' + primary.map(function (column) {
+                    return mockQuote(engine, column.name);
+                }).join(', ') + ')');
+            }
+        }
+        definition.foreignKeys.forEach(function (fk) {
+            const constraint = fk.resolvedName
+                ? 'CONSTRAINT ' + mockQuote(engine, fk.resolvedName) + ' ' : '';
+            lines.push('  ' + constraint + mockForeignKeySql(engine, fk));
+        });
+        let sql = 'CREATE TABLE ' + mockTableName(engine, scope, definition.name) +
+            ' (\n' + lines.join(',\n') + '\n)';
+        if (engine === 'mysql') {
+            const options = definition.options || {};
+            sql += ' ENGINE=' + (options.engine || 'InnoDB');
+            sql += ' DEFAULT CHARSET=' + (options.charset || 'utf8mb4');
+            if (options.collation) sql += ' COLLATE=' + options.collation;
+            if (options.comment) {
+                sql += " COMMENT='" + String(options.comment).replace(/'/g, "''") + "'";
+            }
+        }
+        return sql + ';';
+    }
+
+    function mockCreateIndexSql(engine, scope, table, index) {
+        return 'CREATE ' + (index.unique ? 'UNIQUE ' : '') + 'INDEX ' +
+            mockQuote(engine, index.resolvedName) + ' ON ' + mockTableName(engine, scope, table) +
+            ' (' + index.columns.map(function (name) {
+                return mockQuote(engine, name);
+            }).join(', ') + ');';
+    }
+
+    function mockDropIndexSql(engine, scope, table, index) {
+        if (engine === 'mysql') {
+            return 'DROP INDEX ' + mockQuote(engine, index.resolvedName) + ' ON ' +
+                mockTableName(engine, scope, table) + ';';
+        }
+        const prefix = engine === 'postgres' && scope ? mockQuote(engine, scope) + '.' : '';
+        return 'DROP INDEX ' + prefix + mockQuote(engine, index.resolvedName) + ';';
+    }
+
+    function mockAddForeignKeySql(engine, scope, table, fk) {
+        const constraint = fk.resolvedName
+            ? 'CONSTRAINT ' + mockQuote(engine, fk.resolvedName) + ' ' : '';
+        return 'ALTER TABLE ' + mockTableName(engine, scope, table) + ' ADD ' + constraint +
+            mockForeignKeySql(engine, fk) + ';';
+    }
+
+    function mockModifyColumnSql(engine, scope, table, oldName, column) {
+        const target = mockTableName(engine, scope, table);
+        if (engine === 'mysql') {
+            return ['ALTER TABLE ' + target + ' CHANGE COLUMN ' + mockQuote(engine, oldName) + ' ' +
+                mockColumnSql(engine, column) + ';'];
+        }
+        const name = mockQuote(engine, column.name);
+        const statements = [
+            'ALTER TABLE ' + target + ' ALTER COLUMN ' + name + ' TYPE ' + (column.type || 'text') + ';',
+            'ALTER TABLE ' + target + ' ALTER COLUMN ' + name +
+                (column.notNull ? ' SET NOT NULL;' : ' DROP NOT NULL;')
+        ];
+        if (column.hasDefault && String(column.default || '').trim() !== '') {
+            statements.push('ALTER TABLE ' + target + ' ALTER COLUMN ' + name +
+                ' SET DEFAULT ' + String(column.default).trim() + ';');
+        } else {
+            statements.push('ALTER TABLE ' + target + ' ALTER COLUMN ' + name + ' DROP DEFAULT;');
+        }
+        if (column.comment) {
+            statements.push('COMMENT ON COLUMN ' + target + '.' + name + " IS '" +
+                String(column.comment).replace(/'/g, "''") + "';");
+        }
+        return statements;
+    }
+
+    function mockSameFk(left, right) {
+        return left.columns.join(',') === right.columns.join(',') &&
+            left.refTable === right.refTable &&
+            left.refColumns.join(',') === right.refColumns.join(',') &&
+            (left.onUpdate || 'NO ACTION') === (right.onUpdate || 'NO ACTION') &&
+            (left.onDelete || 'NO ACTION') === (right.onDelete || 'NO ACTION');
+    }
+
+    function mockAlterStatements(engine, scope, original, updated, newName) {
+        const statements = [];
+        const warnings = [];
+        let table = original.name;
+        const target = newName && newName !== original.name ? newName : updated.name;
+
+        if (engine === 'sqlite') {
+            const originalByName = {};
+            original.columns.forEach(function (column) { originalByName[column.name] = column; });
+            updated.columns.forEach(function (column) {
+                const previous = originalByName[column.oldName || column.name];
+                if (!previous) return;
+                if (column.type !== previous.type || column.notNull !== previous.notNull ||
+                    column.hasDefault !== previous.hasDefault ||
+                    String(column.default) !== String(previous.default)) {
+                    throw {
+                        code: 'bad_args',
+                        message: 'SQLite 不支持修改列定义（' + column.name + '），请重建表'
+                    };
+                }
+            });
+        }
+
+        if (target && target !== original.name) {
+            statements.push('ALTER TABLE ' + mockTableName(engine, scope, table) + ' RENAME TO ' +
+                mockQuote(engine, target) + ';');
+            table = target;
+        }
+
+        const originalIndexes = mockAssignNames(original.indexes, 'idx', original.name);
+        const updatedIndexes = mockAssignNames(updated.indexes, 'idx', table);
+        const updatedIndexMap = {};
+        updatedIndexes.forEach(function (index) { updatedIndexMap[index.resolvedName] = index; });
+        originalIndexes.forEach(function (index) {
+            const next = updatedIndexMap[index.resolvedName];
+            if (!next || next.unique !== index.unique ||
+                next.columns.join(',') !== index.columns.join(',')) {
+                statements.push(mockDropIndexSql(engine, scope, table, index));
+            }
+        });
+
+        const originalFks = mockAssignNames(original.foreignKeys, 'fk', original.name);
+        const updatedFks = mockAssignNames(updated.foreignKeys, 'fk', table);
+        const originalFkMap = {};
+        const updatedFkMap = {};
+        originalFks.forEach(function (fk) { originalFkMap[fk.resolvedName] = fk; });
+        updatedFks.forEach(function (fk) { updatedFkMap[fk.resolvedName] = fk; });
+        const dropFk = engine === 'mysql' ? ' DROP FOREIGN KEY ' : ' DROP CONSTRAINT ';
+        if (engine !== 'sqlite') {
+            originalFks.forEach(function (fk) {
+                const next = updatedFkMap[fk.resolvedName];
+                if (!next || !mockSameFk(fk, next)) {
+                    statements.push('ALTER TABLE ' + mockTableName(engine, scope, table) + dropFk +
+                        mockQuote(engine, fk.resolvedName) + ';');
+                }
+            });
+        }
+
+        const originalByName = {};
+        original.columns.forEach(function (column) { originalByName[column.name] = column; });
+        const kept = {};
+        updated.columns.forEach(function (column) {
+            const oldName = column.oldName && originalByName[column.oldName]
+                ? column.oldName : column.name;
+            const previous = originalByName[oldName];
+            if (!previous) {
+                statements.push('ALTER TABLE ' + mockTableName(engine, scope, table) + ' ADD COLUMN ' +
+                    mockColumnSql(engine, column) + ';');
+                return;
+            }
+            kept[oldName] = true;
+            if (oldName !== column.name) {
+                statements.push('ALTER TABLE ' + mockTableName(engine, scope, table) +
+                    ' RENAME COLUMN ' + mockQuote(engine, oldName) + ' TO ' +
+                    mockQuote(engine, column.name) + ';');
+            }
+            const changed = column.type !== previous.type || column.notNull !== previous.notNull ||
+                column.hasDefault !== previous.hasDefault ||
+                String(column.default) !== String(previous.default) ||
+                String(column.comment || '') !== String(previous.comment || '');
+            if (changed && engine !== 'sqlite') {
+                mockModifyColumnSql(engine, scope, table, column.name, column)
+                    .forEach(function (sql) { statements.push(sql); });
+            }
+        });
+
+        original.columns.forEach(function (column) {
+            if (kept[column.name]) return;
+            const renamed = updated.columns.some(function (item) {
+                return item.oldName === column.name;
+            });
+            if (renamed) return;
+            statements.push('ALTER TABLE ' + mockTableName(engine, scope, table) + ' DROP COLUMN ' +
+                mockQuote(engine, column.name) + ';');
+        });
+
+        const originalIndexMap = {};
+        originalIndexes.forEach(function (index) { originalIndexMap[index.resolvedName] = index; });
+        updatedIndexes.forEach(function (index) {
+            const previous = originalIndexMap[index.resolvedName];
+            if (!previous || previous.unique !== index.unique ||
+                previous.columns.join(',') !== index.columns.join(',')) {
+                statements.push(mockCreateIndexSql(engine, scope, table, index));
+            }
+        });
+
+        updatedFks.forEach(function (fk) {
+            const previous = originalFkMap[fk.resolvedName];
+            if (previous && mockSameFk(fk, previous)) return;
+            if (engine === 'sqlite') {
+                warnings.push('SQLite 不支持在线添加外键，请重建表');
+                return;
+            }
+            statements.push(mockAddForeignKeySql(engine, scope, table, fk));
+        });
+
+        return {
+            statements: statements,
+            warnings: warnings,
+            table: table,
+            target: target || original.name,
+            indexes: updatedIndexes,
+            foreignKeys: updatedFks
+        };
+    }
+
+    function mockDdlToken(statements) {
+        let hash = 1469598103934665603n;
+        const text = statements.join('\n');
+        for (let i = 0; i < text.length; i += 1) {
+            hash ^= BigInt(text.charCodeAt(i));
+            hash = (hash * 1099511628211n) & 0xFFFFFFFFFFFFFFFFn;
+        }
+        return hash.toString(16);
+    }
+
+    function mockDdlPlan(a) {
+        const engine = mockDdlEngine(a.sessionId);
+        const mode = String(a.mode || 'create');
+        const definition = mockDdlNormalize(a);
+        const ref = a.ref || {};
+        const scope = definition.scope || ref.database || ref.schema || 'main';
+        const newName = String(a.newName || '').trim();
+        const notSqlite = engine !== 'sqlite';
+        let statements = [];
+        let warnings = [];
+        let next = null;
+
+        if (mode === 'database.create') {
+            if (!notSqlite) throw { code: 'bad_args', message: 'SQLite 不支持新建数据库' };
+            const name = newName || definition.name;
+            if (!name) throw { code: 'bad_args', message: '数据库名不能为空' };
+            statements = [engine === 'mysql'
+                ? 'CREATE DATABASE ' + mockQuote(engine, name) + ' DEFAULT CHARACTER SET utf8mb4;'
+                : 'CREATE DATABASE ' + mockQuote(engine, name) + ';'];
+            next = { database: name };
+        } else if (mode === 'database.drop') {
+            if (!notSqlite) throw { code: 'bad_args', message: 'SQLite 不支持删除数据库' };
+            const name = newName || definition.name || ref.database || '';
+            if (!name) throw { code: 'bad_args', message: '数据库名不能为空' };
+            statements = ['DROP DATABASE ' + mockQuote(engine, name) + ';'];
+            next = { database: name };
+        } else if (mode === 'drop' || mode === 'truncate') {
+            const name = definition.name || ref.name;
+            if (!name) throw { code: 'bad_args', message: '表名不能为空' };
+            const target = mockTableName(engine, scope, name);
+            if (mode === 'drop') {
+                statements = ['DROP TABLE ' + target + ';'];
+                next = { dropName: name, scope: scope };
+            } else {
+                statements = [engine === 'mysql'
+                    ? 'TRUNCATE TABLE ' + target + ';'
+                    : 'DELETE FROM ' + target + ';'];
+                next = { truncateName: name, scope: scope };
+            }
+        } else if (mode === 'create') {
+            if (!definition.name) throw { code: 'bad_args', message: '表名不能为空' };
+            if (!definition.columns.length) throw { code: 'bad_args', message: '至少需要一列' };
+            if (TABLES[definition.name] || VIEWS[definition.name]) {
+                throw { code: 'bad_args', message: '对象已存在: ' + definition.name };
+            }
+            const indexes = mockAssignNames(definition.indexes, 'idx', definition.name);
+            const foreignKeys = mockAssignNames(definition.foreignKeys, 'fk', definition.name);
+            const draft = {
+                scope: scope,
+                name: definition.name,
+                columns: definition.columns,
+                indexes: indexes,
+                foreignKeys: foreignKeys,
+                options: definition.options
+            };
+            const createSql = mockCreateSql(engine, scope, draft);
+            statements.push(createSql);
+            indexes.forEach(function (index) {
+                statements.push(mockCreateIndexSql(engine, scope, definition.name, index));
+            });
+            next = {
+                createName: definition.name,
+                scope: scope,
+                columns: definition.columns,
+                indexes: indexes,
+                foreignKeys: foreignKeys,
+                sql: createSql
+            };
+        } else if (mode === 'alter') {
+            const originalName = String(ref.name || definition.name || '').trim();
+            if (!originalName) throw { code: 'bad_args', message: '缺少表名' };
+            const original = mockDdlDefinition({
+                sessionId: a.sessionId,
+                ref: { kind: 'table', name: originalName, database: scope, schema: scope }
+            });
+            original.scope = scope;
+            const result = mockAlterStatements(engine, scope, original, definition, newName);
+            statements = result.statements;
+            warnings = result.warnings;
+            next = {
+                originalName: originalName,
+                name: result.table,
+                scope: scope,
+                columns: definition.columns,
+                indexes: result.indexes,
+                foreignKeys: result.foreignKeys,
+                sql: mockCreateSql(engine, scope, {
+                    scope: scope,
+                    name: result.table,
+                    columns: definition.columns,
+                    indexes: result.indexes,
+                    foreignKeys: result.foreignKeys,
+                    options: definition.options
+                })
+            };
+        } else {
+            throw { code: 'bad_args', message: '不支持的 DDL 模式: ' + mode };
+        }
+
+        return {
+            engine: engine,
+            mode: mode,
+            scope: scope,
+            statements: statements,
+            warnings: warnings,
+            token: mockDdlToken(statements),
+            next: next
+        };
+    }
+
+    function mockDdlColumns(columns) {
+        return columns.map(function (column) {
+            return {
+                name: column.name,
+                type: column.type,
+                kind: mockKind(column.type),
+                nullable: !column.notNull && !column.primaryKey,
+                primaryKey: !!column.primaryKey,
+                autoIncrement: !!column.autoIncrement
+            };
+        });
+    }
+
+    function mockDdlStoreForeignKeys(owner, foreignKeys) {
+        for (let i = FOREIGN_KEYS.length - 1; i >= 0; i -= 1) {
+            if (FOREIGN_KEYS[i].owner === owner) FOREIGN_KEYS.splice(i, 1);
+        }
+        foreignKeys.forEach(function (fk) {
+            FOREIGN_KEYS.push({
+                owner: owner,
+                name: fk.resolvedName,
+                table: fk.refTable,
+                from: fk.columns[0],
+                to: fk.refColumns[0],
+                onUpdate: fk.onUpdate || 'NO ACTION',
+                onDelete: fk.onDelete || 'NO ACTION',
+                match: 'NONE'
+            });
+        });
+    }
+
+    function mockDdlStoreIndexes(owner, indexes) {
+        for (let i = INDEXES.length - 1; i >= 0; i -= 1) {
+            if (INDEXES[i].table === owner) INDEXES.splice(i, 1);
+        }
+        indexes.forEach(function (index) {
+            INDEXES.push({
+                name: index.resolvedName,
+                table: owner,
+                unique: !!index.unique,
+                columns: index.columns.slice()
+            });
+        });
+    }
+
+    function mockDdlApply(a, plan) {
+        const mode = String(a.mode || 'create');
+        if (mode === 'database.create' || mode === 'database.drop') return;
+        const next = plan.next || {};
+
+        if (mode === 'create') {
+            const name = next.createName;
+            TABLES[name] = {
+                columns: mockDdlColumns(next.columns || []),
+                rows: [],
+                sql: next.sql
+            };
+            mockDdlStoreIndexes(name, next.indexes || []);
+            mockDdlStoreForeignKeys(name, next.foreignKeys || []);
+            return;
+        }
+
+        if (mode === 'drop') {
+            const name = next.dropName;
+            delete TABLES[name];
+            for (let i = INDEXES.length - 1; i >= 0; i -= 1) {
+                if (INDEXES[i].table === name) INDEXES.splice(i, 1);
+            }
+            for (let i = FOREIGN_KEYS.length - 1; i >= 0; i -= 1) {
+                if (FOREIGN_KEYS[i].owner === name) FOREIGN_KEYS.splice(i, 1);
+            }
+            for (let i = TRIGGERS.length - 1; i >= 0; i -= 1) {
+                if (TRIGGERS[i].table === name) TRIGGERS.splice(i, 1);
+            }
+            return;
+        }
+
+        if (mode === 'truncate') {
+            const entry = TABLES[next.truncateName];
+            if (entry) {
+                entry.rows = [];
+                entry._rowids = [];
+            }
+            return;
+        }
+
+        if (mode === 'alter') {
+            const entry = TABLES[next.originalName];
+            if (!entry) throw { code: 'not_found', message: '表不存在: ' + next.originalName };
+            const columns = mockDdlColumns(next.columns || []);
+            const sameShape = entry.columns.map(function (column) { return column.name; }).join(',') ===
+                columns.map(function (column) { return column.name; }).join(',');
+            const rows = sameShape ? entry.rows : [];
+            const rowids = sameShape ? entry._rowids : [];
+
+            if (next.name !== next.originalName) {
+                TABLES[next.name] = entry;
+                delete TABLES[next.originalName];
+                INDEXES.forEach(function (index) {
+                    if (index.table === next.originalName) index.table = next.name;
+                });
+                FOREIGN_KEYS.forEach(function (fk) {
+                    if (fk.owner === next.originalName) fk.owner = next.name;
+                    if (fk.table === next.originalName) fk.table = next.name;
+                });
+                TRIGGERS.forEach(function (trigger) {
+                    if (trigger.table === next.originalName) trigger.table = next.name;
+                });
+            }
+
+            entry.columns = columns;
+            entry.rows = rows;
+            entry._rowids = rowids;
+            entry.sql = next.sql;
+            mockDdlStoreIndexes(next.name, next.indexes || []);
+            mockDdlStoreForeignKeys(next.name, next.foreignKeys || []);
+            return;
+        }
+
+        throw { code: 'bad_args', message: '不支持的 DDL 模式: ' + mode };
     }
 
     // ---------------------------------------------------------------- 查询
@@ -1294,6 +1938,104 @@
                     entry.def.rows.length = 0;
                     entry.def._rowids.length = 0;
                     reply(reqId, { affected: affected, elapsedMs: 5 });
+                } catch (error) {
+                    fail(reqId, error);
+                }
+                return { ok: true, reqId };
+            }
+
+            // ---------------------------------------------------- DDL 设计器（M6，内存模拟）
+            case 'ddl.types': {
+                const engine = a.engine || sessionEngine(a.sessionId) || 'sqlite';
+                const types = engine === 'mysql'
+                    ? ['INT', 'BIGINT', 'VARCHAR(64)', 'VARCHAR(255)', 'TEXT', 'DECIMAL(10,2)', 'DATETIME', 'JSON', 'BLOB']
+                    : (engine === 'postgres'
+                        ? ['integer', 'bigint', 'character varying(64)', 'text', 'numeric(10,2)', 'boolean', 'timestamp with time zone', 'jsonb', 'uuid']
+                        : ['INTEGER', 'TEXT', 'REAL', 'BLOB', 'NUMERIC', 'BOOLEAN', 'DATE', 'DATETIME']);
+                reply(reqId, {
+                    engine: engine,
+                    types: types,
+                    supports: {
+                        columnComment: engine !== 'sqlite',
+                        tableComment: engine !== 'sqlite',
+                        storageOptions: engine === 'mysql',
+                        alterColumn: engine !== 'sqlite',
+                        alterForeignKey: engine !== 'sqlite',
+                        alterPrimaryKey: engine !== 'sqlite',
+                        transactionalDdl: engine !== 'mysql',
+                        database: engine !== 'sqlite'
+                    }
+                });
+                return { ok: true, reqId };
+            }
+
+            case 'ddl.load': {
+                try {
+                    const definition = mockDdlDefinition(a);
+                    reply(reqId, { definition: definition, warnings: [] });
+                } catch (error) {
+                    fail(reqId, error);
+                }
+                return { ok: true, reqId };
+            }
+
+            case 'ddl.tables': {
+                reply(reqId, { tables: Object.keys(TABLES) });
+                return { ok: true, reqId };
+            }
+
+            case 'ddl.preview': {
+                try {
+                    const plan = mockDdlPlan(a);
+                    reply(reqId, {
+                        engine: sessionEngine(a.sessionId),
+                        mode: a.mode,
+                        scope: plan.scope,
+                        statements: plan.statements,
+                        sql: plan.statements.join('\n\n'),
+                        token: plan.token,
+                        warnings: plan.warnings,
+                        transactional: sessionEngine(a.sessionId) !== 'mysql'
+                    });
+                } catch (error) {
+                    fail(reqId, error);
+                }
+                return { ok: true, reqId };
+            }
+
+            case 'ddl.apply': {
+                try {
+                    const plan = mockDdlPlan(a);
+                    if (!a.token || a.token !== plan.token) {
+                        throw { code: 'bad_args', message: 'DDL 已变化，请重新预览后再执行' };
+                    }
+                    const target = plan.next && (plan.next.dropName || plan.next.truncateName ||
+                        plan.next.database || '');
+                    if (a.mode === 'drop' || a.mode === 'truncate' || a.mode === 'database.drop') {
+                        if (String(a.confirmName || '') !== target) {
+                            throw {
+                                code: 'bad_args',
+                                message: a.mode === 'database.drop'
+                                    ? '请输入完整数据库名确认删除操作'
+                                    : '请输入完整表名确认操作'
+                            };
+                        }
+                    }
+                    if (sessions.get(a.sessionId) && sessions.get(a.sessionId).readOnly) {
+                        throw { code: 'read_only', message: '只读连接不允许执行 DDL' };
+                    }
+                    mockDdlApply(a, plan);
+                    reply(reqId, {
+                        ok: true,
+                        applied: plan.statements.length,
+                        statements: plan.statements,
+                        warnings: plan.warnings.concat(
+                            sessionEngine(a.sessionId) === 'mysql'
+                                ? ['MySQL DDL 会隐式提交，失败后无法自动回滚'] : []),
+                        transactional: sessionEngine(a.sessionId) !== 'mysql',
+                        rolledBack: false,
+                        elapsedMs: 8
+                    });
                 } catch (error) {
                     fail(reqId, error);
                 }

@@ -10,11 +10,13 @@
 
         const dom = {};
         let lastSql = '';
+        let lastSqlName = 'ddl';
 
         function byId(id) { return document.getElementById(id); }
 
         function init() {
-            ['detailDialog', 'detailTitle', 'detailSub', 'detailBody', 'detailClose', 'detailCopy', 'detailKind']
+            ['detailDialog', 'detailTitle', 'detailSub', 'detailBody', 'detailClose', 'detailCopy',
+                'detailSave', 'detailKind']
                 .forEach(function (id) { dom[id] = byId(id); });
             if (!dom.detailDialog) return;
 
@@ -36,6 +38,26 @@
                     toast('复制失败：' + (error.message || error), 'error');
                 });
             });
+            if (dom.detailSave) {
+                dom.detailSave.addEventListener('click', function () {
+                    if (!lastSql) {
+                        toast('没有可保存的 SQL', 'error');
+                        return;
+                    }
+                    api.pickFile({
+                        kind: 'sql',
+                        save: true,
+                        defaultName: lastSqlName + '.sql'
+                    }).then(function (picked) {
+                        if (!picked || !picked.path) return;
+                        return api.appSaveFile(picked.path, lastSql).then(function () {
+                            toast('DDL 已保存到 ' + picked.path);
+                        });
+                    }).catch(function (error) {
+                        toast('保存失败：' + (error.message || error), 'error');
+                    });
+                });
+            }
         }
 
         function open() {
@@ -54,6 +76,7 @@
             const box = U.el('div', 'detail-loading', '正在读取元数据…');
             dom.detailBody.appendChild(box);
             if (dom.detailCopy) dom.detailCopy.hidden = true;
+            if (dom.detailSave) dom.detailSave.hidden = true;
             lastSql = '';
             open();
         }
@@ -191,7 +214,9 @@
                 }
 
                 sqlBlock(detail.sql || '');
+                lastSqlName = (detail.name || ref.name || 'ddl') + '-table';
                 if (dom.detailCopy) dom.detailCopy.hidden = !lastSql;
+                if (dom.detailSave) dom.detailSave.hidden = !lastSql;
                 void dom.detailKind;
             } catch (error) {
                 dom.detailBody.textContent = '读取失败：' + (error.message || error);
@@ -208,6 +233,7 @@
                     (result.warnings && result.warnings.length ? ' · ' + result.warnings.length + ' 条提示' : '');
                 U.clear(dom.detailBody);
                 sqlBlock(result.sql || '');
+                lastSqlName = (ref.name || 'ddl') + '-' + (ref.kind || 'ddl');
                 if (result.warnings && result.warnings.length) {
                     const box = section('提示', result.warnings.length);
                     result.warnings.forEach(function (warning) {
@@ -215,6 +241,7 @@
                     });
                 }
                 if (dom.detailCopy) dom.detailCopy.hidden = !lastSql;
+                if (dom.detailSave) dom.detailSave.hidden = !lastSql;
             } catch (error) {
                 dom.detailBody.textContent = '读取失败：' + (error.message || error);
                 toast('读取 DDL 失败：' + (error.message || error), 'error');

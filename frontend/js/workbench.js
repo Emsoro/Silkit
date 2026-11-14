@@ -25,7 +25,8 @@
             connections: null,
             history: null,
             hint: null,
-            table: null
+            table: null,
+            designer: null
         };
 
         app.showDetail = function (sessionId, ref) {
@@ -192,6 +193,30 @@
         app.openSqlDialog = openSqlDialog;
         app.saveSqlDialog = saveSqlDialog;
 
+        // DDL 执行成功后的统一善后：刷新对象树/表标签，重命名同步标签，删除关闭标签。
+        app.afterDdl = function (sessionId, info) {
+            const change = info || {};
+            app.tree.refreshSession(sessionId);
+            if (app.hint) app.hint.invalidate(sessionId);
+            const original = change.originalName || '';
+            state.tabsForSession(sessionId).forEach(function (tab) {
+                if (tab.kind !== 'table' || !tab.ref || !tab.ref.name) return;
+                if (original && tab.ref.name !== original) return;
+                if (change.dropped) {
+                    app.tabs.closeTab(tab.id);
+                    return;
+                }
+                if (change.newName && change.newName !== tab.ref.name) {
+                    tab.ref.name = change.newName;
+                    tab.title = '表: ' + change.newName;
+                    app.tabs.updateChrome(tab);
+                    app.tabs.render();
+                }
+                if (state.activeTab() === tab && app.table) app.table.reload(tab);
+            });
+            scheduleTabsPersist();
+        };
+
         // ------------------------------------------------------------ 标签持久化
         function tabsSnapshot() {
             return state.tabs.slice(0, 50).map(function (tab) {
@@ -246,6 +271,7 @@
         app.table = window.SilkitTable ? window.SilkitTable.create(app) : null;
         app.tabs = window.SilkitTabs.create(app);
         app.detail = window.SilkitDetail.create(app);
+        app.designer = window.SilkitDesigner ? window.SilkitDesigner.create(app) : null;
         app.tree = window.SilkitTree.create(app);
         app.connections = window.SilkitConnections.create(app);
         app.history = window.SilkitHistory.create(app);
@@ -268,7 +294,7 @@
             const mode = byId('statusMode');
             const run = byId('runBtn');
             if (mode) {
-                mode.textContent = session ? 'M5 · 查询与表数据' : 'M5 · 等待连接';
+                mode.textContent = session ? 'M6 · 表设计与 DDL' : 'M6 · 等待连接';
             }
             if (run) run.disabled = !!(state.activeTab() && state.activeTab().running);
         }
@@ -284,6 +310,7 @@
             app.results.init();
             if (app.table) app.table.init();
             app.detail.init();
+            if (app.designer) app.designer.init();
             app.history.load(settings);
             // 先恢复标签，再初始化标签视图（tabs.init 在无标签时才建默认标签）。
             const restored = restoreTabs(settings);
