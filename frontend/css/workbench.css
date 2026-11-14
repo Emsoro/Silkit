@@ -805,9 +805,66 @@ body.is-col-resizing * {
     gap: 6px;
 }
 
-.field-row .input {
+/* 只作用于 .field-row 的直接子输入框；嵌套在 .field 里的输入框保持自身高度 */
+.field-row > .input {
     flex: 1;
     min-width: 0;
+}
+
+.field-row > .field {
+    min-width: 0;
+}
+
+/* 数据库引擎：横排单选（替代下拉） */
+.engine-picker {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.engine-option {
+    position: relative;
+    flex: 1 1 0;
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-1);
+    color: var(--text-dim);
+    font-size: 12.5px;
+    white-space: nowrap;
+    cursor: pointer;
+    user-select: none;
+    transition: background .15s ease, border-color .15s ease, color .15s ease;
+}
+
+.engine-option input {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: 0;
+    opacity: 0;
+}
+
+.engine-option:hover {
+    border-color: var(--border-strong);
+    color: var(--text);
+}
+
+.engine-option:has(input:checked) {
+    background: var(--accent-soft);
+    border-color: var(--accent);
+    color: var(--accent);
+    font-weight: 600;
+}
+
+.engine-option:focus-within {
+    outline: 2px solid var(--accent-2);
+    outline-offset: 1px;
 }
 
 .field-hint {
@@ -1320,6 +1377,12 @@ body.is-col-resizing * {
     border: 1px solid var(--border);
     background: var(--bg-1);
     color: var(--text);
+}
+
+/* 运行按钮的播放图标：固定实心绿色，不跟随主题的 accent 变化 */
+#runBtn svg path {
+    fill: #22c55e;
+    stroke: #22c55e;
 }
 
 .editor-body { display: flex; min-height: 0; }

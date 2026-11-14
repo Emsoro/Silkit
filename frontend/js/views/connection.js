@@ -1,4 +1,4 @@
-// SQLite 连接对话框：文件选择、已保存连接、测试连接、保存与打开/断开。
+// 连接对话框：引擎选择（SQLite / MySQL / PostgreSQL）、文件选择、已保存连接、测试连接与打开/断开。
 (function () {
     'use strict';
 
@@ -15,6 +15,20 @@
         let profilesLoaded = false;
 
         function byId(id) { return document.getElementById(id); }
+
+        // 引擎选择改为横排单选组，用这两个 helper 读写选中值。
+        function engineValue() {
+            const checked = dom.connEngine &&
+                dom.connEngine.querySelector('input[name="connEngine"]:checked');
+            return checked ? checked.value : 'sqlite';
+        }
+
+        function setEngineValue(value) {
+            if (!dom.connEngine) return;
+            const input = dom.connEngine.querySelector(
+                'input[name="connEngine"][value="' + value + '"]');
+            if (input) input.checked = true;
+        }
 
         function init() {
             [
@@ -59,6 +73,10 @@
             dom.connName.addEventListener('input', clearError);
             dom.connEngine.addEventListener('change', function () {
                 updateEngineFields(true);
+                if (dom.connTitle && !editingId) {
+                    dom.connTitle.textContent =
+                        '新建 ' + (ENGINE_LABELS[engineValue()] || 'SQLite') + ' 连接';
+                }
                 clearError();
             });
 
@@ -169,9 +187,10 @@
 
         const ENGINE_LABELS = { sqlite: 'SQLite', mysql: 'MySQL / MariaDB', postgres: 'PostgreSQL' };
         const DEFAULT_PORTS = { mysql: '3306', postgres: '5432' };
+        const DEFAULT_USERS = { mysql: 'root', postgres: 'postgres' };
 
         function updateEngineFields(resetDefaults) {
-            const engine = dom.connEngine.value;
+            const engine = engineValue();
             const isSqlite = engine === 'sqlite';
             dom.sqliteFields.hidden = !isSqlite;
             dom.serverFields.hidden = isSqlite;
@@ -182,6 +201,14 @@
             if (resetDefaults) {
                 dom.connPort.value = DEFAULT_PORTS[engine] || '';
                 if (!dom.connHost.value) dom.connHost.value = '127.0.0.1';
+                // 切换引擎时填入该引擎的默认用户名（用户手动输入过的值不覆盖）。
+                const knownDefaults = Object.keys(DEFAULT_USERS).map(function (key) {
+                    return DEFAULT_USERS[key];
+                });
+                const currentUser = dom.connUser.value.trim();
+                if (!currentUser || knownDefaults.indexOf(currentUser) !== -1) {
+                    dom.connUser.value = DEFAULT_USERS[engine] || '';
+                }
             }
         }
 
@@ -192,7 +219,7 @@
             const p = profile || {};
             const options = p.options || {};
             const ssl = p.ssl || {};
-            dom.connEngine.value = ENGINE_LABELS[p.engine] ? p.engine : 'sqlite';
+            setEngineValue(ENGINE_LABELS[p.engine] ? p.engine : 'sqlite');
             dom.connName.value = p.name || '';
             dom.connFile.value = p.file || '';
             dom.connReadOnly.checked = !!p.readOnly;
@@ -200,8 +227,8 @@
             dom.connForeignKeys.checked = options.foreignKeys !== false;
             dom.connJournal.value = options.journalMode || '';
             dom.connHost.value = p.host || '127.0.0.1';
-            dom.connPort.value = p.port || DEFAULT_PORTS[dom.connEngine.value] || '';
-            dom.connUser.value = p.user || '';
+            dom.connPort.value = p.port || DEFAULT_PORTS[engineValue()] || '';
+            dom.connUser.value = p.user || DEFAULT_USERS[p.engine] || '';
             dom.connPassword.value = '';
             dom.connDatabase.value = p.database || '';
             dom.connSchema.value = p.schema || '';
@@ -213,7 +240,7 @@
             dom.connInitSql.value = options.initSql || '';
             updateEngineFields(false);
             if (dom.connTitle) dom.connTitle.textContent = editingId ? '编辑连接' :
-                '新建 ' + (ENGINE_LABELS[dom.connEngine.value] || 'SQLite') + ' 连接';
+                '新建 ' + (ENGINE_LABELS[engineValue()] || 'SQLite') + ' 连接';
             if (dom.connConnectBtn) dom.connConnectBtn.textContent = editingId ? '重新连接' : '连接';
             if (dom.connDelete) dom.connDelete.hidden = !editingId;
             renderProfiles();
@@ -268,7 +295,7 @@
 
         function collect() {
             clearError();
-            const engine = dom.connEngine.value;
+            const engine = engineValue();
             let profile;
 
             if (engine === 'sqlite') {

@@ -21,8 +21,8 @@
             'sidebar.search': '搜索对象…',
             'sidebar.refresh': '刷新对象树',
             'sidebar.emptyTitle': '还没有连接',
-            'sidebar.emptyHint': '打开一个 SQLite .db 文件开始',
-            'sidebar.openSqlite': '打开 SQLite 数据库',
+            'sidebar.emptyHint': '新建连接时可选择 MySQL、PostgreSQL 或 SQLite',
+            'sidebar.openConnection': '打开数据库连接',
             'sidebar.notConnected': '尚未连接',
 
             'tabbar.new': '新建查询标签',
@@ -132,8 +132,8 @@
             'sidebar.search': 'Search objects…',
             'sidebar.refresh': 'Refresh object tree',
             'sidebar.emptyTitle': 'No connections yet',
-            'sidebar.emptyHint': 'Open a SQLite .db file to get started',
-            'sidebar.openSqlite': 'Open SQLite Database',
+            'sidebar.emptyHint': 'Create a connection to MySQL, PostgreSQL or SQLite',
+            'sidebar.openConnection': 'Open Database Connection',
             'sidebar.notConnected': 'Not connected',
 
             'tabbar.new': 'New query tab',

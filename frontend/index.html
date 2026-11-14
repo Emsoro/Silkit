@@ -75,9 +75,9 @@
                 <div class="tree-empty" id="treeEmpty">
                     <span class="tree-empty-icon" data-icon="database"></span>
                     <p data-i18n="sidebar.emptyTitle">还没有连接</p>
-                    <p class="muted" data-i18n="sidebar.emptyHint">打开一个 SQLite .db 文件开始</p>
+                    <p class="muted" data-i18n="sidebar.emptyHint">新建连接时可选择 MySQL、PostgreSQL 或 SQLite</p>
                     <button class="btn btn-soft" type="button" data-tree-action="new">
-                        <span data-icon="plug"></span> <span data-i18n="sidebar.openSqlite">打开 SQLite 数据库</span>
+                        <span data-icon="plug"></span> <span data-i18n="sidebar.openConnection">打开数据库连接</span>
                     </button>
                 </div>
                 <div id="treeRoots"></div>
@@ -261,7 +261,7 @@
         <span class="spacer"></span>
         <span class="status-item" id="ipcStatus" data-i18n="status.ipc">IPC 就绪</span>
         <span class="status-item" id="statusTheme">晨樱</span>
-        <span class="status-item" id="statusVersion">v0.1.0</span>
+        <span class="status-item" id="statusVersion">v1.0.0</span>
     </footer>
 </div>
 
@@ -271,7 +271,7 @@
         <div class="modal-head">
             <div class="modal-title">
                 <span data-icon="plug"></span>
-                <span id="connTitle">新建 SQLite 连接</span>
+                <span id="connTitle">新建连接</span>
             </div>
             <button id="connDialogClose" class="icon-btn" type="button" data-icon="close" aria-label="关闭"></button>
         </div>
@@ -294,14 +294,23 @@
                     <input id="connName" class="input" type="text" placeholder="本地示例库" autocomplete="off">
                 </label>
 
-                <label class="field">
+                <div class="field">
                     <span class="field-label">数据库引擎</span>
-                    <select id="connEngine" class="input">
-                        <option value="sqlite">SQLite</option>
-                        <option value="mysql">MySQL / MariaDB</option>
-                        <option value="postgres">PostgreSQL</option>
-                    </select>
-                </label>
+                    <div class="engine-picker" id="connEngine" role="radiogroup" aria-label="数据库引擎">
+                        <label class="engine-option">
+                            <input type="radio" name="connEngine" value="sqlite" checked>
+                            <span>SQLite</span>
+                        </label>
+                        <label class="engine-option">
+                            <input type="radio" name="connEngine" value="mysql">
+                            <span>MySQL / MariaDB</span>
+                        </label>
+                        <label class="engine-option">
+                            <input type="radio" name="connEngine" value="postgres">
+                            <span>PostgreSQL</span>
+                        </label>
+                    </div>
+                </div>
 
                 <div id="serverFields" hidden>
                     <label class="field">
