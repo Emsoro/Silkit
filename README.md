@@ -171,16 +171,18 @@ Silkit/
 - **会话亲和**：每个连接一条 Session 线程，驱动对象不跨线程使用；`Cancel()` 单独设计，可跨线程调用。
 - **流式结果**：`query.execute` 按语句发 `statement` / `batch`，首批携带列元数据，达到 `maxRows` 后标记 `truncated`。
 
-## 已知限制（v0.1.0）
+## 已知限制（v0.6.0）
 
-- 仅 SQLite 驱动可用；MySQL / MariaDB（M2）、PostgreSQL（M3）尚未接入
-- SQL 编辑器仍是带行号的 `textarea`；CodeMirror、自动补全、SQL 文件与片段在 M4 接入
-- 对象树搜索为已加载节点的本地过滤；后端 `meta.search` 已就绪，前端结果渲染并入 M4
-- 表数据只读（结果网格可复制/查看）；CRUD、筛选、分页、表设计器在 M5 / M6
-- 导入 / 导出 / 转储、结果导出向导在 M7
-- 查询历史暂由前端 `localStorage` + `settings.json` 持久化，M4 迁移到后端 `history.jsonl`
-- `query.ack` 背压、`ui_state.*` 会话恢复尚未实现
-- DevMode 下需把 `frontend/` 放在 exe 同级目录（或 `build\Release\..\..\frontend`）
+- **平台**：目前仅 Windows 桌面端，依赖系统 WebView2 运行时；macOS / Linux 尚未支持。
+- **导入 / 导出 / 转储**：仅提供当前结果集的 CSV / JSON 一键导出（前端 Blob 下载）；完整导出向导（流式、进度、编码选择）、CSV 导入、SQL 转储等归入 M7。
+- **结果流式背压**：`query.ack` 背压尚未实现，超大结果集依赖 `maxRows` 截断，建议显式限制返回行数。
+- **PostgreSQL 表 DDL**：为目录简化重建，与 `pg_dump --schema-only` 存在差异；视图 / 函数 / 触发器的定义编辑需在详情面板查看 DDL 后手动保存 `.sql`，表设计器暂仅覆盖表对象。
+- **引擎版本覆盖**：已对照真实 MySQL 8.4.13 与 PostgreSQL 18.0.7 验收；MariaDB 11、PostgreSQL 13–16 等未逐版本部署（共用驱动路径，未单独验证）。
+- **性能验收**：5000 表 / 1000 表元数据等大规模场景、类型矩阵尚未实测。
+- **设置与打磨**：尚无独立设置页；i18n（目前仅中文界面）、单实例、多显示器 DPI、崩溃上报等打磨项归入 M8。
+- **远程连接**：暂不支持 SSH 隧道（v1.1 规划），直连需数据库网络可达。
+
+> 开发模式（DevMode）下需将 `frontend/` 置于 exe 同级目录（或 `build\Release\..\..\frontend`）。
 
 ## 许可
 
