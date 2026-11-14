@@ -226,6 +226,9 @@ bool ProfileStore::SaveLocked() {
 
 nlohmann::json ProfileStore::Sanitize(const nlohmann::json& profile) {
     nlohmann::json copy = profile;
+    // 只回传「是否已保存密码」，密文本身不出主进程。
+    const auto secret = profile.value("secret", nlohmann::json::object());
+    copy["hasSecret"] = secret.is_object() && secret.value("save", false);
     copy.erase("secret");
     copy.erase("password");
     return copy;

@@ -118,10 +118,12 @@
                 state.profiles = Array.isArray(result && result.connections) ? result.connections : [];
                 profilesLoaded = true;
                 renderProfiles();
+                if (ctx.onProfiles) ctx.onProfiles(state.profiles);
                 return state.profiles;
             } catch (error) {
                 profilesLoaded = true;
                 renderProfiles();
+                if (ctx.onProfiles) ctx.onProfiles(state.profiles || []);
                 if (ctx.onProfilesError) ctx.onProfilesError(error);
                 return [];
             }
@@ -235,7 +237,7 @@
             dom.connCharset.value = p.charset || '';
             dom.connSslMode.value = ssl.mode || 'prefer';
             dom.connServerReadOnly.checked = !!p.readOnly;
-            dom.connSavePassword.checked = !!(p.secret && p.secret.save);
+            dom.connSavePassword.checked = !!(p.hasSecret || (p.secret && p.secret.save));
             dom.connConnectTimeout.value = options.connectTimeoutMs != null ? options.connectTimeoutMs : 8000;
             dom.connInitSql.value = options.initSql || '';
             updateEngineFields(false);
@@ -395,6 +397,9 @@
                 }
                 await loadProfiles();
                 fill(profile);
+                // fill() 会清空密码框，这里还原，避免「保存」后紧接着点「重新连接」时密码丢失。
+                dom.connPassword.value = data.password;
+                dom.connSavePassword.checked = data.savePassword;
                 if (showToast) toast('连接配置已保存');
                 return profile;
             } catch (error) {
@@ -461,15 +466,23 @@
                     engine: (opened.profile && opened.profile.engine) || profile.engine
                 };
                 closeDialog();
-                toast('已连接 ' + (session.profile.name || ENGINE_LABELS[session.engine] || '数据库') +
-                    (session.serverVersion ? ' · ' + session.serverVersion : ''));
+                // 连接成功不再弹右下角气泡，结果直接体现在左侧对象树与状态栏。
+                // 同时记住密码（DPAPI 加密），下次启动双击即可直连。
+                if (data.password && (profile.id || editingId)) {
+                    profile.id = profile.id || editingId;
+                    try {
+                        await api.connSave(profile, data.password, true);
+                    } catch (error) {
+                        console.warn('[silkit] 记住密码失败', error);
+                    }
+                }
                 await loadProfiles();
                 if (ctx.onOpen) ctx.onOpen(session);
             } catch (error) {
                 const parts = [error.message || '连接失败'];
                 if (error.detail) parts.push(error.detail);
                 setError(parts.join(' · '));
-                toast('连接失败：' + (error.message || '未知错误'), 'error');
+                toast(parts.join(' · '), 'error');
             } finally {
                 setBusy(false);
                 if (dom.connConnectBtn) {
@@ -513,6 +526,13 @@
             openDialog(session.profile || null);
         }
 
+        /// 从左侧列表直接连接：不经过编辑对话框；缺密码时由错误提示引导去补。
+        async function connectProfile(profile) {
+            if (!profile || busy) return;
+            fill(profile);
+            await connect();
+        }
+
         return {
             init: init,
             openDialog: openDialog,
@@ -521,6 +541,8 @@
             loadProfiles: loadProfiles,
             disconnect: disconnect,
             connect: connect,
+            connectProfile: connectProfile,
+            deleteProfile: deleteProfile,
             isBusy: function () { return busy; }
         };
     }

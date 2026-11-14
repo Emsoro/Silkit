@@ -24,6 +24,7 @@
 
         const dom = {};
         let activeNode = null;
+        let profileList = [];
 
         function byId(id) { return document.getElementById(id); }
 
@@ -102,8 +103,81 @@
             return (session && session.currentDb) || '';
         }
 
+        function engineLabelOf(engine) {
+            if (engine === 'mysql') return 'MySQL';
+            if (engine === 'postgres') return 'PostgreSQL';
+            return 'SQLite';
+        }
+
+        function profileSummary(profile) {
+            if (!profile) return '';
+            if (profile.engine === 'sqlite') return profile.file || '';
+            const target = (profile.user || '') + '@' + (profile.host || '') +
+                (profile.port ? ':' + profile.port : '');
+            return profile.database ? target + '/' + profile.database : target;
+        }
+
+        /// 未连接的已保存连接：占位节点，双击即可连接。
+        function addProfileNode(profile) {
+            if (!dom.roots || !profile) return null;
+            let group = dom.roots.querySelector('.tree-group[data-profile="' + profile.id + '"]');
+            if (group) return group;
+
+            group = document.createElement('div');
+            group.className = 'tree-group';
+            group.setAttribute('data-profile', profile.id);
+
+            const root = document.createElement('button');
+            root.type = 'button';
+            root.className = 'tree-node tree-root is-offline';
+            root.setAttribute('data-profile', profile.id);
+            root.setAttribute('data-kind', 'profile');
+            root.setAttribute('data-name', profile.name || '未命名连接');
+            root.setAttribute('data-has-children', '0');
+            root.setAttribute('data-loaded', '1');
+            root.style.setProperty('--depth', '0');
+            root.title = (profileSummary(profile) || profile.name || '') + '\n双击连接';
+
+            const caret = U.el('span', 'caret is-leaf');
+            const dot = U.el('span', 'db-dot');
+            dot.style.setProperty('--dot', 'var(--text-faint)');
+            const label = U.el('span', 'node-label', profile.name || '未命名连接');
+            const badge = U.el('span', 'node-badge', engineLabelOf(profile.engine));
+
+            root.appendChild(caret);
+            root.appendChild(dot);
+            root.appendChild(label);
+            root.appendChild(badge);
+            group.appendChild(root);
+            dom.roots.appendChild(group);
+            return group;
+        }
+
+        /// 同步「已保存但未连接」的连接列表（连接成功后由会话节点接管）。
+        function renderProfiles(profiles) {
+            profileList = Array.isArray(profiles) ? profiles.slice() : [];
+            if (!dom.roots) return;
+            U.qsa('.tree-group[data-profile]', dom.roots).forEach(function (group) {
+                group.remove();
+            });
+            const connected = {};
+            state.sessions.forEach(function (session) {
+                const id = session.profile && session.profile.id;
+                if (id) connected[id] = true;
+            });
+            profileList.forEach(function (profile) {
+                if (!connected[profile.id]) addProfileNode(profile);
+            });
+            updateStatus();
+        }
+
         function addSession(session) {
             if (!dom.roots || !session) return;
+            const profileId = session.profile && session.profile.id;
+            if (profileId) {
+                const placeholder = dom.roots.querySelector('.tree-group[data-profile="' + profileId + '"]');
+                if (placeholder) placeholder.remove();
+            }
             let group = dom.roots.querySelector('.tree-group[data-session="' + session.id + '"]');
             if (group) {
                 highlightSession(state.activeSession());
@@ -129,8 +203,7 @@
             const dot = U.el('span', 'db-dot');
             dot.style.setProperty('--dot', 'var(--accent)');
             const engine = (session.profile && session.profile.engine) || session.engine || 'sqlite';
-            const engineLabel = engine === 'mysql' ? 'MySQL' :
-                (engine === 'postgres' ? 'PostgreSQL' : 'SQLite');
+            const engineLabel = engineLabelOf(engine);
             const label = U.el('span', 'node-label', (session.profile && session.profile.name) || engineLabel);
             const badge = U.el('span', 'node-badge', engineLabel);
             const spinner = U.el('span', 'node-spinner');
@@ -173,8 +246,15 @@
 
         function removeSession(sessionId) {
             if (!dom.roots) return;
+            const session = state.session(sessionId);
             const group = dom.roots.querySelector('.tree-group[data-session="' + sessionId + '"]');
             if (group) group.remove();
+            // 断开后回到「未连接」占位，仍留在左栏里方便再次连接。
+            const profileId = session && session.profile && session.profile.id;
+            if (profileId) {
+                const profile = profileList.find(function (item) { return item.id === profileId; });
+                if (profile) addProfileNode(profile);
+            }
             updateStatus();
         }
 
@@ -217,19 +297,24 @@
 
         function updateStatus() {
             if (!dom.status) return;
-            const count = state.sessions.size;
+            const active = state.sessions.size;
+            const offline = dom.roots ? dom.roots.querySelectorAll('.tree-group[data-profile]').length : 0;
+            const total = active + offline;
             const dot = byId('treeDot');
-            if (dot) dot.classList.toggle('is-off', count === 0);
-            if (!count) {
+            if (dot) dot.classList.toggle('is-off', total === 0);
+            if (!total) {
                 dom.status.textContent = '尚未连接';
-            } else if (count === 1) {
+            } else if (active === 0) {
+                dom.status.textContent = offline + ' 个已保存连接';
+            } else if (active === 1 && offline === 0) {
                 const session = state.activeSession();
                 const profile = session && session.profile ? session.profile : {};
                 dom.status.textContent = '1 个连接 · ' + (profile.name || 'SQLite');
             } else {
-                dom.status.textContent = count + ' 个连接';
+                dom.status.textContent = active + ' 个连接' +
+                    (offline ? ' · ' + offline + ' 个未连接' : '');
             }
-            if (dom.empty) dom.empty.hidden = count > 0;
+            if (dom.empty) dom.empty.hidden = total > 0;
         }
 
         // ------------------------------------------------------------ 节点
@@ -443,9 +528,16 @@
         function onDoubleClick(event) {
             const node = event.target.closest('.tree-node');
             if (!node) return;
+            const kind = node.getAttribute('data-kind');
+            if (kind === 'profile') {
+                const profile = profileList.find(function (item) {
+                    return item.id === node.getAttribute('data-profile');
+                });
+                if (profile && ctx.connections.connectProfile) ctx.connections.connectProfile(profile);
+                return;
+            }
             const session = sessionOf(node);
             if (!session) return;
-            const kind = node.getAttribute('data-kind');
             const name = node.getAttribute('data-name');
             const ref = descriptorFor(node);
             if (kind === 'table' || kind === 'view') {
@@ -463,6 +555,21 @@
         function showMenu(event, node) {
             if (!dom.menu) return;
             event.preventDefault();
+            const nodeKind = node.getAttribute('data-kind');
+            if (nodeKind === 'profile') {
+                const profile = profileList.find(function (item) {
+                    return item.id === node.getAttribute('data-profile');
+                });
+                if (!profile) return;
+                selectNode(node);
+                openMenu([
+                    { action: 'connect-profile', label: '连接' },
+                    { action: 'edit-profile', label: '编辑连接…' },
+                    { separator: true },
+                    { action: 'delete-profile', label: '删除连接', danger: true }
+                ], node, event);
+                return;
+            }
             const session = sessionOf(node);
             if (!session) return;
             selectNode(node);
@@ -530,6 +637,10 @@
             }
 
             if (!items.length) return;
+            openMenu(items, node, event);
+        }
+
+        function openMenu(items, node, event) {
             U.clear(dom.menu);
             items.forEach(function (item) {
                 if (item.separator) {
@@ -564,6 +675,20 @@
 
         function runAction(action, node) {
             if (!node) return;
+            if (node.getAttribute('data-kind') === 'profile') {
+                const profile = profileList.find(function (item) {
+                    return item.id === node.getAttribute('data-profile');
+                });
+                if (!profile) return;
+                if (action === 'connect-profile' && ctx.connections.connectProfile) {
+                    ctx.connections.connectProfile(profile);
+                } else if (action === 'edit-profile') {
+                    ctx.connections.openDialog(profile);
+                } else if (action === 'delete-profile' && ctx.connections.deleteProfile) {
+                    ctx.connections.deleteProfile(profile.id);
+                }
+                return;
+            }
             const session = sessionOf(node);
             if (!session) return;
             const kind = node.getAttribute('data-kind');
@@ -751,6 +876,7 @@
             init: init,
             addSession: addSession,
             removeSession: removeSession,
+            renderProfiles: renderProfiles,
             refreshSession: refreshSession,
             refreshActive: refreshActive,
             updateStatus: updateStatus,

@@ -288,6 +288,20 @@
     font-weight: 600;
 }
 
+/* 已保存但未连接的连接：弱化显示，双击即可连接 */
+.tree-root.is-offline {
+    color: var(--text-dim);
+    font-weight: 500;
+}
+
+.tree-root.is-offline .node-label {
+    color: var(--text-dim);
+}
+
+.tree-root.is-offline .node-badge {
+    opacity: .75;
+}
+
 .tree-node svg {
     width: 14px;
     height: 14px;
@@ -1016,13 +1030,14 @@
 /* ---------------------------------------------------------------- Toast */
 .toast-host {
     position: fixed;
-    right: 16px;
-    bottom: 36px;
+    /* 左下角：右下角会遮挡对话框底部的「连接」「保存」按钮 */
+    left: 16px;
+    bottom: 40px;
     z-index: 80;
     display: flex;
     flex-direction: column;
     gap: 8px;
-    align-items: flex-end;
+    align-items: flex-start;
     pointer-events: none;
 }
 

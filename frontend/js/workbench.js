@@ -123,6 +123,10 @@
             if (app.hint) app.hint.invalidate(session.id);
             updateStatus();
         };
+        app.onProfiles = function (profiles) {
+            // 左栏始终列出已保存的连接（未连接时以占位节点呈现）。
+            if (app.tree) app.tree.renderProfiles(profiles);
+        };
         app.onProfilesError = function (error) {
             console.warn('[silkit] conn.list 失败', error);
         };

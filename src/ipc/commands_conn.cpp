@@ -32,7 +32,16 @@ std::string PasswordFromProfile(const json& profile, const std::string& explicit
 
 json ResolveProfile(const json& args, ProfileStore& profiles) {
     if (args.contains("profile") && args["profile"].is_object()) {
-        return args["profile"];
+        json profile = args["profile"];
+        // 前端拿到的 profile 已剥离 secret；未显式给密码时补上服务端保存的那份。
+        const std::string id = profile.value("id", std::string{});
+        if (!id.empty() && !profile.contains("secret")) {
+            const json stored = profiles.Get(id);
+            if (stored.is_object() && stored.contains("secret")) {
+                profile["secret"] = stored["secret"];
+            }
+        }
+        return profile;
     }
     const std::string id = args.value("id", std::string{});
     if (id.empty()) dbutil::ThrowCommandError("bad_args", "缺少连接 id 或 profile");
@@ -83,11 +92,7 @@ void RegisterConnectionCommands(AsyncRouter& router,
     });
 
     router.Register("conn.test", [&profiles](const json& args, TaskContext&) -> json {
-        json profile = args.value("profile", json::object());
-        if (profile.empty()) {
-            const std::string id = args.value("id", std::string{});
-            if (!id.empty()) profile = profiles.Get(id);
-        }
+        json profile = ResolveProfile(args, profiles);
 
         std::string error;
         db::ConnectParams params = dbutil::ParamsFromProfile(profile, PasswordFromProfile(profile, args.value("password", std::string{})), error);
