@@ -9,6 +9,7 @@
         const api = window.SilkitApi;
         const state = window.SilkitState;
         const toast = options.toast;
+        const I = window.SilkitI18n;
 
         const dom = {};
         let tabsPersistTimer = 0;
@@ -26,7 +27,8 @@
             history: null,
             hint: null,
             table: null,
-            designer: null
+            designer: null,
+            settingsView: null
         };
 
         app.showDetail = function (sessionId, ref) {
@@ -227,18 +229,25 @@
                     dirty: !!tab.dirty,
                     ref: tab.ref || null,
                     autoLimit: tab.autoLimit || null,
-                    filePath: tab.filePath || null
+                    filePath: tab.filePath || null,
+                    scroll: Number(tab.editorScroll) || 0
                 };
             });
+        }
+
+        function activeTabIndex() {
+            const index = state.tabs.indexOf(state.activeTab());
+            return index < 0 ? 0 : index;
         }
 
         function scheduleTabsPersist() {
             clearTimeout(tabsPersistTimer);
             tabsPersistTimer = setTimeout(function () {
-                api.settingsSet({ query: { tabs: tabsSnapshot(), activeTab: 0 } })
-                    .catch(function (error) {
-                        console.warn('[silkit] 保存标签失败', error);
-                    });
+                api.settingsSet({
+                    query: { tabs: tabsSnapshot(), activeTab: activeTabIndex() }
+                }).catch(function (error) {
+                    console.warn('[silkit] 保存标签失败', error);
+                });
             }, 600);
         }
 
@@ -259,7 +268,8 @@
                     sql: isTable ? '' : item.sql,
                     dirty: isTable ? false : !!item.dirty,
                     ref: isTable ? item.ref : null,
-                    filePath: isTable ? null : (item.filePath || null)
+                    filePath: isTable ? null : (item.filePath || null),
+                    editorScroll: Number(item.scroll) || 0
                 }));
             });
             return restored.length > 0;
@@ -276,6 +286,36 @@
         app.connections = window.SilkitConnections.create(app);
         app.history = window.SilkitHistory.create(app);
         app.io = window.SilkitIo ? window.SilkitIo.create(app) : null;
+        app.settingsView = window.SilkitSettings ? window.SilkitSettings.create(app) : null;
+
+        // M8：把设置应用到运行时（语言、动效、字号、行高、侧栏宽度、编辑器选项）。
+        function applySettings(settings) {
+            const next = settings || {};
+            state.settings = next;
+            const ui = next.ui || {};
+            if (I) I.setLanguage(ui.language || 'zh-CN', { notify: false });
+
+            const shell = document.querySelector('.app');
+            if (shell) shell.classList.toggle('reduce-motion', !!ui.reduceMotion);
+
+            const root = document.documentElement;
+            const width = Number(ui.sidebarWidth);
+            if (Number.isFinite(width)) {
+                root.style.setProperty('--sidebar-w', Math.max(180, Math.min(560, width)) + 'px');
+            }
+            const fontSize = Number(next.editor && next.editor.fontSize);
+            if (Number.isFinite(fontSize)) {
+                root.style.setProperty('--editor-font-size', Math.max(10, Math.min(22, fontSize)) + 'px');
+            }
+
+            if (app.tabs) app.tabs.applySettings(next.editor || {});
+            const rowHeight = Number(ui.gridRowHeight);
+            const height = Number.isFinite(rowHeight) ? rowHeight : 26;
+            if (app.results) app.results.setRowHeight(height);
+            if (app.table) app.table.setRowHeight(height);
+            updateStatus();
+        }
+        app.applySettings = applySettings;
 
         function byId(id) { return document.getElementById(id); }
 
@@ -295,7 +335,9 @@
             const mode = byId('statusMode');
             const run = byId('runBtn');
             if (mode) {
-                mode.textContent = session ? 'M7 · 导入导出与转储' : 'M7 · 等待连接';
+                mode.textContent = session
+                    ? (I ? I.t('status.modeConnected') : 'M8 · 已连接')
+                    : (I ? I.t('status.mode') : 'M8 · 等待连接');
             }
             if (run) run.disabled = !!(state.activeTab() && state.activeTab().running);
         }
@@ -308,6 +350,7 @@
             dom.treeRefresh = byId('treeRefresh');
             dom.format = byId('formatBtn');
             dom.explain = byId('explainBtn');
+            dom.settings = byId('settingsBtn');
 
             app.results.init();
             if (app.table) app.table.init();
@@ -315,13 +358,23 @@
             if (app.designer) app.designer.init();
             app.history.load(settings);
             // 先恢复标签，再初始化标签视图（tabs.init 在无标签时才建默认标签）。
-            const restored = restoreTabs(settings);
+            const restoreEnabled = !(settings && settings.ui && settings.ui.restoreTabs === false);
+            const restored = restoreEnabled ? restoreTabs(settings) : false;
             app.tabs.init();
-            if (restored) toast('已恢复上次打开的标签');
+            applySettings(settings);
+            if (restored) {
+                const savedIndex = Number(settings && settings.query && settings.query.activeTab) || 0;
+                const target = state.tabs[savedIndex];
+                if (target) app.tabs.activate(target.id, true);
+                toast('已恢复上次打开的标签');
+            }
             app.tabs.bindDragDrop();
             app.tree.init();
             app.connections.init();
             if (app.io) app.io.init();
+            if (dom.settings && app.settingsView) {
+                dom.settings.addEventListener('click', function () { app.settingsView.open(); });
+            }
 
             if (dom.newConn) dom.newConn.addEventListener('click', function () { app.connections.openDialog(); });
             if (dom.newQuery) {

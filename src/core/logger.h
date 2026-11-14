@@ -43,4 +43,8 @@ void LogInfo(const std::string& message);
 void LogWarn(const std::string& message);
 void LogError(const std::string& message);
 
+/// 脱敏：把 `password=...` / `pwd: ...` / `secret=...` / `token=...` 等值替换成 ***。
+/// 日志写入前统一调用；也可供其他模块复用（如崩溃信息）。
+std::string MaskSecrets(const std::string& message);
+
 }  // namespace silkit

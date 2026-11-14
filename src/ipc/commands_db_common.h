@@ -3,6 +3,7 @@
 #include "db/driver.h"
 #include "db/session.h"
 #include "db/session_manager.h"
+#include "db/sql_splitter.h"
 #include "ipc/async_router.h"
 
 #include <memory>
@@ -39,5 +40,11 @@ RowsResult RunRows(db::Connection& connection,
 std::string CellText(const db::Cell& cell);
 std::string NodeNameFromCell(const db::Cell& cell);
 std::int64_t CellInt(const db::Cell& cell, std::int64_t fallback = 0);
+
+/// 安全模式（settings.query.safeMode）下检查语句列表。
+/// 存在危险语句且调用方未携带匹配的 confirmToken 时抛出 IpcError(confirm_required)，
+/// error.details 内含 statements / token / count，供前端展示确认。
+void CheckSafeMode(const json& args, const json& settings,
+                   const std::vector<db::SqlStatement>& statements);
 
 }  // namespace silkit::ipc::dbutil

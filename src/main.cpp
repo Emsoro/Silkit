@@ -15,6 +15,7 @@
 
 #include <Windows.h>
 
+#include <cstdio>
 #include <string>
 
 namespace {
@@ -43,6 +44,45 @@ void ActivateExistingInstance() {
     }
 }
 
+/// 未处理异常时写一份本地崩溃日志（不包含连接密码等敏感信息）。
+LONG WINAPI CrashLogFilter(EXCEPTION_POINTERS* pointers) {
+    SYSTEMTIME st{};
+    GetLocalTime(&st);
+
+    wchar_t name[64]{};
+    swprintf_s(name, L"crash-%04u%02u%02u-%02u%02u%02u.log", st.wYear, st.wMonth, st.wDay,
+               st.wHour, st.wMinute, st.wSecond);
+    const auto path = silkit::Paths::LogsDir() / name;
+
+    HANDLE file = CreateFileW(path.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS,
+                              FILE_ATTRIBUTE_NORMAL, nullptr);
+    if (file != INVALID_HANDLE_VALUE) {
+        const DWORD code = (pointers && pointers->ExceptionRecord)
+                               ? pointers->ExceptionRecord->ExceptionCode
+                               : 0;
+        const void* address = (pointers && pointers->ExceptionRecord)
+                                  ? pointers->ExceptionRecord->ExceptionAddress
+                                  : nullptr;
+        char buffer[768]{};
+        const int length = std::snprintf(
+            buffer, sizeof(buffer),
+            "Silkit %s crash\n"
+            "time=%04u-%02u-%02u %02u:%02u:%02u\n"
+            "exception=0x%08lX\n"
+            "address=%p\n"
+            "thread=%lu\n",
+            silkit::kVersion, st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond,
+            static_cast<unsigned long>(code), address,
+            static_cast<unsigned long>(GetCurrentThreadId()));
+        if (length > 0) {
+            DWORD written = 0;
+            WriteFile(file, buffer, static_cast<DWORD>(length), &written, nullptr);
+        }
+        CloseHandle(file);
+    }
+    return EXCEPTION_CONTINUE_SEARCH;
+}
+
 }  // namespace
 
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
@@ -61,6 +101,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     }
 
     silkit::Logger::Instance().Init(silkit::Paths::LogsDir());
+    SetUnhandledExceptionFilter(CrashLogFilter);
     silkit::LogInfo(std::string("Silkit ") + silkit::kVersion + " 启动");
 
     silkit::Settings settings;

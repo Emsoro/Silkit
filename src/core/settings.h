@@ -16,13 +16,15 @@ public:
     bool Load(const std::filesystem::path& file);
     nlohmann::json Snapshot() const;
     nlohmann::json Patch(const nlohmann::json& patch);
+    /// 恢复默认配置并立即写盘（同时保留旧文件为 .bak）。
+    nlohmann::json Reset();
     void Flush();
 
     /// 默认配置（与 CODEPLAN §5.3 保持一致）
     static nlohmann::json Defaults();
 
 private:
-    void SaveLocked();
+    void SaveLocked(bool backup = true);
 
     mutable std::mutex mutex_;
     std::filesystem::path file_;

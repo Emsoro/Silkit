@@ -177,6 +177,9 @@
 
         settingsGet: function () { return call('settings.get'); },
         settingsSet: function (patch) { return call('settings.set', { patch: patch }); },
+        settingsReset: function () { return call('settings.reset'); },
+        appPaths: function () { return call('app.paths'); },
+        appOpenPath: function (kind) { return call('app.open_path', { kind: kind }); },
 
         themeList: function () { return call('theme.list'); },
         themeSet: function (theme, persist) {
@@ -250,6 +253,10 @@
             if (typeof opts.fetchSize === 'number') args.fetchSize = opts.fetchSize;
             if (typeof opts.maxCellBytes === 'number') args.maxCellBytes = opts.maxCellBytes;
             if (opts.continueOnError) args.continueOnError = true;
+            if (opts.confirmDestructive && opts.confirmToken) {
+                args.confirmDestructive = true;
+                args.confirmToken = opts.confirmToken;
+            }
             return start('query.execute', args, opts);
         },
         queryCancel: function (sessionId) {

@@ -148,4 +148,31 @@ bool IsDestructiveStatement(const std::string& sql) {
     return false;
 }
 
+std::vector<DestructiveHit> FindDestructiveStatements(const std::vector<SqlStatement>& statements) {
+    std::vector<DestructiveHit> hits;
+    for (std::size_t i = 0; i < statements.size(); ++i) {
+        if (IsDestructiveStatement(statements[i].text)) {
+            hits.push_back(DestructiveHit{i, statements[i].text});
+        }
+    }
+    return hits;
+}
+
+std::uint64_t DestructiveToken(const std::vector<SqlStatement>& statements) {
+    std::uint64_t hash = 1469598103934665603ull;  // FNV-1a 64
+    const auto mix = [&hash](const std::string& text) {
+        for (const unsigned char ch : text) {
+            hash ^= ch;
+            hash *= 1099511628211ull;
+        }
+    };
+    for (std::size_t i = 0; i < statements.size(); ++i) {
+        mix(std::to_string(i));
+        mix(":");
+        mix(statements[i].text);
+        mix("\n");
+    }
+    return hash;
+}
+
 }  // namespace silkit::db

@@ -63,7 +63,10 @@
     // ------------------------------------------------------------ IPC 忙碌指示
     function setBusy(busy) {
         const status = $('ipcStatus');
-        if (status) status.textContent = busy ? 'IPC 执行中…' : 'IPC 就绪';
+        if (!status) return;
+        const I = window.SilkitI18n;
+        status.textContent = busy ? (I ? I.t('status.busy') : 'IPC 执行中…')
+                                  : (I ? I.t('status.ipc') : 'IPC 就绪');
     }
 
     function activeResults() {
@@ -143,12 +146,75 @@
     }
 
     // ------------------------------------------------------------ 侧栏
-    function toggleSidebar() {
+    function applySidebarWidth(width) {
+        const value = Number(width);
+        if (!Number.isFinite(value)) return;
+        document.documentElement.style.setProperty(
+            '--sidebar-w', Math.max(180, Math.min(560, value)) + 'px');
+    }
+
+    function applySidebarHidden(hidden) {
+        sidebarHidden = !!hidden;
         const sidebar = document.querySelector('.sidebar');
-        if (!sidebar) return;
-        sidebarHidden = !sidebarHidden;
-        sidebar.classList.toggle('is-collapsed', sidebarHidden);
+        if (sidebar) sidebar.classList.toggle('is-collapsed', sidebarHidden);
+        const splitter = $('sidebarSplitter');
+        if (splitter) splitter.hidden = sidebarHidden;
+    }
+
+    function persistSidebar(patch) {
+        api.settingsSet({ ui: patch }).catch(function () { /* ignore */ });
+    }
+
+    function toggleSidebar() {
+        if (!document.querySelector('.sidebar')) return;
+        applySidebarHidden(!sidebarHidden);
+        persistSidebar({ sidebarHidden: sidebarHidden });
         toast(sidebarHidden ? '侧栏已收起（Ctrl+B 恢复）' : '侧栏已展开');
+    }
+
+    function bindSidebarSplitter() {
+        const splitter = $('sidebarSplitter');
+        const sidebar = document.querySelector('.sidebar');
+        if (!splitter || !sidebar) return;
+        let dragging = false;
+
+        function onMove(event) {
+            if (!dragging) return;
+            const left = sidebar.getBoundingClientRect().left;
+            applySidebarWidth(event.clientX - left);
+        }
+
+        function stop() {
+            if (!dragging) return;
+            dragging = false;
+            splitter.classList.remove('is-dragging');
+            document.body.style.cursor = '';
+            document.body.style.userSelect = '';
+            const width = Math.round(sidebar.getBoundingClientRect().width);
+            persistSidebar({ sidebarWidth: width });
+        }
+
+        splitter.addEventListener('pointerdown', function (event) {
+            if (event.button !== 0 || sidebarHidden) return;
+            dragging = true;
+            splitter.classList.add('is-dragging');
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+            splitter.setPointerCapture(event.pointerId);
+            event.preventDefault();
+        });
+        splitter.addEventListener('pointermove', onMove);
+        splitter.addEventListener('pointerup', stop);
+        splitter.addEventListener('pointercancel', stop);
+
+        splitter.addEventListener('keydown', function (event) {
+            if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+            event.preventDefault();
+            const current = sidebar.getBoundingClientRect().width;
+            const next = current + (event.key === 'ArrowLeft' ? -16 : 16);
+            applySidebarWidth(next);
+            persistSidebar({ sidebarWidth: Math.round(Math.max(180, Math.min(560, next))) });
+        });
     }
 
     // ------------------------------------------------------------ 快捷键
@@ -159,7 +225,7 @@
     }
 
     function modalOpen() {
-        const ids = ['connDialog', 'cellViewer', 'detailDialog', 'tablePreview'];
+        const ids = ['connDialog', 'cellViewer', 'detailDialog', 'tablePreview', 'ioDialog', 'settingsDialog'];
         for (let i = 0; i < ids.length; i += 1) {
             const node = $(ids[i]);
             if (node && !node.hidden) return true;
@@ -279,6 +345,7 @@
 
         bindKeys();
         bindSplitter();
+        bindSidebarSplitter();
 
         const themeBtn = $('themeBtn');
         if (themeBtn) {
@@ -304,8 +371,14 @@
         try {
             const result = await api.settingsGet();
             settings = result && result.settings ? result.settings : null;
-            if (settings && settings.ui && settings.ui.editorRatio) {
-                applyEditorRatio(settings.ui.editorRatio);
+            if (settings) {
+                const ui = settings.ui || {};
+                if (window.SilkitI18n) {
+                    window.SilkitI18n.setLanguage(ui.language || 'zh-CN', { notify: false });
+                }
+                applyEditorRatio(ui.editorRatio);
+                applySidebarWidth(ui.sidebarWidth);
+                applySidebarHidden(ui.sidebarHidden);
             }
         } catch (error) {
             console.warn('[silkit] settings.get 失败', error);
@@ -332,7 +405,7 @@
 
         if (!bridge.isNative) {
             const tag = document.querySelector('.brand-tag');
-            if (tag) tag.textContent = 'M4 · Mock';
+            if (tag) tag.textContent = 'M8 · Mock';
             if ($('ipcStatus')) $('ipcStatus').textContent = 'IPC 就绪（浏览器 Mock）';
         }
 

@@ -544,7 +544,7 @@
             });
         }
 
-        function startRun() {
+        function startRun(confirm) {
             const path = dom.ioRunPath.value.trim();
             if (!path) {
                 setError('请选择 SQL 文件');
@@ -556,6 +556,10 @@
                 path: path,
                 continueOnError: dom.ioRunContinue.checked
             };
+            if (confirm && confirm.token) {
+                args.confirmDestructive = true;
+                args.confirmToken = confirm.token;
+            }
 
             runTask(api.queryExecuteFile(args, {
                 onProgress: function (data) {
@@ -582,10 +586,32 @@
                         '：' + error.message;
                 }
                 return '执行失败：' + error.message;
+            }, function (details) {
+                if (confirmDanger(details)) {
+                    startRun({ token: details.token });
+                } else {
+                    setStatus('已取消');
+                    toast('危险语句未执行');
+                }
             });
         }
 
-        function runTask(current, onSuccess, onErrorText) {
+        function confirmDanger(details) {
+            const info = details || {};
+            const statements = Array.isArray(info.statements) ? info.statements : [];
+            const I = window.SilkitI18n;
+            const title = I ? I.t('danger.title') : '确认执行危险语句';
+            const summary = I
+                ? I.t('danger.message', { n: info.count || statements.length })
+                : '安全模式检测到 ' + (info.count || statements.length) + ' 条危险语句，执行后可能无法撤销。';
+            const preview = statements.map(function (item) {
+                return '#' + (Number(item.index) + 1) + '  ' +
+                    String(item.sql || '').replace(/\s+/g, ' ').slice(0, 120);
+            }).join('\n');
+            return window.confirm(title + '\n\n' + summary + (preview ? '\n\n' + preview : ''));
+        }
+
+        function runTask(current, onSuccess, onErrorText, onConfirmRequired) {
             busy = true;
             task = current;
             dom.ioStartBtn.disabled = true;
@@ -605,6 +631,14 @@
                 if (error && error.code === 'cancelled') {
                     setStatus('已取消，临时文件已清理');
                     toast('任务已取消');
+                    return;
+                }
+                if (error && error.code === 'confirm_required' && typeof onConfirmRequired === 'function') {
+                    busy = false;
+                    task = null;
+                    dom.ioStartBtn.disabled = false;
+                    dom.ioCancelBtn.hidden = true;
+                    onConfirmRequired(error.details || {});
                     return;
                 }
                 const text = onErrorText(error || {});

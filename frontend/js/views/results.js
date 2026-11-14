@@ -723,6 +723,7 @@
             addMessage: addMessage,
             renderMessages: renderMessages,
             openCell: openCell,
+            setRowHeight: function (height) { if (grid) grid.setRowHeight(height); },
             copyAll: function () { if (grid) grid.copyAll(true); }
         };
     }

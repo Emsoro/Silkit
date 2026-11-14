@@ -21,7 +21,7 @@
             set: null,
             columns: null,
             widths: [],
-            rowHeight: ROW_HEIGHT,
+            rowHeight: Number(opts.rowHeight) || ROW_HEIGHT,
             scrollTop: 0,
             selection: null,
             dragAnchor: null,
@@ -785,10 +785,17 @@
             state.observer.observe(host);
         }
 
+        function setRowHeight(height) {
+            const value = Number(height);
+            state.rowHeight = Math.max(18, Number.isFinite(value) ? value : ROW_HEIGHT);
+            refresh();
+        }
+
         setEmpty(state.emptyMessage, state.emptyHint);
 
         return {
             setSet: setSet,
+            setRowHeight: setRowHeight,
             refresh: refresh,
             setEmpty: setEmpty,
             focus: focus,

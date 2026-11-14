@@ -555,7 +555,8 @@ void RegisterIoCommands(AsyncRouter& router, session::SessionManager& sessions, 
         return summary;
     });
 
-    router.Register("query.execute_file", [&sessions](const json& args, TaskContext& ctx) -> json {
+    router.Register("query.execute_file", [&sessions, &settings](const json& args,
+                                                                 TaskContext& ctx) -> json {
         auto session = dbutil::RequireSession(sessions, Text(args, "sessionId"));
         const std::string path = Text(args, "path");
         if (path.empty()) dbutil::ThrowCommandError("bad_args", "缺少 SQL 文件路径");
@@ -579,6 +580,7 @@ void RegisterIoCommands(AsyncRouter& router, session::SessionManager& sessions, 
             dbutil::ThrowCommandError("decode_error", error);
         }
 
+        const json settings_snapshot = settings.Snapshot();
         ctx.SetCancelHook([session] { session->Cancel(); });
 
         try {
@@ -590,6 +592,7 @@ void RegisterIoCommands(AsyncRouter& router, session::SessionManager& sessions, 
                         : (connection.EngineKind() == db::Engine::Postgres ? 2 : 0));
                 const std::vector<db::SqlStatement> statements = db::SplitSql(text, split_options);
                 if (statements.empty()) dbutil::ThrowCommandError("empty_sql", "SQL 文件没有可执行的语句");
+                dbutil::CheckSafeMode(args, settings_snapshot, statements);
 
                 json summaries = json::array();
                 json errors = json::array();

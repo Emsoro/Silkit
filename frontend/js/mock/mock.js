@@ -211,6 +211,25 @@
         return clone(DEFAULTS);
     }
 
+    // 安全模式 mock：与后端一致，未确认时返回 confirm_required。
+    function mockSafetyError(reqId, sql) {
+        const settings = loadSettings();
+        const safe = !settings.query || settings.query.safeMode !== false;
+        if (!safe) return false;
+        const text = String(sql || '');
+        const hit = /(^|;)\s*(drop|truncate|alter)\b/i.test(text) ||
+            /(^|;)\s*(delete|update)\b(?![\s\S]*\bwhere\b)/i.test(text);
+        if (!hit) return false;
+        fail(reqId, {
+            code: 'confirm_required',
+            message: '安全模式：检测到危险语句',
+            count: 1,
+            token: 'mock-token',
+            statements: [{ index: 0, sql: text.slice(0, 200) }]
+        });
+        return true;
+    }
+
     function saveSettings(settings) {
         try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch (e) { /* ignore */ }
     }
@@ -1590,6 +1609,25 @@
                 return { ok: true, reqId };
             }
 
+            case 'settings.reset': {
+                try { localStorage.removeItem(SETTINGS_KEY); } catch (e) { /* ignore */ }
+                reply(reqId, { settings: clone(DEFAULTS) });
+                return { ok: true, reqId };
+            }
+
+            case 'app.paths':
+                reply(reqId, {
+                    dataDir: 'C:\\Users\\mock\\AppData\\Roaming\\Silkit',
+                    logsDir: 'C:\\Users\\mock\\AppData\\Roaming\\Silkit\\logs',
+                    settingsFile: 'C:\\Users\\mock\\AppData\\Roaming\\Silkit\\settings.json',
+                    logFile: 'C:\\Users\\mock\\AppData\\Roaming\\Silkit\\logs\\silkit-20261114.log'
+                });
+                return { ok: true, reqId };
+
+            case 'app.open_path':
+                reply(reqId, { ok: true, path: a.kind === 'logs' ? 'C:\\mock\\logs' : 'C:\\mock\\data' });
+                return { ok: true, reqId };
+
             case 'theme.list':
                 reply(reqId, { themes: clone(THEMES) });
                 return { ok: true, reqId };
@@ -2057,6 +2095,7 @@
 
             // ---------------------------------------------------- 查询
             case 'query.execute':
+                if (!a.confirmDestructive && mockSafetyError(reqId, a.sql)) return { ok: true, reqId };
                 startQuery(reqId, a);
                 return { ok: true, reqId };
 
@@ -2155,6 +2194,9 @@
             }
 
             case 'query.execute_file': {
+                if (!a.confirmDestructive && mockSafetyError(reqId, 'DROP TABLE IF EXISTS demo;')) {
+                    return { ok: true, reqId };
+                }
                 const statements = 6;
                 progress(reqId, { index: 2, total: statements });
                 event(reqId, 'statement', { index: 2, total: statements, offset: 120, sql: 'UPDATE users SET name = ...' });

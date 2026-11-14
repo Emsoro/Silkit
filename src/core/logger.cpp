@@ -2,11 +2,15 @@
 
 #include <Windows.h>
 
+#include <algorithm>
+#include <cctype>
 #include <chrono>
 #include <cstdio>
+#include <cstring>
 #include <fstream>
 #include <mutex>
 #include <system_error>
+#include <vector>
 
 namespace silkit {
 namespace {
@@ -38,7 +42,81 @@ const char* LevelName(LogLevel level) {
     return "INFO";
 }
 
+bool IsKeyChar(char ch) {
+    return std::isalnum(static_cast<unsigned char>(ch)) != 0 || ch == '_' || ch == '-';
+}
+
+bool MatchKey(const std::string& lower, std::size_t pos, const char* key) {
+    const std::size_t len = std::strlen(key);
+    if (lower.compare(pos, len, key) != 0) return false;
+    if (pos > 0 && IsKeyChar(lower[pos - 1])) return false;
+    const std::size_t end = pos + len;
+    if (end < lower.size() && IsKeyChar(lower[end])) return false;
+    return true;
+}
+
 }  // namespace
+
+std::string MaskSecrets(const std::string& message) {
+    static const char* const kKeys[] = {
+        "password", "passwd", "pwd", "secret", "token", "api_key", "apikey",
+        "access_key", "private_key"};
+
+    std::string lower = message;
+    std::transform(lower.begin(), lower.end(), lower.begin(), [](unsigned char ch) {
+        return static_cast<char>(std::tolower(ch));
+    });
+
+    std::string out;
+    out.reserve(message.size());
+    std::size_t i = 0;
+    while (i < message.size()) {
+        bool matched = false;
+        for (const char* key : kKeys) {
+            const std::size_t len = std::strlen(key);
+            if (!MatchKey(lower, i, key)) continue;
+
+            std::size_t j = i + len;
+            while (j < message.size() && (message[j] == ' ' || message[j] == '\t')) ++j;
+            if (j >= message.size() || (message[j] != '=' && message[j] != ':')) break;
+            out.append(message, i, j - i + 1);
+            ++j;
+            const std::size_t after_separator = j;
+            while (j < message.size() && (message[j] == ' ' || message[j] == '\t')) ++j;
+
+            const char quote = (j < message.size() && (message[j] == '"' || message[j] == '\''))
+                                   ? message[j]
+                                   : '\0';
+            if (quote != '\0') ++j;
+            const std::size_t value_start = j;
+            // 保留分隔符后的空格与起始引号。
+            out.append(message, after_separator, value_start - after_separator);
+            while (j < message.size()) {
+                const char ch = message[j];
+                if (quote != '\0') {
+                    if (ch == quote) break;
+                } else if (std::isspace(static_cast<unsigned char>(ch)) || ch == ';' || ch == ',' ||
+                           ch == '&' || ch == '}' || ch == ')' || ch == '"' || ch == '\'') {
+                    break;
+                }
+                ++j;
+            }
+            if (j > value_start) out += "***";
+            if (quote != '\0' && j < message.size() && message[j] == quote) {
+                out.push_back(quote);
+                ++j;
+            }
+            i = j;
+            matched = true;
+            break;
+        }
+        if (!matched) {
+            out.push_back(message[i]);
+            ++i;
+        }
+    }
+    return out;
+}
 
 Logger& Logger::Instance() {
     static Logger instance;
@@ -94,7 +172,7 @@ void Logger::Write(LogLevel level, const std::string& message) {
     if (!initialized_ || !stream_.is_open()) return;
 
     RotateIfNeeded();
-    stream_ << Timestamp() << " [" << LevelName(level) << "] " << message << '\n';
+    stream_ << Timestamp() << " [" << LevelName(level) << "] " << MaskSecrets(message) << '\n';
     stream_.flush();
 }
 

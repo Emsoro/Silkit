@@ -37,7 +37,23 @@
             return { sql: tab.sql || '', label: '全部语句' };
         }
 
-        async function run(tab, scope) {
+        // 安全模式：后端返回 confirm_required 时展示危险语句并二次确认。
+        function confirmDanger(details) {
+            const info = details || {};
+            const statements = Array.isArray(info.statements) ? info.statements : [];
+            const I = window.SilkitI18n;
+            const title = I ? I.t('danger.title') : '确认执行危险语句';
+            const summary = I
+                ? I.t('danger.message', { n: info.count || statements.length })
+                : '安全模式检测到 ' + (info.count || statements.length) + ' 条危险语句，执行后可能无法撤销。';
+            const preview = statements.map(function (item) {
+                return '#' + (Number(item.index) + 1) + '  ' +
+                    String(item.sql || '').replace(/\s+/g, ' ').slice(0, 120);
+            }).join('\n');
+            return window.confirm(title + '\n\n' + summary + (preview ? '\n\n' + preview : ''));
+        }
+
+        async function run(tab, scope, confirm) {
             if (!tab) return;
             if (tab.running) {
                 cancel(tab);
@@ -78,7 +94,9 @@
                     if (data && data.message) {
                         results.addMessage(tab, 'progress', data.message);
                     }
-                }
+                },
+                confirmDestructive: !!(confirm && confirm.confirmDestructive),
+                confirmToken: confirm ? confirm.confirmToken : undefined
             });
             tab.task = task;
 
@@ -95,6 +113,18 @@
             } catch (error) {
                 if (error && error.code === 'cancelled') {
                     results.cancelled(tab);
+                } else if (error && error.code === 'confirm_required') {
+                    tab.task = null;
+                    setRunning(tab, false);
+                    if (confirmDanger(error.details)) {
+                        return run(tab, scope, {
+                            confirmDestructive: true,
+                            confirmToken: error.details && error.details.token
+                        });
+                    }
+                    results.addMessage(tab, 'info', '已取消：危险语句未执行');
+                    results.showMessages();
+                    return;
                 } else {
                     results.fail(tab, error || { message: '执行失败' }, sql);
                     toast('执行失败：' + ((error && error.message) || '未知错误'), 'error');

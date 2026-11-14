@@ -14,6 +14,7 @@
 #include <tauricpp/window.hpp>
 
 #include <Windows.h>
+#include <shellapi.h>
 
 #include <algorithm>
 #include <array>
@@ -160,6 +161,34 @@ void RegisterCommands(AsyncRouter& router,
     router.Register("settings.set", [&settings](const json& args, TaskContext&) -> json {
         const json patch = args.value("patch", json::object());
         return json{{"settings", settings.Patch(patch)}};
+    });
+
+    router.Register("settings.reset", [&settings](const json&, TaskContext&) -> json {
+        return json{{"settings", settings.Reset()}};
+    });
+
+    router.Register("app.paths", [](const json&, TaskContext&) -> json {
+        return json{{"dataDir", Paths::ToUtf8(Paths::Root())},
+                    {"logsDir", Paths::ToUtf8(Paths::LogsDir())},
+                    {"settingsFile", Paths::ToUtf8(Paths::SettingsFile())},
+                    {"logFile", Paths::ToUtf8(Logger::Instance().CurrentFile())}};
+    });
+
+    // 仅允许打开数据目录 / 日志目录，避免变成任意路径启动器。
+    router.Register("app.open_path", [](const json& args, TaskContext&) -> json {
+        const std::string kind = args.value("kind", std::string{"data"});
+        if (kind != "data" && kind != "logs") {
+            return json{{"ok", false},
+                        {"error", {{"code", "bad_args"}, {"message", "仅支持 data / logs"}}}};
+        }
+        const std::filesystem::path path =
+            kind == "logs" ? Paths::LogsDir() : Paths::Root();
+        std::error_code ec;
+        std::filesystem::create_directories(path, ec);
+        const HINSTANCE result = ShellExecuteW(nullptr, L"open", path.c_str(), nullptr, nullptr,
+                                               SW_SHOWNORMAL);
+        return json{{"ok", reinterpret_cast<INT_PTR>(result) > 32},
+                    {"path", Paths::ToUtf8(path)}};
     });
 
     router.Register("theme.list", [](const json&, TaskContext&) -> json {

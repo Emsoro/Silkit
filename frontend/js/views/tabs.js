@@ -16,6 +16,7 @@
         let cm = null;
         let errorMark = null;
         let hintTimer = 0;
+        let autocompleteEnabled = true;
         const tools = window.SilkitSqlTools || null;
         const hint = ctx.hint || null;
 
@@ -138,6 +139,7 @@
 
             // 输入字母/点号后延迟触发补全（M4-4）。
             cm.on('inputRead', function (editor, change) {
+                if (!autocompleteEnabled) return;
                 if (!change || change.origin !== '+input') return;
                 if (!change.text || !change.text.length) return;
                 const text = change.text[change.text.length - 1];
@@ -155,6 +157,7 @@
 
             cm.addKeyMap({
                 'Ctrl-Space': function () {
+                    if (!autocompleteEnabled) return;
                     cm.showHint({ hint: hintForSession(), completeSingle: false });
                 }
             });
@@ -565,10 +568,27 @@
             cm.focus();
         }
 
+        function applySettings(settings) {
+            const editor = settings || {};
+            autocompleteEnabled = editor.autocomplete !== false;
+            if (!cm) return;
+            const tab_size = Number(editor.tabSize) || 2;
+            if (editor.showLineNumbers !== undefined) {
+                cm.setOption('lineNumbers', !!editor.showLineNumbers);
+            }
+            if (editor.wordWrap !== undefined) {
+                cm.setOption('lineWrapping', !!editor.wordWrap);
+            }
+            cm.setOption('indentUnit', tab_size);
+            cm.setOption('tabSize', tab_size);
+            cm.refresh();
+        }
+
         return {
             init: init,
             render: render,
             activate: activate,
+            applySettings: applySettings,
             openQuery: openQuery,
             openTable: openTable,
             closeTab: closeTab,

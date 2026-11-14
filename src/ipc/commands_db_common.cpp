@@ -2,6 +2,7 @@
 
 #include "db/engine_dialect.h"
 #include "db/identifier.h"
+#include "db/sql_util.h"
 #include "db/types.h"
 
 #include <cstdlib>
@@ -187,6 +188,35 @@ std::int64_t CellInt(const db::Cell& cell, std::int64_t fallback) {
     const long long value = std::strtoll(cell.text.c_str(), &end, 10);
     if (end == nullptr || *end != '\0') return fallback;
     return value;
+}
+
+void CheckSafeMode(const json& args, const json& settings,
+                   const std::vector<db::SqlStatement>& statements) {
+    if (!settings.is_object()) return;
+    const auto query_it = settings.find("query");
+    if (query_it == settings.end() || !query_it->is_object()) return;
+    if (!query_it->value("safeMode", true)) return;
+
+    const auto hits = db::FindDestructiveStatements(statements);
+    if (hits.empty()) return;
+
+    const std::string token = std::to_string(db::DestructiveToken(statements));
+    const bool confirmed = args.value("confirmDestructive", false) &&
+                           args.value("confirmToken", std::string{}) == token;
+    if (confirmed) return;
+
+    json list = json::array();
+    for (std::size_t i = 0; i < hits.size() && i < 20; ++i) {
+        list.push_back(json{{"index", hits[i].index}, {"sql", hits[i].sql}});
+    }
+    throw IpcError(json{
+        {"code", "confirm_required"},
+        {"numericCode", NumericCode("confirm_required")},
+        {"message", "安全模式：检测到 " + std::to_string(hits.size()) +
+                        " 条危险语句（DROP / TRUNCATE / ALTER / 无 WHERE 的 UPDATE / DELETE）"},
+        {"token", token},
+        {"count", hits.size()},
+        {"statements", std::move(list)}});
 }
 
 }  // namespace silkit::ipc::dbutil

@@ -98,6 +98,11 @@ target_link_libraries(test_io PRIVATE silkit_test_lib)
 add_test(NAME io COMMAND test_io)
 set_tests_properties(io PROPERTIES TIMEOUT 180)
 
+add_executable(test_m8 test_m8.cpp)
+target_link_libraries(test_m8 PRIVATE silkit_test_lib)
+add_test(NAME m8 COMMAND test_m8)
+set_tests_properties(m8 PROPERTIES TIMEOUT 30)
+
 add_executable(integration_db integration_db.cpp)
 target_link_libraries(integration_db PRIVATE silkit_test_lib)
 add_test(NAME integration_db COMMAND integration_db)

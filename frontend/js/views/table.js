@@ -1045,7 +1045,8 @@
             save: save,
             reload: reload,
             hasChanges: hasChanges,
-            load: load
+            load: load,
+            setRowHeight: function (height) { if (grid) grid.setRowHeight(height); }
         };
     }
 

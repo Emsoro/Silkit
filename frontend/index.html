@@ -33,20 +33,23 @@
 <div class="app">
     <header class="topbar">
         <div class="brand">
-            <span class="brand-tag">M7</span>
+            <span class="brand-tag" data-i18n="app.brandTag">M8</span>
         </div>
 
         <div class="topbar-actions">
-            <button id="newConnBtn" class="btn btn-ghost" type="button" data-icon="plug">新建连接</button>
-            <button id="newQueryBtn" class="btn btn-ghost" type="button" data-icon="terminal">新建查询</button>
-            <button id="openSqlBtn" class="btn btn-ghost" type="button" data-icon="folder">打开 SQL</button>
-            <button id="runSqlFileBtn" class="btn btn-ghost" type="button" data-icon="bolt">执行 SQL 文件</button>
+            <button id="newConnBtn" class="btn btn-ghost" type="button" data-icon="plug"><span data-i18n="topbar.newConn">新建连接</span></button>
+            <button id="newQueryBtn" class="btn btn-ghost" type="button" data-icon="terminal"><span data-i18n="topbar.newQuery">新建查询</span></button>
+            <button id="openSqlBtn" class="btn btn-ghost" type="button" data-icon="folder"><span data-i18n="topbar.openSql">打开 SQL</span></button>
+            <button id="runSqlFileBtn" class="btn btn-ghost" type="button" data-icon="bolt"><span data-i18n="topbar.runFile">执行 SQL 文件</span></button>
             <span class="topbar-sep"></span>
             <button id="historyBtn" class="btn btn-ghost" type="button" data-icon="history"
-                    aria-haspopup="dialog" aria-expanded="false">最近</button>
+                    aria-haspopup="dialog" aria-expanded="false"><span data-i18n="topbar.history">最近</span></button>
         </div>
 
         <div class="topbar-right">
+            <button id="settingsBtn" class="btn btn-ghost" type="button" data-icon="settings"
+                    aria-haspopup="dialog" data-i18n-aria="topbar.settings" data-i18n-title="topbar.settings"
+                    aria-label="设置" title="设置"></button>
             <button id="themeBtn" class="btn btn-ghost theme-trigger" type="button"
                     aria-haspopup="dialog" aria-expanded="false" aria-controls="themePanel">
                 <span class="theme-dots" aria-hidden="true"><i></i><i></i><i></i></span>
@@ -60,19 +63,21 @@
         <aside class="sidebar">
             <div class="sidebar-search">
                 <span data-icon="search"></span>
-                <input id="treeFilter" type="search" placeholder="搜索对象…" autocomplete="off" spellcheck="false">
+                <input id="treeFilter" type="search" placeholder="搜索对象…" autocomplete="off" spellcheck="false"
+                       data-i18n-placeholder="sidebar.search">
                 <kbd>Ctrl+B</kbd>
                 <button id="treeRefresh" class="icon-btn" type="button" data-icon="refresh"
-                        aria-label="刷新对象树" title="刷新对象树"></button>
+                        aria-label="刷新对象树" title="刷新对象树"
+                        data-i18n-aria="sidebar.refresh" data-i18n-title="sidebar.refresh"></button>
             </div>
 
             <div class="sidebar-body" id="objectTree">
                 <div class="tree-empty" id="treeEmpty">
                     <span class="tree-empty-icon" data-icon="database"></span>
-                    <p>还没有连接</p>
-                    <p class="muted">打开一个 SQLite <code>.db</code> 文件开始</p>
+                    <p data-i18n="sidebar.emptyTitle">还没有连接</p>
+                    <p class="muted" data-i18n="sidebar.emptyHint">打开一个 SQLite .db 文件开始</p>
                     <button class="btn btn-soft" type="button" data-tree-action="new">
-                        <span data-icon="plug"></span> 打开 SQLite 数据库
+                        <span data-icon="plug"></span> <span data-i18n="sidebar.openSqlite">打开 SQLite 数据库</span>
                     </button>
                 </div>
                 <div id="treeRoots"></div>
@@ -80,9 +85,12 @@
 
             <div class="sidebar-foot">
                 <span class="status-dot" id="treeDot"></span>
-                <span id="treeStatus">尚未连接</span>
+                <span id="treeStatus" data-i18n="sidebar.notConnected">尚未连接</span>
             </div>
         </aside>
+
+        <div class="sidebar-splitter" id="sidebarSplitter" role="separator" aria-orientation="vertical"
+             aria-label="调整侧栏宽度" tabindex="0"></div>
 
         <main class="main">
             <div class="tabbar" id="tabbar" role="tablist" aria-label="工作区">
@@ -159,17 +167,17 @@
                     <span class="spacer"></span>
                     <select id="runScope" class="input input-mini" aria-label="执行范围"
                             title="执行范围（Ctrl+Enter 按所选范围执行）">
-                        <option value="all">全部语句</option>
-                        <option value="current">当前语句</option>
+                        <option value="all" data-i18n="editor.scopeAll">全部语句</option>
+                        <option value="current" data-i18n="editor.scopeCurrent">当前语句</option>
                     </select>
                     <button class="btn btn-mini" type="button" id="formatBtn" data-icon="bolt"
-                            title="格式化 SQL（Shift+Alt+F）">格式化</button>
+                            title="格式化 SQL（Shift+Alt+F）"><span data-i18n="editor.format">格式化</span></button>
                     <button class="btn btn-mini" type="button" id="explainBtn" data-icon="pulse"
                             title="查看执行计划（Ctrl+Shift+P）">EXPLAIN</button>
                     <button class="btn btn-mini" type="button" id="runBtn" data-icon="play"
-                            title="执行当前 SQL（Ctrl+Enter / F5）">运行</button>
+                            title="执行当前 SQL（Ctrl+Enter / F5）"><span data-i18n="editor.run">运行</span></button>
                     <button class="btn btn-mini btn-danger-soft" type="button" id="cancelBtn" data-icon="stop"
-                            title="取消执行（Esc）" hidden>取消</button>
+                            title="取消执行（Esc）" hidden><span data-i18n="editor.cancel">取消</span></button>
                 </div>
                 <div class="editor-body">
                     <div id="sqlEditor" class="editor-cm" aria-label="SQL 编辑器"></div>
@@ -182,23 +190,26 @@
             <section class="results" id="resultsPane">
                 <div class="result-tabs" role="tablist" aria-label="结果">
                     <button class="rtab active" type="button" role="tab" data-target="resultGrid" aria-selected="true">
-                        <span data-icon="grid"></span> 结果
+                        <span data-icon="grid"></span> <span data-i18n="results.tabResult">结果</span>
                     </button>
                     <button class="rtab" type="button" role="tab" data-target="explainView" aria-selected="false">
-                        <span data-icon="pulse"></span> 计划
+                        <span data-icon="pulse"></span> <span data-i18n="results.tabPlan">计划</span>
                     </button>
                     <button class="rtab" type="button" role="tab" data-target="messageLog" aria-selected="false">
-                        <span data-icon="message"></span> 消息
+                        <span data-icon="message"></span> <span data-i18n="results.tabMessage">消息</span>
                         <span class="rtab-count" id="msgCount" hidden>0</span>
                     </button>
                     <span class="result-sets" id="resultSets" role="tablist" aria-label="结果集"></span>
                     <span class="spacer"></span>
                     <button class="btn btn-mini" type="button" id="exportCsvBtn" data-icon="save"
-                            title="导出当前结果集为 CSV" aria-label="导出 CSV" disabled>CSV</button>
+                            title="导出当前结果集为 CSV" aria-label="导出 CSV"
+                            data-i18n-title="results.exportCsv" data-i18n-aria="results.exportCsv" disabled>CSV</button>
                     <button class="btn btn-mini" type="button" id="exportJsonBtn" data-icon="save"
-                            title="导出当前结果集为 JSON" aria-label="导出 JSON" disabled>JSON</button>
+                            title="导出当前结果集为 JSON" aria-label="导出 JSON"
+                            data-i18n-title="results.exportJson" data-i18n-aria="results.exportJson" disabled>JSON</button>
                     <button class="btn btn-mini" type="button" id="resultCopyBtn" data-icon="copy"
-                            title="复制当前结果集为 TSV（含表头）" aria-label="复制结果" disabled></button>
+                            title="复制当前结果集为 TSV（含表头）" aria-label="复制结果"
+                            data-i18n-title="results.copy" data-i18n-aria="results.copy" disabled></button>
                     <span class="result-meta" id="resultMeta"></span>
                 </div>
 
@@ -214,8 +225,8 @@
                     <div id="explainView" class="explain-wrap" role="tabpanel" hidden>
                         <div class="explain-empty" id="explainEmpty">
                             <span data-icon="pulse"></span>
-                            <p>还没有执行计划</p>
-                            <p class="muted">选中语句后点击 EXPLAIN，或在计划面板查看最近一次输出。</p>
+                            <p data-i18n="results.emptyPlan">还没有执行计划</p>
+                            <p class="muted" data-i18n="results.emptyPlanHint">选中语句后点击 EXPLAIN，或在计划面板查看最近一次输出。</p>
                         </div>
                         <pre class="explain-pre" id="explainPre" hidden></pre>
                         <div class="explain-warn" id="explainWarn" hidden></div>
@@ -224,8 +235,8 @@
                     <div id="messageLog" class="log-wrap" role="tabpanel" hidden>
                         <div class="log-empty" id="logEmpty">
                             <span data-icon="pulse"></span>
-                            <p>还没有消息</p>
-                            <p class="muted">执行 SQL 后，这里显示语句耗时、行数与错误定位。</p>
+                            <p data-i18n="results.emptyMessage">还没有消息</p>
+                            <p class="muted" data-i18n="results.emptyMessageHint">执行 SQL 后，这里显示语句耗时、行数与错误定位。</p>
                         </div>
                         <ol class="log-list" id="logList"></ol>
                     </div>
@@ -239,16 +250,16 @@
                     <span id="resultFootState">就绪</span>
                     <span id="resultFootTrunc" class="foot-warn" hidden>结果已截断</span>
                     <span class="spacer"></span>
-                    <span class="hint">双击单元格查看全文 · Ctrl+C 复制选区</span>
+                    <span class="hint" data-i18n="results.hint">双击单元格查看全文 · Ctrl+C 复制选区</span>
                 </div>
             </section>
         </main>
     </div>
 
     <footer class="statusbar">
-        <span class="status-item" id="statusMode">M1 · 等待连接</span>
+        <span class="status-item" id="statusMode" data-i18n="status.mode">M8 · 等待连接</span>
         <span class="spacer"></span>
-        <span class="status-item" id="ipcStatus">IPC 就绪</span>
+        <span class="status-item" id="ipcStatus" data-i18n="status.ipc">IPC 就绪</span>
         <span class="status-item" id="statusTheme">晨樱</span>
         <span class="status-item" id="statusVersion">v0.1.0</span>
     </footer>
@@ -861,6 +872,188 @@
     </div>
 </div>
 
+<!-- ---------------------------------------------------------------- M8 设置 -->
+<div id="settingsDialog" class="modal" hidden>
+    <div class="modal-dialog modal-settings" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+        <div class="modal-head">
+            <div class="modal-title">
+                <span data-icon="settings"></span>
+                <span id="settingsTitle" data-i18n="settings.title">设置</span>
+            </div>
+            <button id="settingsClose" class="icon-btn" type="button" data-icon="close"
+                    aria-label="关闭" data-i18n-aria="common.close"></button>
+        </div>
+
+        <div class="settings-layout">
+            <aside class="settings-nav" id="settingsNav">
+                <button class="settings-tab active" type="button" data-tab="general" data-i18n="settings.tabGeneral">通用</button>
+                <button class="settings-tab" type="button" data-tab="editor" data-i18n="settings.tabEditor">编辑器</button>
+                <button class="settings-tab" type="button" data-tab="query" data-i18n="settings.tabQuery">查询</button>
+                <button class="settings-tab" type="button" data-tab="grid" data-i18n="settings.tabGrid">数据网格</button>
+                <button class="settings-tab" type="button" data-tab="export" data-i18n="settings.tabExport">导出</button>
+                <button class="settings-tab" type="button" data-tab="about" data-i18n="settings.tabAbout">关于</button>
+            </aside>
+
+            <section class="settings-body">
+                <div class="settings-pane" data-pane="general">
+                    <label class="field">
+                        <span class="field-label" data-i18n="settings.language">界面语言</span>
+                        <select class="input" data-path="ui.language">
+                            <option value="zh-CN">简体中文</option>
+                            <option value="en-US">English</option>
+                        </select>
+                        <span class="field-hint" data-i18n="settings.languageHint">切换后立即生效，重启后保持。</span>
+                    </label>
+                    <label class="field">
+                        <span class="field-label" data-i18n="settings.sidebarWidth">侧栏宽度</span>
+                        <input class="input" type="number" min="180" max="560" data-path="ui.sidebarWidth">
+                    </label>
+                    <label class="settings-check">
+                        <input type="checkbox" data-path="ui.reduceMotion">
+                        <span data-i18n="settings.reduceMotion">减少动画</span>
+                    </label>
+                    <label class="settings-check">
+                        <input type="checkbox" data-path="ui.restoreTabs">
+                        <span data-i18n="settings.restoreTabs">启动时恢复标签</span>
+                    </label>
+                    <label class="settings-check">
+                        <input type="checkbox" data-path="ui.confirmDestructive">
+                        <span data-i18n="settings.confirmDestructive">危险操作二次确认</span>
+                    </label>
+                </div>
+
+                <div class="settings-pane" data-pane="editor" hidden>
+                    <label class="field">
+                        <span class="field-label" data-i18n="settings.editorFontSize">字号</span>
+                        <input class="input" type="number" min="10" max="22" data-path="editor.fontSize">
+                    </label>
+                    <label class="field">
+                        <span class="field-label" data-i18n="settings.editorTabSize">缩进宽度</span>
+                        <input class="input" type="number" min="2" max="8" data-path="editor.tabSize">
+                    </label>
+                    <label class="settings-check">
+                        <input type="checkbox" data-path="editor.wordWrap">
+                        <span data-i18n="settings.editorWordWrap">自动换行</span>
+                    </label>
+                    <label class="settings-check">
+                        <input type="checkbox" data-path="editor.showLineNumbers">
+                        <span data-i18n="settings.editorLineNumbers">显示行号</span>
+                    </label>
+                    <label class="settings-check">
+                        <input type="checkbox" data-path="editor.autocomplete">
+                        <span data-i18n="settings.editorAutocomplete">自动补全</span>
+                    </label>
+                </div>
+
+                <div class="settings-pane" data-pane="query" hidden>
+                    <label class="settings-check">
+                        <input type="checkbox" data-path="query.safeMode">
+                        <span data-i18n="settings.querySafeMode">安全模式</span>
+                    </label>
+                    <p class="field-hint" data-i18n="settings.querySafeModeHint">
+                        执行 DROP / TRUNCATE / ALTER / 无 WHERE 的 UPDATE、DELETE 前要求确认。
+                    </p>
+                    <label class="field">
+                        <span class="field-label" data-i18n="settings.queryMaxRows">默认最大行数</span>
+                        <input class="input" type="number" min="0" max="1000000" data-path="query.maxRows">
+                    </label>
+                    <label class="field">
+                        <span class="field-label" data-i18n="settings.queryFetchSize">分批大小</span>
+                        <input class="input" type="number" min="50" max="10000" data-path="query.fetchSize">
+                    </label>
+                    <label class="field">
+                        <span class="field-label" data-i18n="settings.queryHistoryLimit">历史条数上限</span>
+                        <input class="input" type="number" min="100" max="50000" data-path="query.historyLimit">
+                    </label>
+                    <label class="settings-check">
+                        <input type="checkbox" data-path="query.autoLimit">
+                        <span data-i18n="settings.queryAutoLimit">自动追加 LIMIT</span>
+                    </label>
+                </div>
+
+                <div class="settings-pane" data-pane="grid" hidden>
+                    <label class="field">
+                        <span class="field-label" data-i18n="settings.gridPageSize">表格每页行数</span>
+                        <input class="input" type="number" min="50" max="5000" data-path="data.pageSize">
+                    </label>
+                    <label class="field">
+                        <span class="field-label" data-i18n="settings.gridRowHeight">网格行高</span>
+                        <input class="input" type="number" min="20" max="48" data-path="ui.gridRowHeight">
+                    </label>
+                    <label class="field">
+                        <span class="field-label" data-i18n="settings.gridNullDisplay">NULL 显示文本</span>
+                        <input class="input" type="text" data-path="data.nullDisplay">
+                    </label>
+                    <label class="field">
+                        <span class="field-label" data-i18n="settings.gridMaxCell">单元格最大字节</span>
+                        <input class="input" type="number" min="1024" max="16777216" data-path="data.maxCellBytes">
+                    </label>
+                </div>
+
+                <div class="settings-pane" data-pane="export" hidden>
+                    <label class="field">
+                        <span class="field-label" data-i18n="settings.exportEncoding">默认编码</span>
+                        <select class="input" data-path="export.defaultEncoding">
+                            <option value="utf-8">UTF-8</option>
+                            <option value="utf-8-bom">UTF-8 BOM</option>
+                            <option value="utf-16le">UTF-16LE</option>
+                            <option value="gbk">GBK</option>
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span class="field-label" data-i18n="settings.exportDelimiter">CSV 分隔符</span>
+                        <select class="input" data-path="export.csvDelimiter">
+                            <option value=",">逗号 (,)</option>
+                            <option value=";">分号 (;)</option>
+                            <option value="\t">制表符 (Tab)</option>
+                            <option value="|">竖线 (|)</option>
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span class="field-label" data-i18n="settings.exportNull">NULL 字面量</span>
+                        <input class="input" type="text" data-path="export.nullLiteral">
+                    </label>
+                    <label class="settings-check">
+                        <input type="checkbox" data-path="export.includeHeader">
+                        <span data-i18n="settings.exportHeader">默认包含表头</span>
+                    </label>
+                </div>
+
+                <div class="settings-pane" data-pane="about" hidden>
+                    <dl class="settings-about">
+                        <dt data-i18n="settings.aboutVersion">版本</dt>
+                        <dd id="aboutVersion">—</dd>
+                        <dt data-i18n="settings.aboutDataDir">数据目录</dt>
+                        <dd class="mono" id="aboutDataDir">—</dd>
+                        <dt data-i18n="settings.aboutLogsDir">日志目录</dt>
+                        <dd class="mono" id="aboutLogsDir">—</dd>
+                        <dt data-i18n="settings.aboutSettings">配置文件</dt>
+                        <dd class="mono" id="aboutSettings">—</dd>
+                        <dt data-i18n="settings.aboutLogFile">当前日志</dt>
+                        <dd class="mono" id="aboutLogFile">—</dd>
+                    </dl>
+                    <div class="settings-about-actions">
+                        <button class="btn" type="button" data-open-path="data" data-icon="folderOpen">
+                            <span data-i18n="settings.openData">打开数据目录</span>
+                        </button>
+                        <button class="btn" type="button" data-open-path="logs" data-icon="file">
+                            <span data-i18n="settings.openLogs">打开日志目录</span>
+                        </button>
+                    </div>
+                </div>
+            </section>
+        </div>
+
+        <div class="modal-foot">
+            <span class="settings-state" id="settingsState"></span>
+            <span class="spacer"></span>
+            <button class="btn btn-ghost" type="button" id="settingsReset" data-i18n="settings.reset">恢复默认</button>
+            <button class="btn" type="button" id="settingsCancel" data-i18n="settings.cancel">取消</button>
+            <button class="btn btn-primary" type="button" id="settingsSave" data-i18n="settings.save">保存</button>
+        </div>
+    </div>
+</div>
+
 <div id="toastHost" class="toast-host" aria-live="polite"></div>
 
 <script src="js/mock/mock.js"></script>
@@ -874,6 +1067,7 @@
 <script src="vendor/codemirror/closebrackets.js"></script>
 <script src="vendor/codemirror/active-line.js"></script>
 <script src="js/icons.js"></script>
+<script src="js/i18n.js"></script>
 <script src="js/themes.js"></script>
 <script src="js/util.js"></script>
 <script src="js/editor/sql_tools.js"></script>
@@ -890,6 +1084,7 @@
 <script src="js/views/designer.js"></script>
 <script src="js/views/history.js"></script>
 <script src="js/views/io.js"></script>
+<script src="js/views/settings.js"></script>
 <script src="js/workbench.js"></script>
 <script src="js/app.js"></script>
 </body>

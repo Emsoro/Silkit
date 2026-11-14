@@ -38,6 +38,27 @@ bool AtomicWrite(const std::filesystem::path& path, const std::string& content) 
     return true;
 }
 
+/// 保留上一份可解析配置；写坏之后还能从 .bak 恢复。
+void BackupExisting(const std::filesystem::path& path) {
+    std::error_code ec;
+    if (!std::filesystem::exists(path, ec) || ec) return;
+    auto backup = path;
+    backup += L".bak";
+    CopyFileW(path.c_str(), backup.c_str(), FALSE);
+}
+
+bool ParseInto(const std::string& raw, nlohmann::json& out) {
+    if (raw.empty()) return false;
+    try {
+        auto parsed = nlohmann::json::parse(raw);
+        if (!parsed.is_object()) return false;
+        out = std::move(parsed);
+        return true;
+    } catch (const std::exception&) {
+        return false;
+    }
+}
+
 }  // namespace
 
 nlohmann::json Settings::Defaults() {
@@ -104,7 +125,19 @@ bool Settings::Load(const std::filesystem::path& file) {
         auto parsed = nlohmann::json::parse(raw);
         data_ = MergeJson(Defaults(), parsed);
     } catch (const std::exception& e) {
-        LogWarn(std::string("settings: 解析失败，使用默认值: ") + e.what());
+        LogWarn(std::string("settings: 解析失败，尝试从备份恢复: ") + e.what());
+        auto backup = file_;
+        backup += L".bak";
+        std::string backup_raw;
+        nlohmann::json parsed;
+        if (ReadWholeFile(backup, backup_raw) && ParseInto(backup_raw, parsed)) {
+            data_ = MergeJson(Defaults(), parsed);
+            dirty_ = true;
+            // 不再覆盖 .bak（主文件已经损坏）。
+            SaveLocked(false);
+            LogWarn("settings: 已从 " + Paths::ToUtf8(backup) + " 恢复");
+            return true;
+        }
         data_ = Defaults();
         dirty_ = true;
         SaveLocked();
@@ -126,13 +159,27 @@ nlohmann::json Settings::Patch(const nlohmann::json& patch) {
     return data_;
 }
 
+nlohmann::json Settings::Reset() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    data_ = Defaults();
+    dirty_ = true;
+    SaveLocked();
+    return data_;
+}
+
 void Settings::Flush() {
     std::lock_guard<std::mutex> lock(mutex_);
     if (dirty_) SaveLocked();
 }
 
-void Settings::SaveLocked() {
+void Settings::SaveLocked(bool backup) {
     if (file_.empty()) return;
+    if (backup) {
+        // 超大配置（例如内含大量历史）不做备份，避免每次 patch 都复制大文件。
+        std::error_code ec;
+        const auto size = std::filesystem::file_size(file_, ec);
+        if (!ec && size > 0 && size <= 1024 * 1024) BackupExisting(file_);
+    }
     const auto text = data_.dump(2, ' ', false, nlohmann::json::error_handler_t::replace);
     if (!AtomicWrite(file_, text)) {
         LogWarn("settings: 写入失败 " + Paths::ToUtf8(file_));

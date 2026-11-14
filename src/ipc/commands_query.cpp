@@ -84,6 +84,7 @@ void RegisterQueryCommands(AsyncRouter& router,
                                                   : (connection.EngineKind() == db::Engine::Postgres ? 2 : 0));
                 const std::vector<db::SqlStatement> statements = db::SplitSql(sql, split_options);
                 if (statements.empty()) dbutil::ThrowCommandError("empty_sql", "没有可执行的语句");
+                dbutil::CheckSafeMode(args, snapshot, statements);
 
                 const auto started = std::chrono::steady_clock::now();
                 json summaries = json::array();
