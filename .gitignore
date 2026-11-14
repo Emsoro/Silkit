@@ -54,3 +54,9 @@ Thumbs.db
 __pycache__/
 *.pyc
 
+# 本地 IDE 临时产物
+.trae-html-share-packages/
+
+# 本地发布推文（不入库，仅留本地磁盘）
+docs/
+
