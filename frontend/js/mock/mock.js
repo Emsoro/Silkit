@@ -1987,6 +1987,10 @@
             case 'ddl.preview': {
                 try {
                     const plan = mockDdlPlan(a);
+                    const engine = sessionEngine(a.sessionId);
+                    if (engine === 'mysql') {
+                        plan.warnings.push('MySQL DDL 会隐式提交，失败后无法自动回滚');
+                    }
                     reply(reqId, {
                         engine: sessionEngine(a.sessionId),
                         mode: a.mode,
@@ -1995,6 +1999,7 @@
                         sql: plan.statements.join('\n\n'),
                         token: plan.token,
                         warnings: plan.warnings,
+                        affectedRows: a.mode === 'create' ? '0' : '未知',
                         transactional: sessionEngine(a.sessionId) !== 'mysql'
                     });
                 } catch (error) {

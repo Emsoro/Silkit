@@ -91,6 +91,13 @@ std::string JoinPlan(const DdlPlan& plan) {
     return sql;
 }
 
+bool HasWarning(const DdlPlan& plan, const std::string& needle) {
+    for (const auto& warning : plan.warnings) {
+        if (warning.find(needle) != std::string::npos) return true;
+    }
+    return false;
+}
+
 std::unique_ptr<Connection> OpenMemory() {
     silkit::db::SqliteDriver driver;
     silkit::db::ConnectParams params;
@@ -345,6 +352,32 @@ void TestMysqlSql() {
     ExpectContains(drop_sql, "DROP COLUMN `dept_id`", "MySQL 删除列");
     Expect(drop_sql.find("DROP FOREIGN KEY") < drop_sql.find("DROP COLUMN"),
            "MySQL 先删外键再删列");
+    Expect(HasWarning(alter_drop, "删除列 dept_id 会丢失该列数据"), "MySQL 删除列警告");
+    Expect(alter_drop.affected_rows == "未知", "ALTER 影响行数为未知");
+
+    // 缩短长度与新增唯一索引的预览警告
+    DdlTableDefinition narrowed = definition;
+    narrowed.columns[1].type = "VARCHAR(32)";
+    narrowed.indexes.push_back(Index("uq_mail", {"name"}, true));
+    DdlPlan narrow_plan;
+    error.clear();
+    Expect(silkit::db::BuildDdlPlan(DdlMode::Alter, silkit::db::Engine::MySql, "app", definition,
+                                    narrowed, "", narrow_plan, error),
+           "生成 MySQL 缩短长度计划: " + error);
+    Expect(HasWarning(narrow_plan, "缩短"), "MySQL 缩短长度警告");
+    Expect(HasWarning(narrow_plan, "唯一索引 uq_mail"), "MySQL 唯一索引创建警告");
+
+    // 改类型与非空收紧的预览警告
+    DdlTableDefinition retyped = definition;
+    retyped.columns[0].type = "BIGINT";
+    retyped.columns[2].not_null = true;
+    DdlPlan retype_plan;
+    error.clear();
+    Expect(silkit::db::BuildDdlPlan(DdlMode::Alter, silkit::db::Engine::MySql, "app", definition,
+                                    retyped, "", retype_plan, error),
+           "生成 MySQL 改类型计划: " + error);
+    Expect(HasWarning(retype_plan, "类型从 INT 改为 BIGINT"), "MySQL 改类型警告");
+    Expect(HasWarning(retype_plan, "改为 NOT NULL"), "MySQL 收紧非空警告");
 }
 
 void TestPostgresSql() {
@@ -424,9 +457,35 @@ void TestTokenAndValidation() {
            "外键列数量不匹配被拒绝");
     ExpectContains(error, "数量不一致", "外键列数量错误原因");
 
+    // 新对象名严格校验：引号、超长、非法 UTF-8
+    DdlTableDefinition quoted = definition;
+    quoted.name = "bad\"name";
+    error.clear();
+    Expect(!silkit::db::BuildDdlPlan(DdlMode::Create, silkit::db::Engine::Sqlite, "main", {},
+                                     quoted, "", invalid, error),
+           "表名引号被拒绝");
+    ExpectContains(error, "引号", "表名引号错误原因");
+
+    DdlTableDefinition long_name = definition;
+    long_name.engine = silkit::db::Engine::MySql;
+    long_name.name = std::string(65, 'a');
+    error.clear();
+    Expect(!silkit::db::BuildDdlPlan(DdlMode::Create, silkit::db::Engine::MySql, "main", {},
+                                     long_name, "", invalid, error),
+           "MySQL 表名超长被拒绝");
+    ExpectContains(error, "过长", "MySQL 表名超长错误原因");
+
+    DdlTableDefinition bad_utf8 = definition;
+    bad_utf8.name = "bad";
+    bad_utf8.name.push_back(static_cast<char>(0xFF));
+    error.clear();
+    Expect(!silkit::db::BuildDdlPlan(DdlMode::Create, silkit::db::Engine::Sqlite, "main", {},
+                                     bad_utf8, "", invalid, error),
+           "非法 UTF-8 表名被拒绝");
+    ExpectContains(error, "UTF-8", "非法 UTF-8 错误原因");
+
     Expect(!silkit::db::DdlTransactional(silkit::db::Engine::MySql, DdlMode::Create),
-           "MySQL DDL 不事务");
-    Expect(silkit::db::DdlTransactional(silkit::db::Engine::Sqlite, DdlMode::Alter),
+           "MySQL DDL 不事务");    Expect(silkit::db::DdlTransactional(silkit::db::Engine::Sqlite, DdlMode::Alter),
            "SQLite DDL 可事务");
     Expect(!silkit::db::DdlTransactional(silkit::db::Engine::Postgres, DdlMode::DropDatabase),
            "PostgreSQL DROP DATABASE 不事务");

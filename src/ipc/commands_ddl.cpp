@@ -178,9 +178,18 @@ struct PreparedPlan {
     db::DdlTableDefinition updated;
     db::DdlPlan plan;
     std::string scope;
+    std::string affected_rows = "未知";
     db::Engine engine = db::Engine::Sqlite;
     bool transactional = false;
 };
+
+std::string CountRows(session::Session& sess, const PreparedPlan& prepared) {
+    const std::string qualified = db::QuoteIdentifier(prepared.engine, prepared.scope) + "." +
+                                  db::QuoteIdentifier(prepared.engine, prepared.updated.name);
+    auto rows = dbutil::RunRows(sess.Conn(), "SELECT COUNT(*) FROM " + qualified);
+    if (!rows.ok() || rows.rows.empty() || rows.rows.front().empty()) return "未知";
+    return dbutil::CellText(rows.rows.front().front());
+}
 
 PreparedPlan PreparePlan(session::Session& session, const json& args) {
     PreparedPlan prepared;
@@ -251,6 +260,11 @@ PreparedPlan PreparePlan(session::Session& session, const json& args) {
     }
 
     prepared.transactional = db::DdlTransactional(prepared.engine, prepared.mode);
+    prepared.affected_rows = prepared.plan.affected_rows;
+    if ((prepared.mode == db::DdlMode::Drop || prepared.mode == db::DdlMode::Truncate) &&
+        !prepared.updated.name.empty()) {
+        prepared.affected_rows = CountRows(session, prepared);
+    }
     return prepared;
 }
 
@@ -264,6 +278,9 @@ json PlanJson(const PreparedPlan& prepared, const json& args) {
     }
     json warnings = json::array();
     for (const auto& warning : prepared.plan.warnings) warnings.push_back(warning);
+    if (prepared.engine == db::Engine::MySql) {
+        warnings.push_back("MySQL DDL 会隐式提交，失败后无法自动回滚");
+    }
 
     return json{{"engine", db::EngineName(prepared.engine)},
                 {"mode", Text(args, "mode", "create")},
@@ -272,6 +289,7 @@ json PlanJson(const PreparedPlan& prepared, const json& args) {
                 {"sql", sql},
                 {"token", db::DdlPlanToken(prepared.plan)},
                 {"warnings", std::move(warnings)},
+                {"affectedRows", prepared.affected_rows},
                 {"transactional", prepared.transactional}};
 }
 
@@ -384,7 +402,7 @@ json ApplyPlan(session::Session& sess, const PreparedPlan& prepared, const json&
 
     json warnings = json::array();
     for (const auto& warning : prepared.plan.warnings) warnings.push_back(warning);
-    if (!prepared.transactional) {
+    if (prepared.engine == db::Engine::MySql) {
         warnings.push_back("MySQL DDL 会隐式提交，失败后无法自动回滚");
     }
 
@@ -395,6 +413,7 @@ json ApplyPlan(session::Session& sess, const PreparedPlan& prepared, const json&
                 {"applied", executed},
                 {"statements", std::move(executed_statements)},
                 {"warnings", std::move(warnings)},
+                {"affectedRows", prepared.affected_rows},
                 {"transactional", prepared.transactional},
                 {"rolledBack", false},
                 {"elapsedMs", elapsed}};

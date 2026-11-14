@@ -26,7 +26,7 @@
                 'designerTableName', 'designerScope', 'designerEngine', 'designerCharset',
                 'designerCollation', 'designerComment', 'designerOptionHint',
                 'designerPreview', 'designerPreview2', 'designerApply', 'designerCancel',
-                'designerSql', 'designerWarnings', 'designerFootNote',
+                'designerSql', 'designerWarnings', 'designerImpact', 'designerFootNote',
                 'ddlConfirm', 'ddlConfirmTitle', 'ddlConfirmSub', 'ddlConfirmSql',
                 'ddlConfirmWarn', 'ddlConfirmNameField', 'ddlConfirmName',
                 'ddlConfirmError', 'ddlConfirmNote', 'ddlConfirmClose', 'ddlConfirmCancel',
@@ -320,6 +320,7 @@
 
             dom.designerSql.textContent = '尚未生成 SQL。点击底部「预览 SQL」。';
             renderWarnings([]);
+            renderImpact('');
             updateDirty();
             showPanel('columns');
         }
@@ -612,6 +613,7 @@
             dom.designerApply.disabled = true;
             dom.designerSql.textContent = '变更已修改，请重新预览 SQL。';
             renderWarnings([]);
+            renderImpact('');
             updateDirty();
         }
 
@@ -635,6 +637,14 @@
             (warnings || []).forEach(function (warning) {
                 dom.designerWarnings.appendChild(U.el('div', 'designer-warning', warning));
             });
+        }
+
+        function renderImpact(affectedRows) {
+            if (!dom.designerImpact) return;
+            const text = affectedRows === undefined || affectedRows === null || affectedRows === ''
+                ? '' : String(affectedRows);
+            dom.designerImpact.textContent = text ? ('影响行数：' + text) : '';
+            dom.designerImpact.hidden = !text;
         }
 
         function previewArgs() {
@@ -661,6 +671,7 @@
                 current.snapshot = JSON.stringify(payload());
                 dom.designerSql.textContent = result.sql || '（没有需要执行的语句）';
                 renderWarnings(result.warnings || []);
+                renderImpact(result.affectedRows);
                 showPanel('sql');
                 if (!result.statements || !result.statements.length) current.token = null;
                 updateDirty();
@@ -793,6 +804,11 @@
                 if (!confirmState || confirmState.config !== config) return;
                 confirmState.token = result.token || null;
                 dom.ddlConfirmSql.textContent = result.sql || '（没有需要执行的语句）';
+                if (result.affectedRows !== undefined && result.affectedRows !== null &&
+                    result.affectedRows !== '') {
+                    dom.ddlConfirmWarn.appendChild(
+                        U.el('div', 'designer-impact', '影响行数：' + result.affectedRows));
+                }
                 (result.warnings || []).forEach(function (warning) {
                     dom.ddlConfirmWarn.appendChild(U.el('div', 'designer-warning', warning));
                 });

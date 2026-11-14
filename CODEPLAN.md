@@ -61,6 +61,8 @@
 | 2026-11-14 | MySQL 外键元数据查询失效 | `information_schema.KEY_COLUMN_USAGE` 在 MySQL 8 没有 `UPDATE_RULE/DELETE_RULE`，查询报 1054 被静默忽略，导致外键列表为空 | 需要关联 `REFERENTIAL_CONSTRAINTS` 获取级联规则 | 已修复 `ListForeignKeysSql`；MySQL 外键现可正确加载与展示 |
 | 2026-11-14 | MySQL 外键隐式索引 | 外键无可用索引时 MySQL 自动创建同名索引，被当成用户索引，ALTER 时 `DROP INDEX` 报 1072 | 设计器不应管理外键自动索引 | 加载时过滤「名称与列均与外键一致」的索引；ALTER 顺序改为先删外键再删索引 |
 | 2026-11-14 | M6 ALTER 的 SQLite 能力边界 | 修改列类型/NOT NULL/默认值、调整主键、增删外键在 SQLite 下直接返回明确错误 | SQLite 不支持这些 ALTER 操作，静默降级会误导用户 | 提示「请重建表」；MySQL/PG 走 `MODIFY/CHANGE COLUMN` 与 `ALTER COLUMN` |
+| 2026-11-14 | §10.4 预览影响行数 | `DdlPlan` 增加 `affected_rows`，IPC 返回 `affectedRows`；CREATE 为 `0`，DROP/TRUNCATE 执行前 `SELECT COUNT(*)`，ALTER/建库删库为“未知” | 纯生成器无法预估行数；COUNT 对超大表有开销，但预览准确性优先 | 设计器与确认弹窗均展示“影响行数”；Mock 后端同步返回 |
+| 2026-11-14 | §10.6 新对象名严格校验 | `SafeName` 增加 UTF-8 校验、引擎长度上限（MySQL 64 / PG 63 / SQLite 255 字节）、拒绝引号与控制字符 | 既有对象名若包含引号，编辑该表时会被拒绝并提示原因 | 错误信息明确；如需支持此类历史对象，应改为仅校验收窄的新名称字段 |
 
 ### 0.3 版本标识位置
 
@@ -1944,7 +1946,7 @@ INSERT INTO `users` (`name`, `age`) VALUES (?, ?);
 
 ### M6 表设计器与 DDL（8–10 d）→ v0.6.0
 
-> 状态：2026-11-14 已交付并验收。CTest `ddl_builder` 79 项检查通过；`integration_db` 在真实 MySQL 8.4.13 与 PostgreSQL 18.0.7 上完成建表→加载→ALTER→重命名→清空→删除→建库/删库全链路；前端设计器与 Mock 后端经 Node 模拟桥联调通过。
+> 状态：2026-11-14 已交付并验收。CTest `ddl_builder` 93 项检查通过；`integration_db` 在真实 MySQL 8.4.13 与 PostgreSQL 18.0.7 上完成建表→加载→ALTER→重命名→清空→删除→建库/删库全链路；前端设计器与 Mock 后端经 Node 模拟桥联调通过。SQL 预览已补齐警告、影响行数与新对象名严格校验。
 
 - [x] M6-1 `ddl_builder`：CREATE/ALTER/DROP/RENAME（三引擎）。
 - [x] M6-2 表设计器 UI：列/索引/外键/选项/SQL 预览。
@@ -1962,8 +1964,11 @@ INSERT INTO `users` (`name`, `age`) VALUES (?, ?);
 - [x] MySQL/PG 建表 SQL 含主键、唯一索引、外键、注释、表选项（MySQL），ALTER 含改列/加列/删外键/重命名/表选项。
 - [x] 删除/清空需输入对象名，令牌不匹配或 DDL 变化后拒绝执行；失败返回 `statementIndex`/`statement`/`rolledBack` 并保留设计器状态。
 - [x] 真实 MySQL 8.4.13 / PostgreSQL 18.0.7 上执行 M6 DDL：`integration_db`（`SILKIT_INTEGRATION_WRITE=1`）0 failures。
+- [x] SQL 预览满足 §10.4：完整语句（含 schema 限定）+ 影响行数（CREATE `0`、DROP/TRUNCATE 实际 `COUNT(*)`、ALTER 显示“未知”）。
+- [x] 预览警告覆盖丢列、缩短长度、改类型、收紧 NOT NULL、新增唯一索引可能失败、MySQL 不可回滚；`ddl_builder` 断言警告文案。
+- [x] 新对象名严格校验（§10.6）：UTF-8、长度（MySQL 64 / PostgreSQL 63 / SQLite 255 字节）、控制字符、引号、分号。
 - [x] SQLite 文件库夹具 `data/silkit_test.db`（由 `tools/make_test_db.py` 生成）：`sqlite_fixture` 64 项检查通过，覆盖 3 表/1 视图/1 触发器、自增主键、唯一索引、外键级联、只读保护及临时副本上的表/列/索引 DDL。
-- [ ] 视图/函数/触发器保存 `.sql` 在原生桥下的文件对话框未经本轮复测。
+- [ ] 视图/函数/触发器保存 `.sql` 在原生桥下的文件对话框未经本轮复测（代码链路 `api.pickFile({save:true})` → `app.pick_file` → `app.save_file` 已核对）。
 
 ### M7 导入 / 导出 / 转储（5–6 d）→ v0.7.0
 

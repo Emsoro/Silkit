@@ -60,6 +60,8 @@ struct DdlTableDefinition {
 struct DdlPlan {
     std::vector<std::string> statements;
     std::vector<std::string> warnings;
+    /// 预览用影响行数；DDL 无法估算时保持“未知”。
+    std::string affected_rows = "未知";
 };
 
 /// 从目录读取现有表定义（列/索引/外键/选项）。

@@ -123,15 +123,64 @@ bool SafeExpression(const std::string& value, const std::string& field, std::str
     return true;
 }
 
+bool IsValidUtf8(const std::string& text) {
+    std::size_t i = 0;
+    while (i < text.size()) {
+        const unsigned char lead = static_cast<unsigned char>(text[i]);
+        if (lead < 0x80) {
+            ++i;
+            continue;
+        }
+        std::size_t extra = 0;
+        if ((lead & 0xE0) == 0xC0) {
+            extra = 1;
+        } else if ((lead & 0xF0) == 0xE0) {
+            extra = 2;
+        } else if ((lead & 0xF8) == 0xF0) {
+            extra = 3;
+        } else {
+            return false;
+        }
+        if (i + extra >= text.size()) return false;
+        for (std::size_t k = 1; k <= extra; ++k) {
+            if ((static_cast<unsigned char>(text[i + k]) & 0xC0) != 0x80) return false;
+        }
+        i += extra + 1;
+    }
+    return true;
+}
+
+std::size_t IdentifierLimit(Engine engine) {
+    if (engine == Engine::MySql) return 64;
+    if (engine == Engine::Postgres) return 63;
+    return 255;
+}
+
+// 表设计器的新对象名做严格校验：UTF-8、长度、控制字符、引号、分号。
 bool SafeName(const std::string& value, const std::string& field, bool allow_empty,
-              std::string& error) {
+              std::string& error, std::size_t max_bytes = 255) {
     if (value.empty()) {
         if (allow_empty) return true;
         error = field + "不能为空";
         return false;
     }
-    if (!IsSafeIdentifier(value)) {
-        error = field + " 不合法（长度 1–255，且不能包含控制字符）";
+    if (!IsValidUtf8(value)) {
+        error = field + " 不是有效的 UTF-8 文本";
+        return false;
+    }
+    if (value.size() > max_bytes) {
+        error = field + " 过长（最多 " + std::to_string(max_bytes) + " 字节）";
+        return false;
+    }
+    for (unsigned char ch : value) {
+        if (ch < 0x20 || ch == 0x7F) {
+            error = field + " 含有控制字符";
+            return false;
+        }
+    }
+    if (value.find('"') != std::string::npos || value.find('`') != std::string::npos ||
+        value.find('\'') != std::string::npos) {
+        error = field + " 不能包含引号";
         return false;
     }
     if (value.find(';') != std::string::npos) {
@@ -139,6 +188,85 @@ bool SafeName(const std::string& value, const std::string& field, bool allow_emp
         return false;
     }
     return true;
+}
+
+struct TypeShape {
+    std::string base;
+    std::vector<long long> sizes;
+};
+
+std::string NormalizeTypeBase(std::string text) {
+    text = Lower(Trim(text));
+    // 去掉 MySQL 的列修饰，避免 "INT UNSIGNED" 与 "INT" 被误判为不同类型。
+    for (const char* suffix : {" unsigned", " zerofill"}) {
+        const std::string tail = suffix;
+        if (text.size() > tail.size() &&
+            text.compare(text.size() - tail.size(), tail.size(), tail) == 0) {
+            text.resize(text.size() - tail.size());
+            text = Trim(text);
+        }
+    }
+    static const std::map<std::string, std::string> synonyms = {
+        {"integer", "int"},        {"int4", "int"},
+        {"int8", "bigint"},        {"int2", "smallint"},
+        {"character varying", "varchar"}, {"character", "char"},
+        {"numeric", "decimal"},    {"double precision", "double"},
+        {"float8", "double"},      {"float4", "real"},
+        {"bool", "boolean"},       {"timestamp without time zone", "timestamp"},
+        {"time without time zone", "time"},
+    };
+    const auto found = synonyms.find(text);
+    return found == synonyms.end() ? text : found->second;
+}
+
+TypeShape ParseTypeShape(const std::string& type) {
+    TypeShape shape;
+    const std::string text = Lower(Trim(type));
+    const std::size_t paren = text.find('(');
+    shape.base = NormalizeTypeBase(paren == std::string::npos ? text : text.substr(0, paren));
+    if (paren == std::string::npos) return shape;
+
+    const std::size_t close = text.find(')', paren);
+    const std::string args =
+        text.substr(paren + 1, close == std::string::npos ? std::string::npos : close - paren - 1);
+    std::size_t start = 0;
+    while (start <= args.size()) {
+        const std::size_t comma = args.find(',', start);
+        const std::string part =
+            Trim(args.substr(start, comma == std::string::npos ? std::string::npos : comma - start));
+        if (!part.empty()) {
+            char* end = nullptr;
+            const long long value = std::strtoll(part.c_str(), &end, 10);
+            shape.sizes.push_back(end != nullptr && *end == '\0' ? value : -1);
+        }
+        if (comma == std::string::npos) break;
+        start = comma + 1;
+    }
+    return shape;
+}
+
+// SQL 预览警告：改类型/缩短长度/收紧非空都可能丢数据或失败。
+void AddColumnChangeWarnings(const DdlColumn& before, const DdlColumn& after, DdlPlan& plan) {
+    const TypeShape old_shape = ParseTypeShape(before.type);
+    const TypeShape new_shape = ParseTypeShape(after.type);
+    if (old_shape.base != new_shape.base) {
+        plan.warnings.push_back("列 " + after.name + " 类型从 " + Trim(before.type) + " 改为 " +
+                                Trim(after.type) + "，可能丢失或截断数据");
+    } else if (!SameText(before.type, after.type)) {
+        const bool old_known = !old_shape.sizes.empty() && old_shape.sizes.front() > 0;
+        const bool new_known = !new_shape.sizes.empty() && new_shape.sizes.front() > 0;
+        if (old_known && new_known && new_shape.sizes.front() < old_shape.sizes.front()) {
+            plan.warnings.push_back("列 " + after.name + " 长度从 " + Trim(before.type) +
+                                    " 缩短为 " + Trim(after.type) + "，可能截断数据");
+        } else if (!(old_known && new_known && new_shape.sizes.front() > old_shape.sizes.front()) &&
+                   old_shape.sizes != new_shape.sizes) {
+            plan.warnings.push_back("列 " + after.name + " 类型从 " + Trim(before.type) + " 改为 " +
+                                    Trim(after.type) + "，可能丢失数据");
+        }
+    }
+    if (!before.not_null && after.not_null) {
+        plan.warnings.push_back("列 " + after.name + " 改为 NOT NULL，表中已有 NULL 值时将执行失败");
+    }
 }
 
 bool HasDefault(const DdlColumn& column) {
@@ -503,13 +631,9 @@ bool AppendAlter(Engine engine, const std::string& scope, const DdlTableDefiniti
 
     // 6. 删除列
     for (const auto* column : drops) {
-        if (engine == Engine::Sqlite) {
-            plan.statements.push_back("ALTER TABLE " + qualified + " DROP COLUMN " +
-                                      QuoteIdentifier(engine, column->name) + ";");
-        } else {
-            plan.statements.push_back("ALTER TABLE " + qualified + " DROP COLUMN " +
-                                      QuoteIdentifier(engine, column->name) + ";");
-        }
+        plan.warnings.push_back("删除列 " + column->name + " 会丢失该列数据");
+        plan.statements.push_back("ALTER TABLE " + qualified + " DROP COLUMN " +
+                                  QuoteIdentifier(engine, column->name) + ";");
     }
 
     // 7. 新增列
@@ -517,6 +641,10 @@ bool AppendAlter(Engine engine, const std::string& scope, const DdlTableDefiniti
         if (engine == Engine::Sqlite && column->not_null && !HasDefault(*column)) {
             error = "SQLite 新增列 " + column->name + " 为 NOT NULL 时必须提供默认值";
             return false;
+        }
+        if (column->not_null && !HasDefault(*column)) {
+            plan.warnings.push_back("新增列 " + column->name +
+                                    " 为 NOT NULL 且无默认值，表中已有数据时将执行失败");
         }
         plan.statements.push_back("ALTER TABLE " + qualified + " ADD COLUMN " +
                                   ColumnDefinitionSql(engine, *column) + ";");
@@ -536,6 +664,8 @@ bool AppendAlter(Engine engine, const std::string& scope, const DdlTableDefiniti
             }
             continue;
         }
+
+        if (changed) AddColumnChangeWarnings(*match.before, *match.after, plan);
 
         if (engine == Engine::MySql) {
             const std::string keyword = renamed ? " CHANGE COLUMN " : " MODIFY COLUMN ";
@@ -637,6 +767,9 @@ bool AppendAlter(Engine engine, const std::string& scope, const DdlTableDefiniti
         }
         const std::string name = IndexName(updated, index, used_names);
         used_names.insert(name);
+        if (index.unique) {
+            plan.warnings.push_back("唯一索引 " + name + " 在存在重复值时可能创建失败");
+        }
         plan.statements.push_back(CreateIndexSql(engine, scope, updated.name, index, name));
     }
 
@@ -941,8 +1074,9 @@ std::vector<std::string> DdlTypeSuggestions(Engine engine) {
 }
 
 bool ValidateDefinition(const DdlTableDefinition& definition, std::string& error) {
-    if (!SafeName(definition.name, "表名", false, error)) return false;
-    if (!SafeName(definition.scope, "库/Schema", true, error)) return false;
+    const std::size_t limit = IdentifierLimit(definition.engine);
+    if (!SafeName(definition.name, "表名", false, error, limit)) return false;
+    if (!SafeName(definition.scope, "库/Schema", true, error, limit)) return false;
     if (definition.columns.empty()) {
         error = "至少需要一列";
         return false;
@@ -950,7 +1084,7 @@ bool ValidateDefinition(const DdlTableDefinition& definition, std::string& error
 
     std::set<std::string> columns;
     for (const auto& column : definition.columns) {
-        if (!SafeName(column.name, "列名", false, error)) return false;
+        if (!SafeName(column.name, "列名", false, error, limit)) return false;
         if (!columns.insert(Lower(column.name)).second) {
             error = "列名重复: " + column.name;
             return false;
@@ -975,7 +1109,7 @@ bool ValidateDefinition(const DdlTableDefinition& definition, std::string& error
 
     std::set<std::string> indexes;
     for (const auto& index : definition.indexes) {
-        if (!SafeName(index.name, "索引名", true, error)) return false;
+        if (!SafeName(index.name, "索引名", true, error, limit)) return false;
         if (!index.name.empty() && !indexes.insert(Lower(index.name)).second) {
             error = "索引名重复: " + index.name;
             return false;
@@ -994,12 +1128,13 @@ bool ValidateDefinition(const DdlTableDefinition& definition, std::string& error
 
     std::set<std::string> foreign_keys;
     for (const auto& fk : definition.foreign_keys) {
-        if (!SafeName(fk.name, "外键名", true, error)) return false;
+        if (!SafeName(fk.name, "外键名", true, error, limit)) return false;
         if (!fk.name.empty() && !foreign_keys.insert(Lower(fk.name)).second) {
             error = "外键名重复: " + fk.name;
             return false;
         }
-        if (!SafeName(fk.ref_table, "引用表", false, error)) return false;
+        if (!SafeName(fk.ref_table, "引用表", false, error, limit)) return false;
+        if (!SafeName(fk.ref_schema, "引用 Schema", true, error, limit)) return false;
         if (fk.columns.empty() || fk.columns.size() != fk.ref_columns.size()) {
             error = "外键 " + fk.name + " 的列与引用列数量不一致";
             return false;
@@ -1011,7 +1146,7 @@ bool ValidateDefinition(const DdlTableDefinition& definition, std::string& error
             }
         }
         for (const auto& column : fk.ref_columns) {
-            if (!SafeName(column, "外键引用列", false, error)) return false;
+            if (!SafeName(column, "外键引用列", false, error, limit)) return false;
         }
     }
     return true;
@@ -1091,7 +1226,7 @@ bool BuildDdlPlan(DdlMode mode, Engine engine, const std::string& scope,
 
     if (mode == DdlMode::CreateDatabase || mode == DdlMode::DropDatabase) {
         const std::string name = Trim(new_name.empty() ? updated.name : new_name);
-        if (!SafeName(name, "数据库名", false, error)) return false;
+        if (!SafeName(name, "数据库名", false, error, IdentifierLimit(engine))) return false;
         if (mode == DdlMode::CreateDatabase) {
             if (engine == Engine::MySql) {
                 std::string sql = "CREATE DATABASE " + QuoteIdentifier(engine, name);
@@ -1126,7 +1261,7 @@ bool BuildDdlPlan(DdlMode mode, Engine engine, const std::string& scope,
             error = "缺少表名";
             return false;
         }
-        if (!SafeName(target.name, "表名", false, error)) return false;
+        if (!SafeName(target.name, "表名", false, error, IdentifierLimit(engine))) return false;
         out.statements.push_back("DROP TABLE " + Qualified(engine, scope, target.name) + ";");
         out.warnings.push_back("删除表会同时删除表内数据，且不可恢复");
         return true;
@@ -1152,6 +1287,7 @@ bool BuildDdlPlan(DdlMode mode, Engine engine, const std::string& scope,
     if (mode == DdlMode::Create) {
         working.exists = false;
         if (!ValidateDefinition(working, error)) return false;
+        out.affected_rows = "0";
         return AppendCreate(engine, working, out, error);
     }
 
