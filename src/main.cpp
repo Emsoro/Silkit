@@ -20,6 +20,13 @@
 
 namespace {
 
+/// 窗口标题（同时用于第二次启动时定位已有窗口）。
+constexpr wchar_t kWindowTitleW[] = L"Silkit — 跨库数据库工作台";
+constexpr const char* kWindowTitleUtf8 = "Silkit — 跨库数据库工作台";
+
+/// app_icon.rc 中的图标资源 ID（IDI_ICON1）。
+constexpr int kAppIconId = 1;
+
 COLORREF ParseHexColor(const std::string& hex, COLORREF fallback) {
     if (hex.size() != 7 || hex[0] != '#') return fallback;
     auto channel = [&hex](size_t offset) -> BYTE {
@@ -30,7 +37,7 @@ COLORREF ParseHexColor(const std::string& hex, COLORREF fallback) {
 
 /// 第二次启动时激活已有窗口（标题即窗口标识）。
 void ActivateExistingInstance() {
-    if (HWND existing = FindWindowW(nullptr, L"Silkit")) {
+    if (HWND existing = FindWindowW(nullptr, kWindowTitleW)) {
         if (IsIconic(existing)) {
             ShowWindow(existing, SW_RESTORE);
         }
@@ -116,7 +123,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     const std::string bg_hex = silkit::ipc::ThemeBackground(theme);
 
     tauricpp::App::Config config;
-    config.window_config.title = "Silkit";
+    config.window_config.title = kWindowTitleUtf8;
     config.window_config.width = 1120;
     config.window_config.height = 700;
     config.window_config.center = true;
@@ -131,6 +138,17 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
     // 窗口类背景与 WebView2 DefaultBackgroundColor 已在 Window::CreateNativeWindow /
     // SetWebViewBackgroundColor 中按 config.bg_color 设置，启动阶段不会闪白。
     app.OnSetup([&router, &settings, &profiles, &sessions](tauricpp::App& instance) {
+        // 标题栏/任务栏图标取自 exe 内嵌的 app_icon.ico（大小两种尺寸）。
+        HMODULE module = GetModuleHandleW(nullptr);
+        HWND hwnd = instance.GetWindow().GetHwnd();
+        HICON icon_big = static_cast<HICON>(LoadImageW(module, MAKEINTRESOURCEW(kAppIconId), IMAGE_ICON,
+                                                       GetSystemMetrics(SM_CXICON),
+                                                       GetSystemMetrics(SM_CYICON), LR_DEFAULTCOLOR));
+        HICON icon_small = static_cast<HICON>(LoadImageW(module, MAKEINTRESOURCEW(kAppIconId), IMAGE_ICON,
+                                                         GetSystemMetrics(SM_CXSMICON),
+                                                         GetSystemMetrics(SM_CYSMICON), LR_DEFAULTCOLOR));
+        if (icon_big) SendMessageW(hwnd, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(icon_big));
+        if (icon_small) SendMessageW(hwnd, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(icon_small));
         silkit::ipc::RegisterCommands(router, instance.GetWindow(), settings, profiles, sessions);
     });
 

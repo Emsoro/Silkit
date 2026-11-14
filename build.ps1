@@ -80,6 +80,31 @@ if ($py) {
 # ---------------------------------------------------------------- 配置
 Write-Step "配置 CMake（$Generator / $Arch / $Config）"
 
+# vcpkg 不允许在已配置的构建目录中切换 manifest 模式：
+# 已有 build/ 时沿用其缓存值；全新构建目录在依赖已按 classic 安装时也直接复用。
+$manifestMode = "ON"
+$cacheFile = Join-Path $BuildDir "CMakeCache.txt"
+if (Test-Path $cacheFile) {
+    # vcpkg 用 Z_VCPKG_CHECK_MANIFEST_MODE 记录首次配置时的模式，切换会直接报错。
+    $stamp = Select-String -Path $cacheFile -Pattern '^Z_VCPKG_CHECK_MANIFEST_MODE:INTERNAL=(ON|OFF)' |
+        Select-Object -First 1
+    $cachedMode = if ($stamp) {
+        $stamp
+    } else {
+        Select-String -Path $cacheFile -Pattern '^VCPKG_MANIFEST_MODE:BOOL=(ON|OFF)' |
+            Select-Object -First 1
+    }
+    if ($cachedMode) {
+        $manifestMode = $cachedMode.Matches[0].Groups[1].Value
+        if ($manifestMode -eq "OFF") {
+            Write-Warn "build/ 已按非 manifest 模式配置，本次沿用（如需 manifest 请加 -Clean 重建）"
+        }
+    }
+} elseif (Test-Path "$VcpkgRoot\installed\$Triplet\share\webview2") {
+    $manifestMode = "OFF"
+    Write-Warn "检测到 $Triplet 依赖已安装，使用 classic 依赖（-DVCPKG_MANIFEST_MODE=OFF）"
+}
+
 $cmakeArgs = @(
     "-G", $Generator,
     "-A", $Arch,
@@ -87,7 +112,7 @@ $cmakeArgs = @(
     "-S", $ProjectDir,
     "-DCMAKE_TOOLCHAIN_FILE=$VcpkgRoot\scripts\buildsystems\vcpkg.cmake",
     "-DVCPKG_TARGET_TRIPLET=$Triplet",
-    "-DVCPKG_MANIFEST_MODE=ON"
+    "-DVCPKG_MANIFEST_MODE=$manifestMode"
 )
 
 if ($DevMode) {

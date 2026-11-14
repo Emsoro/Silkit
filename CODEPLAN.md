@@ -6,7 +6,7 @@
 >
 > **产品名**：**Silkit**（silk + kit，“丝滑的数据库工具箱”）｜ 构建产物 `Silkit.exe` ｜ 数据目录 `%APPDATA%\Silkit` ｜ 代码目录 `D:\Work\CPlusPlus\Silkit`
 >
-> **规划日期**：2026-11-13 ｜ **当前版本**：v0.1.0（M1 已交付，准备进入 M2）｜ **文档状态**：实施基线 + 进度回写
+> **规划日期**：2026-11-13 ｜ **当前版本**：v1.0.0（M0–M9 已交付，发布准备完成）｜ **文档状态**：实施基线 + 进度回写
 
 ---
 
@@ -28,9 +28,9 @@
 | M6 | 表设计器与 DDL 管理 | 🟡 | 8–10 d | v0.6.0 |
 | M7 | 导入 / 导出 / 转储 | 🟡 | 5–6 d | v0.7.0 |
 | M8 | 设置、主题、会话恢复、安全与打磨 | 🟡 | 5–6 d | v0.8.0 |
-| M9 | 发布 1.0（图标/文档/兼容性/安装包） | ⬜ | 3–4 d | v1.0.0 |
+| M9 | 发布 1.0（图标/文档/兼容性/安装包） | 🟡 | 3–4 d | v1.0.0 |
 
-> 2026-11-14 回写：M0 全部交付；M1 的「连接 → 对象树 → 查询 → 结果」链路已端到端跑通，当前 `v0.1.0`。**M2 / M3 已实现并对照真实服务器验收**（MySQL 8.4.13 / PostgreSQL 18.0.7）。**M4 已交付并运行时验收**。**M5 已交付并运行时验收**：表格数据编辑（CRUD/筛选/分页/单元格查看/事务回滚）经 CDP 探针对照 MySQL 8.4.13 / PostgreSQL 18.0.7 全绿，CTest `table_ops`（SQLite）通过。期间修复一个影响 M1–M4 的 MySQL 数值列误判为二进制而 base64 编码的潜伏 bug。**M6 已交付垂直切片**：三引擎 DDL 生成器、表设计器（列/索引/外键/选项/SQL 预览）、`ddl.preview`/`ddl.apply` 令牌确认、删除/清空/新建删除库、视图/函数/触发器 DDL 保存 `.sql`；CTest `ddl_builder` 全绿（SQLite roundtrip + MySQL/PG SQL 断言），Mock 后端经 Node 模拟桥联调通过。**M7 已交付垂直切片**：CSV 解析/五种流式导出/导入向导/转储/SQL 文件执行/编码；CTest `io` 69 项检查通过（含 100 万行导出、10 万行导入、错误回滚、整库恢复）。**M8 已交付垂直切片**：设置页（通用/编辑器/查询/网格/导出/关于）、设置 `.bak` 备份与损坏恢复、安全模式危险语句令牌确认、日志脱敏与崩溃日志、侧栏拖拽/折叠与激活标签恢复、中英文主要界面；CTest `m8` 25 项检查与 `contrast_check.py` 125 项对比度全部通过；DPI 200% 与多显示器尚未留档。下一里程碑为 **M9（发布 1.0）**。
+> 2026-11-14 回写：M0 全部交付；M1 的「连接 → 对象树 → 查询 → 结果」链路已端到端跑通，当前 `v0.1.0`。**M2 / M3 已实现并对照真实服务器验收**（MySQL 8.4.13 / PostgreSQL 18.0.7）。**M4 已交付并运行时验收**。**M5 已交付并运行时验收**：表格数据编辑（CRUD/筛选/分页/单元格查看/事务回滚）经 CDP 探针对照 MySQL 8.4.13 / PostgreSQL 18.0.7 全绿，CTest `table_ops`（SQLite）通过。期间修复一个影响 M1–M4 的 MySQL 数值列误判为二进制而 base64 编码的潜伏 bug。**M6 已交付垂直切片**：三引擎 DDL 生成器、表设计器（列/索引/外键/选项/SQL 预览）、`ddl.preview`/`ddl.apply` 令牌确认、删除/清空/新建删除库、视图/函数/触发器 DDL 保存 `.sql`；CTest `ddl_builder` 全绿（SQLite roundtrip + MySQL/PG SQL 断言），Mock 后端经 Node 模拟桥联调通过。**M7 已交付垂直切片**：CSV 解析/五种流式导出/导入向导/转储/SQL 文件执行/编码；CTest `io` 69 项检查通过（含 100 万行导出、10 万行导入、错误回滚、整库恢复）。**M8 已交付垂直切片**：设置页（通用/编辑器/查询/网格/导出/关于）、设置 `.bak` 备份与损坏恢复、安全模式危险语句令牌确认、日志脱敏与崩溃日志、侧栏拖拽/折叠与激活标签恢复、中英文主要界面；CTest `m8` 25 项检查与 `contrast_check.py` 125 项对比度全部通过；DPI 200% 与多显示器尚未留档。**M9 已交付**：版本号统一 `1.0.0`（CMake/vcpkg/version.h/前端/Mock）、exe 多分辨率图标与窗口标题、关于页版本与路径、README 功能概览与支持矩阵、`THIRD-PARTY-NOTICES.md`、`tools/check_version.py` 与 `tools/package.ps1` 便携包（`dist/Silkit-1.0.0-win-x64.zip`）、`CHANGELOG.md`；Release 构建下 CTest 9/9、MySQL 8.4.13 与 PostgreSQL 18.0.7 读写/DDL 集成回归全绿、对比度 125 项通过；干净 Windows 11 虚拟机冒烟与 Git tag 待人工执行/提交后完成。
 
 **总量**：约 56–68 个开发日（单人，含自测），按每周 5.5 天计约 **10–12 周**。
 
@@ -67,6 +67,11 @@
 | 2026-11-14 | M8 会话恢复含滚动位置 | 持久化激活标签、编辑器滚动与侧栏宽度/折叠；结果网格与对象树滚动位置未持久化 | 网格/树使用虚拟滚动，恢复时机与加载完成顺序耦合 | 视为可接受偏差；如需恢复网格位置，应在 `setSet` 后按行索引回滚 |
 | 2026-11-14 | M8 崩溃日志 | 未处理异常写文本 `logs/crash-*.log`（版本/时间/异常码/地址/线程），未生成 minidump | 生成 dump 需引入 DbgHelp 与符号/转储策略，文本日志已满足定位入口 | 后续可在发布版追加可选 minidump |
 | 2026-11-14 | M8 安全模式拦截范围 | `query.execute` 与 `query.execute_file` 执行前统一检查；导入 CSV、DDL 应用、转储等显式操作仍走各自的确认流程 | 这些操作本身已在 UI 中要求确认或为显式动作 | 如需统一，可在 `import.csv`/`ddl.apply` 复用 `CheckSafeMode` 令牌 |
+| 2026-11-14 | M9-2 README 含截图 | README 提供功能概览、支持矩阵与发布验收清单，未附截图 | 仓库内没有可直接引用的发布截图，避免引用失效图片 | 截图留待发布页补充；文字描述已覆盖全部能力 |
+| 2026-11-14 | M9-4 干净 Windows 11 虚拟机冒烟 | 未执行（当前无可用虚拟机），仅在本机 Release 产物上验证启动、标题、图标与版本资源 | 需要独立干净环境与可选无 WebView2 场景 | 验收清单写入 README「发布验收清单」，待人工在 VM 执行并回写 |
+| 2026-11-14 | M9-6 安装包 | v1.0 只产出 portable zip（`dist/Silkit-1.0.0-win-x64.zip`），不提供安装程序 | 与计划一致（安装包排期 v1.1） | 解压即用；WebView2 缺失由应用内中文引导 |
+| 2026-11-14 | M9-8 Git tag | `CHANGELOG.md` 已建立，`v1.0.0` 标签需在本次变更提交后创建 | 未提交的工作区无法打标签 | 提交后执行 `git tag -a v1.0.0 -m "Silkit 1.0.0"` |
+| 2026-11-14 | `build.ps1` 固定 `VCPKG_MANIFEST_MODE=ON` | 改为读取 `build/CMakeCache.txt` 的 `Z_VCPKG_CHECK_MANIFEST_MODE` 沿用首次配置模式；全新目录若已按 classic 装好依赖则用 `OFF` | vcpkg 禁止在已配置目录切换 manifest 模式，原脚本在 classic 预装依赖的机器上必然报错 | 两种模式均可构建；需强制 manifest 时先 `-Clean` 删除 `build/` |
 
 ### 0.3 版本标识位置
 
@@ -85,7 +90,7 @@
 
 ### 1.1 一句话
 
-**一个 30MB 以内、双击即用、界面好看的 Windows 数据库工作台**：连上 MySQL/PostgreSQL/SQLite，浏览对象、写 SQL、改数据、改表结构、导入导出，不需要 Java、Python、Node 或浏览器运行时。默认外观为 **晨樱浅色**（低饱和玫瑰 + 梅子墨色），把“专业工具”做出时尚感。
+**一个 10MB 以内、双击即用、界面好看的 Windows 数据库工作台**：连上 MySQL/PostgreSQL/SQLite，浏览对象、写 SQL、改数据、改表结构、导入导出，不需要 Java、Python、Node 或浏览器运行时。默认外观为 **晨樱浅色**（低饱和玫瑰 + 梅子墨色），把“专业工具”做出时尚感。
 
 ### 1.2 目标用户与场景
 
@@ -133,7 +138,7 @@
 ### 1.5 设计原则
 
 1. **本地优先**：只做数据库客户端，不引入账号、云同步、遥测；配置全部落本地。
-2. **轻量**：单 exe 内嵌前端，无 Java/Node/Python；冷启动目标 < 1.5s，安装体积 < 35MB。
+2. **轻量**：单 exe 内嵌前端，无 Java/Node/Python；冷启动目标 < 1.5s，安装体积 < 10MB。
 3. **显式安全**：生成 SQL 必须可预览；破坏性操作二次确认；密码不出 C++ 进程。
 4. **渐进加载**：对象树懒加载；查询结果流式分批；网格虚拟滚动；大字段按需拉取。
 5. **驱动隔离**：所有数据库差异收敛在 `src/db/drivers/*`，UI 只认统一模型。
@@ -160,7 +165,7 @@
 | ADR-12 | 前端用**原生 JS（IIFE 命名空间）+ 模块化文件** | 零构建、改完刷新即可；符合 StepDraw 习惯 | 需要自律的模块边界；不用 TypeScript |
 | ADR-13 | 发布形态：**单 exe + 前端资源内嵌**，依赖系统 WebView2 | 与 StepDraw 完全一致；源码不泄露 | WebView2 缺失需引导安装 |
 | ADR-14 | 许可证待定：应用代码 MIT/Apache-2.0；第三方遵守各自许可 | 便于开源/内部分发 | libmariadb LGPL、libpq PostgreSQL、SQLite Public Domain |
-| ADR-15 | 主题 = **CSS 变量 + `data-theme`/`data-appearance`**，默认「晨樱」浅色，配色偏女性向时尚风 | 换肤零成本、无构建；默认外观形成产品识别 | 需保证对比度与数据可读性，语义色不得复用主色 |
+| ADR-15 | 主题 = **CSS 变量 + `data-theme`/`data-appearance`**，默认「晨樱」浅色，配色偏时尚风 | 换肤零成本、无构建；默认外观形成产品识别 | 需保证对比度与数据可读性，语义色不得复用主色 |
 
 **不采用的方案：**
 
@@ -2028,19 +2033,29 @@ INSERT INTO `users` (`name`, `age`) VALUES (?, ?);
 
 ### M9 发布 1.0（3–4 d）→ v1.0.0
 
-- [ ] M9-1 图标/版本信息/窗口标题/关于页。
-- [ ] M9-2 README（功能/截图/构建/支持矩阵/限制）。
-- [ ] M9-3 第三方许可声明（libmariadb LGPL、libpq、SQLite、CodeMirror MIT）。
-- [ ] M9-4 干净 Windows 11 VM 冒烟（有/无 WebView2）。
-- [ ] M9-5 三库集成回归 + 手工验收清单。
-- [ ] M9-6 发布包（portable zip；安装包 v1.1）。
-- [ ] M9-7 版本号同步检查（CMake/vcpkg/前端/README）。
-- [ ] M9-8 Git tag + CHANGELOG。
+> 状态：2026-11-14 已交付发布准备（版本/图标/文档/许可/便携包）；干净虚拟机冒烟与 Git tag 待人工完成。
+
+- [x] M9-1 图标/版本信息/窗口标题/关于页。
+- [x] M9-2 README（功能/支持矩阵/构建/限制；截图为偏差项）。
+- [x] M9-3 第三方许可声明（libmariadb LGPL、libpq、SQLite、CodeMirror、nlohmann/json、WebView2 SDK）。
+- [ ] M9-4 干净 Windows 11 VM 冒烟（有/无 WebView2）：清单已写入 README，待人工在 VM 执行。
+- [x] M9-5 三库集成回归 + 手工验收清单。
+- [x] M9-6 发布包（portable zip；安装包 v1.1）。
+- [x] M9-7 版本号同步检查（CMake/vcpkg/前端/README，`tools/check_version.py`）。
+- [ ] M9-8 Git tag + CHANGELOG：CHANGELOG 已完成，`v1.0.0` 标签待提交后创建。
+
+**实现说明与偏差**
+- 版本号以 `CMakeLists.txt` 为准，其余位置由 `tools/check_version.py` 校验；`tools/package.ps1` 在打包前强制执行该检查。
+- 版本资源 `app_version.rc` 增加 `#pragma code_page(65001)`，修正中文 `FileDescription` 在 exe 属性中乱码的问题。
+- 窗口标题改为「Silkit — 跨库数据库工作台」，单实例激活逻辑共用同一标题常量；标题栏/任务栏图标从 exe 内嵌 `app_icon.ico` 加载大小两种尺寸。
+- 发布包只含 `Silkit.exe`、`README.md`、`LICENSE`、`THIRD-PARTY-NOTICES.md`；前端资源已内嵌，解压即用。
+- 未提供安装包与代码签名（安装包 v1.1，签名待证书）；干净虚拟机冒烟未执行（偏差记录见 §0.2）。
 
 **验收**
-- 新机器解压即用；WebView2 缺失有中文引导。
-- 三库连接/查询/编辑/设计/导入导出全流程通过。
-- 无 P0/P1 缺陷；已知限制写入 README。
+- 新机器解压即用；WebView2 缺失有中文引导（框架内已实现，待 VM 复核）。
+- 三库连接/查询/编辑/设计/导入导出全流程通过：本机 Release 下 CTest 9/9；MySQL 8.4.13 与 PostgreSQL 18.0.7 的写路径与 DDL 路径集成回归均 0 failures。
+- 无 P0/P1 缺陷；已知限制写入 README（v1.0.0 章节）。
+- 发布产物：`dist/Silkit-1.0.0-win-x64.zip`（3.83 MB，exe 9.13 MB），exe 版本资源为 `1.0.0`。
 
 ---
 

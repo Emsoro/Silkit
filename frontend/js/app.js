@@ -396,7 +396,7 @@
 
         try {
             const info = await api.info();
-            const version = 'v' + (info.version || '0.1.0');
+            const version = 'v' + (info.version || '1.0.0');
             if ($('statusVersion')) $('statusVersion').textContent = version;
         } catch (error) {
             if ($('ipcStatus')) $('ipcStatus').textContent = 'IPC 不可用';

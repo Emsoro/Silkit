@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(Silkit VERSION 0.1.0 LANGUAGES CXX)
+project(Silkit VERSION 1.0.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -115,6 +115,7 @@ set(APP_ADDITIONAL_SOURCES "")
 
 if(MSVC)
     file(WRITE "${GEN_DIR}/app_version.rc"
+        "#pragma code_page(65001)\n"
         "#include <windows.h>\n"
         "VS_VERSION_INFO VERSIONINFO\n"
         " FILEVERSION ${PROJECT_VERSION_MAJOR},${PROJECT_VERSION_MINOR},${PROJECT_VERSION_PATCH},0\n"

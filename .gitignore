@@ -35,6 +35,7 @@
 # 构建产物
 build/
 out/
+dist/
 .vs/
 CMakeUserPresets.json
 *.vcxproj*

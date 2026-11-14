@@ -3,8 +3,51 @@
 跨库数据库工作台（MySQL / MariaDB / PostgreSQL / SQLite），Windows 桌面端。
 C++17 + Win32 + WebView2，前端为原生 HTML/CSS/JS，无 Node 构建步骤。
 
-> 当前进度：**M0–M7 已交付验收 + M8 设置/安全/打磨已交付**：连接 → 对象树 → CodeMirror SQL 编辑器 → 流式结果（多结果/EXPLAIN）→ 表格数据编辑（分页/筛选/网格内联编辑/事务保存/回滚/单元格查看）→ 表设计器（列/索引/外键/选项/SQL 预览与令牌执行）→ 历史/片段 → 标签持久化恢复 → CSV 导入、五种格式流式导出、SQL 转储与 SQL 文件执行（进度/取消/编码）→ 设置面板、安全模式、日志脱敏与崩溃日志、中英文主要界面。
+> 当前版本：**v1.0.0**。进度：**M0–M9 全部交付**：连接 → 对象树 → CodeMirror SQL 编辑器 → 流式结果（多结果/EXPLAIN）→ 表格数据编辑 → 表设计器 → 历史/片段 → CSV 导入、五种格式流式导出、SQL 转储 → 设置面板、安全模式与日志脱敏 → 发布打包。
 > 完整计划与偏差记录见 [CODEPLAN.md](CODEPLAN.md)。
+
+## 功能概览
+
+| 能力 | 说明 |
+|---|---|
+| 连接 | MySQL / MariaDB、PostgreSQL、SQLite；测试连接、DPAPI 保存密码、颜色与分组、只读模式 |
+| 对象浏览 | 库 / 模式 / 表 / 视图 / 函数 / 存储过程 / 触发器；懒加载、搜索、右键菜单、DDL 查看 |
+| 查询 | 多标签编辑器、语法高亮、元数据补全、执行当前/选中/全部、多结果集、EXPLAIN、取消、历史与片段 |
+| 结果网格 | 虚拟滚动、列宽调整、排序筛选、TSV/CSV/JSON/INSERT 复制、长文本与 BLOB 查看、导出 |
+| 表数据 | 分页、服务端筛选排序、内联增删改、事务保存与回滚、SQL 预览、无主键只读保护 |
+| 表设计 | 列 / 索引 / 外键 / 表选项、SQL 预览与令牌执行、影响行数与风险提示 |
+| 导入导出 | CSV 导入向导、CSV/JSON/SQL/Markdown/HTML 流式导出、整库/整表 SQL 转储、`.sql` 文件执行 |
+| 设置与安全 | 五套主题、中英文界面、安全模式危险语句确认、日志脱敏、崩溃日志、会话恢复 |
+
+### 支持矩阵
+
+| 引擎 | 连接 | 查询 | 表数据编辑 | 表设计器 | 导入导出/转储 | 验收状态 |
+|---|---|---|---|---|---|---|
+| SQLite 3.45+ | ✅ | ✅ | ✅ | ✅ | ✅ | 自动化测试全绿 |
+| MySQL 8.x | ✅ | ✅ | ✅ | ✅ | ✅ | 对照 8.4.13 实机验收 |
+| MariaDB 10.x / 11.x | ✅ | ✅ | ✅ | ✅ | ✅ | 共用 libmariadb 驱动，未逐版本部署 |
+| PostgreSQL 13–18 | ✅ | ✅ | ✅ | ✅ | ✅ | 对照 18.0.7 实机验收 |
+
+> 平台：Windows 10 1809+ / Windows 11（x64）。依赖系统 Microsoft Edge WebView2 Runtime。
+
+## M9 发布 1.0 已交付
+
+- **版本信息**：`CMakeLists.txt`、`vcpkg.json`、`src/app/version.h`、状态栏与 Mock 后端统一为 `1.0.0`；`tools/check_version.py` 校验各处一致。
+- **图标与窗口**：exe 内嵌多分辨率 `app_icon.ico`，标题栏/任务栏使用大小两种尺寸；窗口标题为「Silkit — 跨库数据库工作台」。
+- **关于页**：显示版本、数据目录、日志目录、配置文件与当前日志，可直接打开数据/日志目录。
+- **许可声明**：[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) 列出 TauriCPP、nlohmann/json、WebView2 SDK、SQLite、libmariadb、libpq 与 CodeMirror 的许可证与源码地址。
+- **发布包**：`tools/package.ps1` 构建 Release 并生成 `dist/Silkit-1.0.0-win-x64.zip`（exe + README + LICENSE + 第三方声明），解压即用。
+- **验收**：CTest 全绿、对比度检查通过、版本一致性检查通过；干净 Windows 11 虚拟机冒烟待人工执行（见下方清单）。
+
+## 发布验收清单
+
+- [ ] 干净 Windows 11（有 WebView2）：解压 `dist/Silkit-1.0.0-win-x64.zip`，双击 `Silkit.exe` 能启动并显示晨樱主题。
+- [ ] 无 WebView2 的 Windows 10：启动时出现中文安装引导，安装运行时后可用。
+- [ ] 三库回归：SQLite 文件库、MySQL 8.x、PostgreSQL 13+ 各完成连接 → 对象树 → 查询 → 编辑表数据 → 设计表 → 导出/导入。
+- [ ] 重启后标签、SQL、侧栏布局恢复；五套主题切换无白闪。
+- [ ] 缩放 200% 与多显示器拖动下文字与网格清晰。
+- [ ] 只读连接拒绝写操作；开启安全模式后执行 `DROP TABLE` 需二次确认。
+- [ ] `%APPDATA%\Silkit\logs` 与 `settings.json` 中无明文密码。
 
 ## M0 已交付
 
@@ -111,7 +154,7 @@ C:\vcpkg\vcpkg.exe install webview2:x64-windows-static sqlite3:x64-windows-stati
     libmariadb:x64-windows-static libpq:x64-windows-static --classic
 ```
 
-> `vcpkg.json` 的 `builtin-baseline` 已固定到当前 vcpkg 仓库中存在的提交（`ef7dbf94…`），`build.ps1` 的 manifest 模式可直接解析全部依赖。若本机 vcpkg 为浅克隆且仍提示找不到基线，可先用上面的 classic 模式预装依赖，再以 `-DVCPKG_MANIFEST_MODE=OFF` 配置 CMake。
+> `vcpkg.json` 的 `builtin-baseline` 已固定到当前 vcpkg 仓库中存在的提交（`ef7dbf94…`）。`build.ps1` 会自动沿用已有 `build/` 的 vcpkg 模式；全新构建目录若已按 classic 模式装好依赖，也会直接复用（`-DVCPKG_MANIFEST_MODE=OFF`），无需手工切换。若需强制 manifest 模式，请先 `-Clean` 并删除 `build/` 中的 `CMakeCache.txt`。
 
 ### 编译
 
@@ -128,6 +171,23 @@ C:\vcpkg\vcpkg.exe install webview2:x64-windows-static sqlite3:x64-windows-stati
 ```
 
 产物：`build\Release\Silkit.exe`。
+
+### 发布包
+
+```powershell
+# 构建 Release、运行 CTest 并生成 dist/Silkit-1.0.0-win-x64.zip
+.\tools\package.ps1
+
+# 跳过测试 / 只打包已构建的产物
+.\tools\package.ps1 -SkipTests
+.\tools\package.ps1 -SkipBuild
+```
+
+版本一致性检查：
+
+```powershell
+python tools\check_version.py
+```
 
 ### 对比度检查
 
@@ -195,7 +255,7 @@ Silkit/
 - **会话亲和**：每个连接一条 Session 线程，驱动对象不跨线程使用；`Cancel()` 单独设计，可跨线程调用。
 - **流式结果**：`query.execute` 按语句发 `statement` / `batch`，首批携带列元数据，达到 `maxRows` 后标记 `truncated`。
 
-## 已知限制（v0.8.0）
+## 已知限制（v1.0.0）
 
 - **平台**：目前仅 Windows 桌面端，依赖系统 WebView2 运行时；macOS / Linux 尚未支持。
 - **导入 / 导出 / 转储**：CSV 导入需整文件读入（上限 256MB）；SQL 文件执行整文件读入（上限 512MB）后逐条执行，尚未按块流式拆分；SQL 转储只覆盖表结构与数据，视图/函数/触发器定义请从详情面板另存 `.sql`。
@@ -214,4 +274,5 @@ Silkit/
 
 ## 许可
 
-见 [LICENSE](LICENSE)。内置 TauriCPP 框架版权归其原作者所有。
+Silkit 以 MIT 许可证发布，见 [LICENSE](LICENSE)。内置 TauriCPP 框架版权归其原作者所有。
+第三方组件（libmariadb LGPL-2.1、libpq、SQLite、CodeMirror、nlohmann/json、WebView2 SDK）的许可与源码地址见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
