@@ -1,0 +1,2 @@
+// 应用图标资源（由 TauriCPP/tools/make_icon.py 从 icon.png 生成 app_icon.ico）
+IDI_ICON1 ICON DISCARDABLE "app_icon.ico"

@@ -10,7 +10,7 @@
 
     const $ = function (id) { return document.getElementById(id); };
 
-    let pingTask = null;
+
     let panelOpen = false;
     let editorRatio = 0.44;
     let saveTimer = 0;
@@ -60,15 +60,10 @@
         else openPanel();
     }
 
-    // ------------------------------------------------------------ 自检（异步 IPC）
+    // ------------------------------------------------------------ IPC 忙碌指示
     function setBusy(busy) {
         const status = $('ipcStatus');
-        const button = $('pingBtn');
-        const label = $('pingLabel');
-
         if (status) status.textContent = busy ? 'IPC 执行中…' : 'IPC 就绪';
-        if (button) button.setAttribute('aria-pressed', busy ? 'true' : 'false');
-        if (label) label.textContent = busy ? '取消' : '自检';
     }
 
     function activeResults() {
@@ -77,44 +72,6 @@
 
     function activeTab() {
         return state ? state.activeTab() : null;
-    }
-
-    async function runPing() {
-        if (pingTask) {
-            pingTask.cancel();
-            return;
-        }
-
-        const results = activeResults();
-        const tab = activeTab();
-        if (results && tab) results.showMessages();
-        setBusy(true);
-
-        const task = api.start('app.ping', { steps: 3, delayMs: 200 }, {
-            onProgress: function (data) {
-                if (results) results.addMessage(tab, 'progress',
-                    '步骤 ' + data.step + '/' + data.total + ' · ' + data.message);
-            }
-        });
-        pingTask = task;
-
-        try {
-            const result = await task.promise;
-            if (results) results.addMessage(tab, 'result',
-                'pong · ' + result.steps + ' 步 / ' + result.elapsedMs + ' ms');
-            toast('异步 IPC 往返正常（' + result.elapsedMs + ' ms）');
-        } catch (error) {
-            if (error.code === 'cancelled') {
-                if (results) results.addMessage(tab, 'error', '请求已取消（reqId=' + task.reqId + '）');
-                toast('已取消自检');
-            } else {
-                if (results) results.addMessage(tab, 'error', error.message || String(error));
-                toast('自检失败：' + (error.message || error.code), 'error');
-            }
-        } finally {
-            pingTask = null;
-            setBusy(false);
-        }
     }
 
     // ------------------------------------------------------------ 分栏
@@ -276,11 +233,6 @@
             if (event.key === 'Escape') {
                 if (modalOpen()) return;
                 const tab = activeTab();
-                if (pingTask) {
-                    event.preventDefault();
-                    pingTask.cancel();
-                    return;
-                }
                 if (workbench && tab && tab.running) {
                     event.preventDefault();
                     workbench.app.query.cancel(tab);
@@ -335,9 +287,6 @@
                 togglePanel();
             });
         }
-
-        const pingBtn = $('pingBtn');
-        if (pingBtn) pingBtn.addEventListener('click', runPing);
 
         document.addEventListener('pointerdown', function (event) {
             if (!panelOpen) return;

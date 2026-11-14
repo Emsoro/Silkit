@@ -265,28 +265,8 @@
 
         function updateStatus() {
             const session = state.activeSession();
-            const dot = byId('connStatus');
-            const label = byId('connLabel');
             const mode = byId('statusMode');
             const run = byId('runBtn');
-            if (dot) {
-                dot.className = 'dot ' + (session ? 'dot-ok' : 'dot-muted');
-            }
-            if (label) {
-                if (session) {
-                    const profile = session.profile || {};
-                    const engineLabel = profile.engine === 'mysql' ? 'MySQL'
-                        : (profile.engine === 'postgres' ? 'PostgreSQL' : 'SQLite');
-                    label.textContent = (profile.name || '已连接') +
-                        (session.currentDb ? ' · ' + session.currentDb : '') +
-                        (session.readOnly ? ' · 只读' : '');
-                    label.title = (profile.file || profile.host || '') + '\n' +
-                        engineLabel + ' ' + (session.serverVersion || '');
-                } else {
-                    label.textContent = '未连接';
-                    label.title = '文件 · 新建连接';
-                }
-            }
             if (mode) {
                 mode.textContent = session ? 'M5 · 查询与表数据' : 'M5 · 等待连接';
             }

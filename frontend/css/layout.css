@@ -36,26 +36,6 @@
     user-select: none;
 }
 
-.brand-mark {
-    width: 28px;
-    height: 28px;
-    border-radius: 9px;
-    display: grid;
-    place-items: center;
-    background: linear-gradient(135deg, var(--accent), var(--accent-2));
-    color: #fff;
-    font-size: 15px;
-    font-weight: 700;
-    letter-spacing: .02em;
-    box-shadow: var(--shadow-1);
-}
-
-.brand-name {
-    font-size: 15px;
-    font-weight: 650;
-    letter-spacing: .01em;
-}
-
 .brand-tag {
     font-size: 10px;
     font-weight: 600;

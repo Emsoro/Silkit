@@ -147,6 +147,9 @@ if(MSVC)
     )
     list(APPEND APP_ADDITIONAL_SOURCES "${GEN_DIR}/app_version.rc")
 
+    # 应用图标：由 icon.png 经 make_icon.py 生成的多分辨率 .ico
+    list(APPEND APP_ADDITIONAL_SOURCES "${CMAKE_SOURCE_DIR}/app_icon.rc")
+
     file(WRITE "${GEN_DIR}/dpi_awareness.manifest"
         "<?xml version='1.0' encoding='UTF-8' standalone='yes'?>\n"
         "<assembly xmlns='urn:schemas-microsoft-com:asm.v1' manifestVersion='1.0'>\n"
