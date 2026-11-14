@@ -577,11 +577,66 @@
         }
 
         // ------------------------------------------------------------ 单元格查看器
+        function base64ToBytes(text) {
+            try {
+                const binary = atob(String(text || ''));
+                const bytes = new Uint8Array(binary.length);
+                for (let i = 0; i < binary.length; i += 1) {
+                    bytes[i] = binary.charCodeAt(i);
+                }
+                return bytes;
+            } catch (error) {
+                return new Uint8Array(0);
+            }
+        }
+
+        function imageMimeOf(bytes) {
+            if (!bytes || bytes.length < 4) return '';
+            if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47) {
+                return 'image/png';
+            }
+            if (bytes[0] === 0xFF && bytes[1] === 0xD8 && bytes[2] === 0xFF) return 'image/jpeg';
+            if (bytes[0] === 0x47 && bytes[1] === 0x49 && bytes[2] === 0x46) return 'image/gif';
+            if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
+                bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50) {
+                return 'image/webp';
+            }
+            return '';
+        }
+
+        function prettyJson(text) {
+            const trimmed = String(text || '').trim();
+            if (!trimmed || (trimmed[0] !== '{' && trimmed[0] !== '[')) return '';
+            try {
+                return JSON.stringify(JSON.parse(trimmed), null, 2);
+            } catch (error) {
+                return '';
+            }
+        }
+
+        function downloadCell() {
+            if (!cell || !cell.save) return;
+            const save = cell.save;
+            const blob = new Blob([save.data], { type: save.mime });
+            const url = URL.createObjectURL(blob);
+            const anchor = document.createElement('a');
+            anchor.href = url;
+            anchor.download = save.name;
+            document.body.appendChild(anchor);
+            anchor.click();
+            setTimeout(function () {
+                URL.revokeObjectURL(url);
+                anchor.remove();
+            }, 800);
+            toast('已保存 ' + save.name);
+        }
+
         function bindCellViewer() {
             const dialog = byId('cellViewer');
             if (!dialog) return;
             const close = byId('cellViewerClose');
             const copy = byId('cellViewerCopy');
+            const save = byId('cellViewerSave');
             if (close) close.addEventListener('click', function () { dialog.hidden = true; });
             dialog.addEventListener('click', function (event) {
                 if (event.target === dialog) dialog.hidden = true;
@@ -597,6 +652,7 @@
                     });
                 });
             }
+            if (save) save.addEventListener('click', downloadCell);
             document.addEventListener('keydown', function (event) {
                 if (event.key === 'Escape' && !dialog.hidden) dialog.hidden = true;
             });
@@ -612,32 +668,75 @@
             const raw = info.value;
             const column = info.column || {};
             const kind = String(column.kind || '').toLowerCase();
+            const typeName = String(column.type || '').toUpperCase();
+            const isBinary = kind === 'binary' || /BLOB|BYTEA|BINARY/.test(typeName);
+            const fileName = String(column.name || 'cell').replace(/[^\w.-]+/g, '-');
 
             title.textContent = (column.name || '单元格') + ' · 第 ' + (info.rowIndex + 1) + ' 行';
             const parts = [];
             if (column.type) parts.push(column.type);
             else if (column.kind) parts.push(column.kind);
             if (raw == null) parts.push('NULL');
-            else if (kind === 'binary') parts.push(U.formatBytes(U.base64Bytes(raw)) + ' · Base64');
+            else if (isBinary) parts.push(U.formatBytes(U.base64Bytes(raw)) + ' · Base64');
             else parts.push(U.formatNumber(String(raw).length) + ' 字符');
-            meta.textContent = parts.join(' · ');
 
             U.clear(body);
+            const saveBtn = byId('cellViewerSave');
+            if (saveBtn) saveBtn.hidden = raw == null || !!info.noSave;
+            cell.save = null;
+
             if (raw == null) {
                 body.appendChild(U.el('div', 'cell-viewer-null', 'NULL'));
-            } else if (kind === 'binary') {
-                const base64 = U.el('pre', 'cell-viewer-pre', String(raw));
+            } else if (isBinary) {
+                const bytes = base64ToBytes(raw);
+                const mime = imageMimeOf(bytes);
+                if (mime) parts.push('图片 · ' + mime);
                 body.appendChild(U.el('div', 'cell-viewer-label', 'Base64'));
-                body.appendChild(base64);
+                body.appendChild(U.el('pre', 'cell-viewer-pre', String(raw)));
+                if (mime) {
+                    const img = document.createElement('img');
+                    img.className = 'cell-viewer-image';
+                    img.alt = column.name || 'binary';
+                    img.src = 'data:' + mime + ';base64,' + String(raw);
+                    body.appendChild(img);
+                }
                 const hex = U.hexPreview(String(raw), 256);
                 if (hex) {
                     body.appendChild(U.el('div', 'cell-viewer-label', '十六进制（前 256 字节）'));
                     body.appendChild(U.el('pre', 'cell-viewer-pre cell-viewer-hex', hex));
                 }
+                const ext = mime === 'image/png' ? '.png'
+                    : (mime === 'image/jpeg' ? '.jpg'
+                        : (mime === 'image/gif' ? '.gif'
+                            : (mime === 'image/webp' ? '.webp' : '.bin')));
+                cell.save = {
+                    data: bytes,
+                    mime: mime || 'application/octet-stream',
+                    name: fileName + ext
+                };
             } else {
-                body.appendChild(U.el('pre', 'cell-viewer-pre', String(raw)));
+                const text = String(raw);
+                const json = prettyJson(text);
+                if (json) {
+                    parts.push('JSON · 已格式化');
+                    body.appendChild(U.el('div', 'cell-viewer-label', 'JSON'));
+                    body.appendChild(U.el('pre', 'cell-viewer-pre', json));
+                    cell.save = {
+                        data: json,
+                        mime: 'application/json;charset=utf-8',
+                        name: fileName + '.json'
+                    };
+                } else {
+                    body.appendChild(U.el('pre', 'cell-viewer-pre', text));
+                    cell.save = {
+                        data: text,
+                        mime: 'text/plain;charset=utf-8',
+                        name: fileName + '.txt'
+                    };
+                }
             }
 
+            meta.textContent = parts.join(' · ');
             dialog.hidden = false;
             const close = byId('cellViewerClose');
             if (close) close.focus();

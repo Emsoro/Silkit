@@ -35,7 +35,7 @@
         <div class="brand">
             <span class="brand-mark">S</span>
             <span class="brand-name">Silkit</span>
-            <span class="brand-tag">M4</span>
+            <span class="brand-tag">M5</span>
         </div>
 
         <div class="topbar-actions">
@@ -94,6 +94,65 @@
                         aria-label="新建查询标签" title="新建查询（Ctrl+N）"></button>
             </div>
 
+            <!-- M5：表数据编辑视图（table 标签时替换编辑器 + 结果） -->
+            <section class="table-pane" id="tablePane" hidden>
+                <div class="table-toolbar">
+                    <div class="table-title">
+                        <span class="table-icon" data-icon="table"></span>
+                        <span class="table-name" id="tableName">表</span>
+                        <span class="table-badge" id="tableBadge">只读</span>
+                    </div>
+                    <span class="spacer"></span>
+                    <button class="btn btn-mini" type="button" id="tableInsertBtn" data-icon="plus"
+                            title="新增行（当前页末尾）">新增行</button>
+                    <button class="btn btn-mini" type="button" id="tableDeleteBtn" data-icon="trash"
+                            title="删除选中的行">删除行</button>
+                    <button class="btn btn-mini" type="button" id="tableRevertBtn"
+                            title="撤销当前页所有未保存修改">撤销</button>
+                    <button class="btn btn-mini" type="button" id="tableSaveBtn" data-icon="save"
+                            title="预览 SQL 并保存（Ctrl+S）">保存</button>
+                    <span class="topbar-sep"></span>
+                    <button class="btn btn-mini" type="button" id="tableReloadBtn" data-icon="refresh"
+                            title="重新加载当前页">刷新</button>
+                    <button class="btn btn-mini" type="button" id="tableCountBtn"
+                            title="执行 COUNT(*)，得到精确行数">精确计数</button>
+                    <button class="btn btn-mini btn-danger-soft" type="button" id="tableTruncateBtn"
+                            title="清空整张表（需输入表名确认）">清空</button>
+                    <button class="btn btn-mini" type="button" id="tableViewCellBtn" data-icon="eye"
+                            title="查看当前单元格全文（也可双击只读单元格）">查看</button>
+                </div>
+
+                <div class="table-filterbar">
+                    <span class="table-search">
+                        <span data-icon="search"></span>
+                        <input id="tableSearch" type="search" placeholder="搜索整表（文本列 LIKE）…"
+                               autocomplete="off" spellcheck="false">
+                    </span>
+                    <span class="filter-divider"></span>
+                    <select id="tableFilterColumn" class="input input-mini" aria-label="筛选列"></select>
+                    <select id="tableFilterOp" class="input input-mini" aria-label="筛选操作符"></select>
+                    <input id="tableFilterValue" class="input input-mini" type="text"
+                           placeholder="值" autocomplete="off" spellcheck="false">
+                    <button class="btn btn-mini" type="button" id="tableFilterAdd" data-icon="filter"
+                            title="添加筛选条件">加入筛选</button>
+                    <button class="btn btn-mini" type="button" id="tableFilterClear"
+                            title="清除搜索与全部筛选">清除</button>
+                    <span class="filter-chips" id="tableFilterChips"></span>
+                </div>
+
+                <div class="table-error" id="tableError" hidden></div>
+                <div class="table-grid" id="tableGrid"></div>
+                <div class="table-foot">
+                    <span class="table-status" id="tableStatus">加载中…</span>
+                    <span class="spacer"></span>
+                    <button class="btn btn-mini" type="button" id="tablePrev" title="上一页">上一页</button>
+                    <span class="table-page" id="tablePage">第 1 页</span>
+                    <button class="btn btn-mini" type="button" id="tableNext" title="下一页">下一页</button>
+                    <select id="tablePageSize" class="input input-mini" aria-label="每页行数"></select>
+                    <span class="table-total" id="tableTotal"></span>
+                </div>
+            </section>
+
             <section class="editor-pane" id="editorPane">
                 <div class="editor-head">
                     <span class="win-dots" aria-hidden="true"><i></i><i></i><i></i></span>
@@ -122,7 +181,7 @@
             <div class="splitter" id="splitter" role="separator" aria-orientation="horizontal"
                  aria-label="调整编辑器高度" tabindex="0"></div>
 
-            <section class="results">
+            <section class="results" id="resultsPane">
                 <div class="result-tabs" role="tablist" aria-label="结果">
                     <button class="rtab active" type="button" role="tab" data-target="resultGrid" aria-selected="true">
                         <span data-icon="grid"></span> 结果
@@ -378,7 +437,36 @@
         <div class="cell-viewer-body" id="cellViewerBody"></div>
         <div class="modal-foot">
             <span class="spacer"></span>
+            <button id="cellViewerSave" class="btn" type="button" data-icon="save" hidden>保存为文件</button>
             <button id="cellViewerCopy" class="btn" type="button" data-icon="copy">复制内容</button>
+        </div>
+    </div>
+</div>
+
+<!-- ---------------------------------------------------------------- SQL 预览（M5 保存） -->
+<div id="tablePreview" class="modal" hidden>
+    <div class="modal-dialog modal-wide modal-preview" role="dialog" aria-modal="true"
+         aria-labelledby="tablePreviewTitle">
+        <div class="modal-head">
+            <div class="modal-title">
+                <span data-icon="bolt"></span>
+                <span id="tablePreviewTitle">保存预览</span>
+            </div>
+            <button class="icon-btn" type="button" data-icon="close"
+                    id="tablePreviewClose" aria-label="关闭"></button>
+        </div>
+        <div class="preview-sub" id="tablePreviewMeta"></div>
+        <div class="preview-body">
+            <ol class="preview-list" id="tablePreviewList"></ol>
+            <div class="preview-warn" id="tablePreviewWarn"></div>
+        </div>
+        <div class="modal-foot">
+            <span class="muted">修改会在单个事务中执行</span>
+            <span class="spacer"></span>
+            <button id="tablePreviewCancel" class="btn" type="button">取消</button>
+            <button id="tablePreviewRun" class="btn btn-primary" type="button" data-icon="check">
+                执行并保存
+            </button>
         </div>
     </div>
 </div>
@@ -458,6 +546,7 @@
 <script src="js/state.js"></script>
 <script src="js/components/grid.js"></script>
 <script src="js/views/results.js"></script>
+<script src="js/views/table.js"></script>
 <script src="js/views/query.js"></script>
 <script src="js/views/tabs.js"></script>
 <script src="js/views/tree.js"></script>

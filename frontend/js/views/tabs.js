@@ -44,6 +44,10 @@
             dom.sub = byId('editorSub');
             dom.run = byId('runBtn');
             dom.cancel = byId('cancelBtn');
+            dom.editorPane = byId('editorPane');
+            dom.splitter = byId('splitter');
+            dom.resultsPane = byId('resultsPane');
+            dom.tablePane = byId('tablePane');
 
             dom.tabbar.addEventListener('click', function (event) {
                 const close = event.target.closest('.tab-close');
@@ -228,7 +232,7 @@
         // ------------------------------------------------------------ 激活与编辑
         function saveEditor() {
             const tab = state.activeTab();
-            if (!tab) return;
+            if (!tab || tab.kind === 'table') return;
             if (cm) {
                 tab.sql = cm.getValue();
                 const info = cm.getScrollInfo();
@@ -236,16 +240,21 @@
             }
         }
 
-        function activate(id) {
-            const next = state.tab(id);
-            if (!next) return;
-            if (state.activeTabId === id) {
-                updateChrome(next);
-                return;
+        function syncLayout(tab) {
+            const isTable = !!(tab && tab.kind === 'table');
+            if (dom.tablePane) dom.tablePane.hidden = !isTable;
+            if (dom.editorPane) dom.editorPane.hidden = isTable;
+            if (dom.splitter) dom.splitter.hidden = isTable;
+            if (dom.resultsPane) dom.resultsPane.hidden = isTable;
+            if (isTable) {
+                if (ctx.table) ctx.table.show(tab);
+            } else if (cm) {
+                setTimeout(function () { cm.refresh(); }, 0);
             }
-            saveEditor();
-            clearErrorHighlight();
-            state.setActiveTab(id);
+        }
+
+        /// 把标签内容呈现到主区域（不改变 activeTabId）。
+        function present(next) {
             ensureDoc(next);
             if (cm) {
                 cm.swapDoc(next.doc);
@@ -256,7 +265,22 @@
             }
             render();
             updateChrome(next);
-            results.show(next);
+            syncLayout(next);
+            if (next.kind !== 'table') results.show(next);
+        }
+
+        function activate(id, force) {
+            const next = state.tab(id);
+            if (!next) return;
+            if (!force && state.activeTabId === id) {
+                updateChrome(next);
+                syncLayout(next);
+                return;
+            }
+            if (state.activeTabId !== id) saveEditor();
+            clearErrorHighlight();
+            state.setActiveTab(id);
+            present(next);
         }
 
         function updateChrome(tab) {
@@ -438,15 +462,7 @@
                 filePath: opts.filePath || null
             });
             state.setActiveTab(tab.id);
-            render();
-            ensureDoc(tab);
-            if (cm) {
-                cm.swapDoc(tab.doc);
-                cm.setOption('mode', mimeFor(state.session(tab.sessionId)));
-                cm.refresh();
-            }
-            updateChrome(tab);
-            results.show(tab);
+            present(tab);
             if (ctx.onTabChanged) ctx.onTabChanged(tab);
             if (opts.focus !== false && cm) cm.focus();
             return tab;
@@ -457,7 +473,9 @@
                 const tab = state.tabs[i];
                 if (tab.kind !== 'table' || tab.sessionId !== sessionId) continue;
                 if (!tab.ref) continue;
-                if (tab.ref.name === ref.name && (tab.ref.database || 'main') === (ref.database || 'main')) {
+                if (tab.ref.name === ref.name &&
+                    (tab.ref.database || 'main') === (ref.database || 'main') &&
+                    (tab.ref.schema || '') === (ref.schema || '')) {
                     return tab;
                 }
             }
@@ -465,7 +483,6 @@
         }
 
         function openTable(session, ref, options) {
-            const opts = options || {};
             if (!session) {
                 toast('请先打开连接', 'error');
                 return null;
@@ -473,41 +490,27 @@
             const reference = {
                 kind: ref.kind === 'view' ? 'view' : 'table',
                 name: ref.name,
-                database: ref.database || 'main'
+                database: ref.database || 'main',
+                schema: ref.schema || ''
             };
             const existing = findTableTab(session.id, reference);
             if (existing) {
-                activate(existing.id);
-                if (opts.autoRun !== false) query.run(existing);
+                activate(existing.id, true);
                 return existing;
             }
 
-            const limit = Number(opts.limit) || 500;
-            const sql = 'SELECT * FROM ' + U.quoteIdentifier(reference.name) +
-                ' LIMIT ' + limit + ';';
             saveEditor();
-            querySeq += 1;
             const tab = state.addTab({
                 kind: 'table',
                 title: (reference.kind === 'view' ? '视图: ' : '表: ') + reference.name,
                 sessionId: session.id,
-                sql: sql,
+                sql: '',
                 dirty: false,
-                ref: reference,
-                autoLimit: limit
+                ref: reference
             });
             state.setActiveTab(tab.id);
-            render();
-            ensureDoc(tab);
-            if (cm) {
-                cm.swapDoc(tab.doc);
-                cm.setOption('mode', mimeFor(state.session(tab.sessionId)));
-                cm.refresh();
-            }
-            updateChrome(tab);
-            results.show(tab);
+            present(tab);
             if (ctx.onTabChanged) ctx.onTabChanged(tab);
-            if (opts.autoRun !== false) query.run(tab);
             return tab;
         }
 
@@ -517,27 +520,25 @@
             if (tab.running && tab.task) {
                 tab.task.cancel();
             }
+            if (tab.kind === 'table') {
+                if (ctx.table && ctx.table.hasChanges(tab) &&
+                    !window.confirm('表「' + ((tab.ref && tab.ref.name) || tab.title) +
+                        '」还有未保存的修改，仍要关闭？')) {
+                    return;
+                }
+                if (ctx.table) ctx.table.close(tab);
+            }
             const wasActive = state.activeTabId === id;
-            if (wasActive) saveEditor();
+            if (wasActive && tab.kind !== 'table') saveEditor();
             const index = state.tabs.indexOf(tab);
             state.removeTab(id);
             if (ctx.onTabChanged) ctx.onTabChanged(tab);
             const next = state.tabs[Math.min(index, state.tabs.length - 1)];
             if (next) {
-                state.setActiveTab(next.id);
-                activate(next.id);
-                if (cm) {
-                    ensureDoc(next);
-                    cm.swapDoc(next.doc);
-                    cm.setOption('mode', mimeFor(state.session(next.sessionId)));
-                    cm.refresh();
-                }
-                updateChrome(next);
-                results.show(next);
+                present(next);
             } else {
                 openQuery(null, { sql: '', focus: true });
             }
-            render();
         }
 
         function closeActive() {

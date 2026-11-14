@@ -192,6 +192,7 @@ set(SILKIT_SOURCES
     src/db/engine_dialect.cpp
     src/db/session.cpp
     src/db/session_manager.cpp
+    src/db/table_ops.cpp
     src/db/drivers/sqlite_driver.cpp
     src/db/drivers/mysql_driver.cpp
     src/db/drivers/postgres_driver.cpp
@@ -202,6 +203,7 @@ set(SILKIT_SOURCES
     src/ipc/commands_meta.cpp
     src/ipc/commands_meta_engine.cpp
     src/ipc/commands_query.cpp
+    src/ipc/commands_table.cpp
     src/util/base64.cpp
 )
 

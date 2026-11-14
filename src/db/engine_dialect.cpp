@@ -330,6 +330,27 @@ std::string ListPrimaryKeysSql(Engine engine, const std::string& scope,
            " AND ix.indisprimary ORDER BY a.attnum";
 }
 
+std::string ListUniqueIndexColumnsSql(Engine engine, const std::string& scope,
+                                      const std::string& table) {
+    if (engine == Engine::MySql) {
+        return "SELECT INDEX_NAME, COLUMN_NAME FROM information_schema.STATISTICS"
+               " WHERE " + MySqlSchemaFilter(scope) + " AND TABLE_NAME = " + Lit(table) +
+               " AND NON_UNIQUE = 0 AND SUB_PART IS NULL"
+               " ORDER BY INDEX_NAME, SEQ_IN_INDEX";
+    }
+    if (engine == Engine::Postgres) {
+        return "SELECT i.relname, a.attname FROM pg_index ix"
+               " JOIN pg_class i ON i.oid = ix.indexrelid"
+               " JOIN pg_class c ON c.oid = ix.indrelid"
+               " JOIN pg_namespace n ON n.oid = c.relnamespace"
+               " JOIN pg_attribute a ON a.attrelid = ix.indrelid AND a.attnum = ANY(ix.indkey)"
+               " WHERE " + PgSchemaFilter(scope) + " AND c.relname = " + Lit(table) +
+               " AND ix.indisunique AND ix.indpred IS NULL AND ix.indexprs IS NULL"
+               " ORDER BY i.relname, a.attnum";
+    }
+    return {};
+}
+
 std::string DdlSql(Engine engine, const std::string& kind,
                     const std::string& scope, const std::string& name) {
     const std::string quoted = QuoteIdentifier(engine, scope) + "." + QuoteIdentifier(engine, name);
@@ -406,6 +427,17 @@ std::string ServerStatsSql(Engine engine) {
     }
     return "SELECT current_setting('server_encoding'), current_setting('TimeZone'),"
            " current_setting('server_version')";
+}
+
+std::string ExplainSql(Engine engine, const std::string& sql, bool analyze) {
+    const std::string trimmed = sql;
+    if (engine == Engine::MySql) {
+        return analyze ? "EXPLAIN ANALYZE " + trimmed : "EXPLAIN " + trimmed;
+    }
+    if (engine == Engine::Postgres) {
+        return analyze ? "EXPLAIN (ANALYZE) " + trimmed : "EXPLAIN " + trimmed;
+    }
+    return "EXPLAIN QUERY PLAN " + trimmed;
 }
 
 }  // namespace silkit::db

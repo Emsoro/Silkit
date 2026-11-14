@@ -974,6 +974,16 @@ body.is-col-resizing * {
     letter-spacing: .04em;
 }
 
+.cell-viewer-image {
+    max-width: 100%;
+    max-height: 420px;
+    align-self: center;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background:
+        repeating-conic-gradient(var(--bg-2) 0% 25%, var(--bg-1) 0% 50%) 50% / 16px 16px;
+}
+
 .cell-viewer-null {
     font-family: var(--font-mono);
     color: var(--syntax-null);
@@ -1402,6 +1412,379 @@ body.is-col-resizing * {
     font-size: 11px;
     color: var(--warning);
     padding: 2px 4px;
+}
+
+/* ---------------------------------------------------------------- M5 表数据编辑 */
+.table-pane {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg-1);
+}
+
+.table-pane[hidden] {
+    display: none !important;
+}
+
+.table-toolbar {
+    height: 36px;
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 10px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-1);
+    overflow-x: auto;
+}
+
+.table-title {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    min-width: 0;
+}
+
+.table-icon {
+    display: inline-flex;
+    color: var(--accent);
+}
+
+.table-icon svg {
+    width: 14px;
+    height: 14px;
+}
+
+.table-name {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 280px;
+}
+
+.table-badge {
+    flex: none;
+    font-size: 10px;
+    line-height: 16px;
+    padding: 0 7px;
+    border-radius: var(--radius-pill);
+    border: 1px solid var(--border);
+    background: var(--bg-0);
+    color: var(--text-faint);
+    white-space: nowrap;
+}
+
+.table-badge.is-editable {
+    color: var(--success);
+    border-color: color-mix(in srgb, var(--success) 32%, transparent);
+    background: color-mix(in srgb, var(--success) 9%, var(--bg-1));
+}
+
+.table-badge.is-readonly {
+    color: var(--warning);
+    border-color: color-mix(in srgb, var(--warning) 32%, transparent);
+    background: color-mix(in srgb, var(--warning) 9%, var(--bg-1));
+}
+
+.table-filterbar {
+    height: 34px;
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 10px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-2);
+    overflow-x: auto;
+}
+
+.table-search {
+    flex: 0 1 300px;
+    min-width: 130px;
+    height: 24px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 0 9px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    background: var(--bg-1);
+    color: var(--text-faint);
+}
+
+.table-search svg {
+    width: 12px;
+    height: 12px;
+    flex: none;
+}
+
+.table-search input {
+    flex: 1;
+    min-width: 0;
+    border: 0;
+    outline: none;
+    background: transparent;
+    color: var(--text);
+    font-size: 11.5px;
+    font-family: var(--font-ui);
+}
+
+.table-search:focus-within {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+.filter-divider {
+    flex: none;
+    width: 1px;
+    height: 16px;
+    background: var(--border);
+}
+
+.filter-chips {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+}
+
+.filter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 1px 2px 1px 8px;
+    border-radius: var(--radius-pill);
+    border: 1px solid color-mix(in srgb, var(--accent) 24%, transparent);
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-size: 10.5px;
+    white-space: nowrap;
+}
+
+.filter-chip-text {
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.filter-chip-close {
+    width: 16px;
+    height: 16px;
+    border: 0;
+    border-radius: 50%;
+    background: transparent;
+    color: inherit;
+    font-size: 12px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.filter-chip-close:hover {
+    background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.filter-empty {
+    font-size: 10.5px;
+    color: var(--text-faint);
+}
+
+.table-error {
+    flex: none;
+    padding: 5px 12px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--danger);
+    background: color-mix(in srgb, var(--danger) 8%, var(--bg-1));
+    border-bottom: 1px solid color-mix(in srgb, var(--danger) 24%, transparent);
+}
+
+.table-grid {
+    flex: 1;
+    min-height: 0;
+    position: relative;
+    overflow: auto;
+    background: var(--bg-1);
+}
+
+.table-foot {
+    height: 30px;
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 10px;
+    border-top: 1px solid var(--border);
+    background: var(--bg-2);
+    font-size: 11px;
+    color: var(--text-dim);
+}
+
+.table-status {
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.table-status.is-dirty {
+    color: var(--warning);
+}
+
+.table-status.is-error {
+    color: var(--danger);
+}
+
+.table-page,
+.table-total {
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+}
+
+.table-total {
+    color: var(--text-faint);
+}
+
+/* 行状态 */
+.vgrid-row.is-new {
+    background: color-mix(in srgb, var(--success) 9%, var(--bg-1));
+}
+
+.vgrid-row.is-new:hover {
+    background: color-mix(in srgb, var(--success) 15%, var(--bg-1));
+}
+
+.vgrid-row.is-new .vgrid-rownum {
+    color: var(--success);
+    font-weight: 600;
+}
+
+.vgrid-row.is-edited {
+    background: color-mix(in srgb, var(--warning) 8%, var(--bg-1));
+}
+
+.vgrid-row.is-edited:hover {
+    background: color-mix(in srgb, var(--warning) 14%, var(--bg-1));
+}
+
+.vgrid-row.is-edited .vgrid-rownum {
+    color: var(--warning);
+    font-weight: 600;
+}
+
+.vgrid-row.is-deleted {
+    background: color-mix(in srgb, var(--danger) 6%, var(--bg-1));
+}
+
+.vgrid-row.is-deleted .vgrid-cell {
+    color: var(--text-faint);
+    text-decoration: line-through;
+}
+
+.vgrid-row.is-error-row {
+    background: color-mix(in srgb, var(--danger) 15%, var(--bg-1));
+    box-shadow: inset 3px 0 0 var(--danger);
+}
+
+.vgrid-row.is-error-row .vgrid-rownum {
+    color: var(--danger);
+    font-weight: 600;
+}
+
+.vgrid-cell.is-dirty-cell {
+    position: relative;
+}
+
+.vgrid-cell.is-dirty-cell::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    right: 0;
+    border-top: 6px solid var(--warning);
+    border-left: 6px solid transparent;
+    pointer-events: none;
+}
+
+.vgrid-editor {
+    position: absolute;
+    z-index: 8;
+    margin: 0;
+    padding: 0 9px;
+    border: 1px solid var(--accent);
+    border-radius: 2px;
+    outline: none;
+    background: var(--bg-1);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    line-height: 22px;
+    box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+/* SQL 预览 */
+.modal-dialog.modal-preview {
+    height: min(640px, calc(100vh - 48px));
+}
+
+.preview-sub {
+    flex: none;
+    padding: 7px 14px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-0);
+    color: var(--text-dim);
+    font-size: 11.5px;
+}
+
+.preview-body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 14px;
+    overflow: hidden;
+}
+
+.preview-list {
+    flex: 1;
+    min-height: 0;
+    margin: 0;
+    padding: 4px 10px 4px 28px;
+    overflow: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-0);
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--text);
+}
+
+.preview-sql {
+    padding: 6px 0;
+    border-bottom: 1px dashed var(--border);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.preview-sql:last-child {
+    border-bottom: 0;
+}
+
+.preview-empty {
+    padding: 10px 0;
+    color: var(--text-faint);
+    list-style: none;
+    margin-left: -18px;
+}
+
+.preview-warn {
+    flex: none;
+    font-size: 11px;
+    color: var(--warning);
 }
 
 /* ---------------------------------------------------------------- 响应式 */

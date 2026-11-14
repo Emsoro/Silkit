@@ -26,6 +26,7 @@
             selection: null,
             dragAnchor: null,
             dragging: false,
+            editing: null,
             emptyMessage: '还没有结果',
             emptyHint: '按 Ctrl+Enter 执行当前 SQL',
             observer: null
@@ -139,6 +140,7 @@
         // ---------------------------------------------------------- 表头
         function renderHead() {
             const columns = state.set && state.set.columns ? state.set.columns : [];
+            const sort = opts.sortState ? opts.sortState() : null;
             U.clear(headRow);
 
             const corner = U.el('div', 'vgrid-hcell vgrid-rownum', '#');
@@ -149,6 +151,9 @@
                 const cell = U.el('div', 'vgrid-hcell');
                 cell.setAttribute('role', 'columnheader');
                 cell.setAttribute('data-col', String(index));
+                if (sort && sort.column === column.name) {
+                    cell.classList.add('is-sorted');
+                }
                 const name = U.el('span', 'vgrid-hname', column.name || ('列 ' + (index + 1)));
                 const type = U.el('span', 'vgrid-htype', column.type || column.kind || '');
                 if (column.type) {
@@ -158,6 +163,9 @@
                 }
                 cell.appendChild(name);
                 if (column.type || column.kind) cell.appendChild(type);
+                if (sort && sort.column === column.name) {
+                    cell.appendChild(U.el('span', 'vgrid-sort', sort.desc ? '↓' : '↑'));
+                }
                 const handle = U.el('span', 'vgrid-resize');
                 handle.setAttribute('data-col', String(index));
                 handle.title = '拖拽调整列宽 · 双击自动适应';
@@ -185,6 +193,18 @@
             cell.setAttribute('role', 'gridcell');
             cell.setAttribute('data-row', String(rowIndex));
             cell.setAttribute('data-col', String(colIndex));
+
+            if (opts.cellClass) {
+                const extra = opts.cellClass(rowIndex, colIndex);
+                if (extra) extra.split(/\s+/).forEach(function (name) {
+                    if (name) cell.classList.add(name);
+                });
+            }
+
+            if (value === undefined) {
+                cell.classList.add('is-unset');
+                return cell;
+            }
 
             const kind = String(column && column.kind || '').toLowerCase();
             if (value === null || value === undefined) {
@@ -253,6 +273,12 @@
                 node.className = 'vgrid-row' + (rowIndex % 2 === 1 ? ' is-even' : '');
                 node.setAttribute('role', 'row');
                 node.setAttribute('data-row', String(rowIndex));
+                if (opts.rowClass) {
+                    const extra = opts.rowClass(rowIndex);
+                    if (extra) extra.split(/\s+/).forEach(function (name) {
+                        if (name) node.classList.add(name);
+                    });
+                }
                 node.style.gridTemplateColumns = template;
                 node.style.minWidth = (ROWNO_WIDTH + state.widths.reduce(function (s, w) { return s + w; }, 0)) + 'px';
                 U.clear(node);
@@ -409,6 +435,124 @@
             });
         }
 
+        // ---------------------------------------------------------- 单元格编辑
+        function canEditCell(rowIndex, colIndex) {
+            return !!(opts.canEdit && opts.canEdit(rowIndex, colIndex));
+        }
+
+        function stopEditing(commit, ed) {
+            const editing = ed || state.editing;
+            if (!editing || state.editing !== editing) return;
+            state.editing = null;
+            if (editing.input && editing.input.parentNode) editing.input.parentNode.removeChild(editing.input);
+            if (!commit) return;
+            const text = editing.input ? editing.input.value : '';
+            const originalText = editing.original == null ? null : String(editing.original);
+            if (originalText === text) return;
+            if (opts.onEditCell) opts.onEditCell(editing.row, editing.col, text, false);
+        }
+
+        function cancelEdit() {
+            stopEditing(false, state.editing);
+        }
+
+        function commitEdit() {
+            stopEditing(true, state.editing);
+        }
+
+        function beginEdit(rowIndex, colIndex) {
+            if (!canEditCell(rowIndex, colIndex)) {
+                if (opts.onToast) opts.onToast('该单元格不可编辑', 'warn');
+                return false;
+            }
+            if (state.editing) {
+                const current = state.editing;
+                if (current.row === rowIndex && current.col === colIndex) {
+                    if (current.input) current.input.focus();
+                    return true;
+                }
+                commitEdit();
+            }
+            const rows = currentRows();
+            if (!rows[rowIndex]) return false;
+            const cellEl = shell.querySelector(
+                '.vgrid-cell[data-row="' + rowIndex + '"][data-col="' + colIndex + '"]');
+            if (!cellEl) return false;
+
+            const input = document.createElement('input');
+            input.className = 'vgrid-editor';
+            input.type = 'text';
+            input.autocomplete = 'off';
+            input.spellcheck = false;
+            const editing = {
+                row: rowIndex,
+                col: colIndex,
+                original: rows[rowIndex][colIndex],
+                input: input
+            };
+            input.value = editing.original == null ? '' : String(editing.original);
+
+            const shellRect = shell.getBoundingClientRect();
+            const rect = cellEl.getBoundingClientRect();
+            input.style.left = (rect.left - shellRect.left) + 'px';
+            input.style.top = (rect.top - shellRect.top) + 'px';
+            input.style.width = Math.max(56, rect.width) + 'px';
+            input.style.height = Math.max(20, rect.height) + 'px';
+
+            input.addEventListener('keydown', function (event) {
+                if (state.editing !== editing) return;
+                if (event.key === 'Escape') {
+                    event.preventDefault();
+                    cancelEdit();
+                    shell.focus({ preventScroll: true });
+                    return;
+                }
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    commitEdit();
+                    shell.focus({ preventScroll: true });
+                    return;
+                }
+                if (event.key === 'Tab') {
+                    event.preventDefault();
+                    const columns = state.set && state.set.columns ? state.set.columns : [];
+                    const next = colIndex + (event.shiftKey ? -1 : 1);
+                    commitEdit();
+                    if (next >= 0 && next < columns.length) beginEdit(rowIndex, next);
+                    else shell.focus({ preventScroll: true });
+                    return;
+                }
+                if ((event.ctrlKey || event.metaKey) && event.key === '0') {
+                    event.preventDefault();
+                    const target = state.editing;
+                    state.editing = null;
+                    if (target && target.input && target.input.parentNode) {
+                        target.input.parentNode.removeChild(target.input);
+                    }
+                    if (opts.onEditCell) opts.onEditCell(rowIndex, colIndex, null, true);
+                    shell.focus({ preventScroll: true });
+                }
+            });
+            input.addEventListener('blur', function () {
+                if (state.editing === editing) commitEdit();
+            });
+
+            state.editing = editing;
+            shell.appendChild(input);
+            input.focus();
+            input.select();
+            return true;
+        }
+
+        function setNullAt(rowIndex, colIndex) {
+            if (!canEditCell(rowIndex, colIndex)) {
+                if (opts.onToast) opts.onToast('该单元格不可编辑', 'warn');
+                return false;
+            }
+            if (opts.onEditCell) opts.onEditCell(rowIndex, colIndex, null, true);
+            return true;
+        }
+
         // ---------------------------------------------------------- 事件
         host.addEventListener('scroll', function () {
             state.scrollTop = host.scrollTop;
@@ -443,6 +587,12 @@
             const header = event.target.closest('.vgrid-hcell[data-col]');
             if (header) {
                 const index = Number(header.getAttribute('data-col'));
+                if (opts.onSortColumn) {
+                    event.preventDefault();
+                    const columns = state.set && state.set.columns ? state.set.columns : [];
+                    if (columns[index]) opts.onSortColumn(index, columns[index]);
+                    return;
+                }
                 const rows = currentRows();
                 if (rows.length) {
                     setSelection({ row: 0, col: index }, { row: rows.length - 1, col: index });
@@ -503,10 +653,16 @@
                 return;
             }
             const target = cellAt(event.target);
-            if (target && target.col >= 0) openCell(target.row, target.col);
+            if (!target || target.col < 0) return;
+            if (canEditCell(target.row, target.col)) {
+                beginEdit(target.row, target.col);
+                return;
+            }
+            openCell(target.row, target.col);
         });
 
         shell.addEventListener('keydown', function (event) {
+            if (state.editing) return;
             const mod = event.ctrlKey || event.metaKey;
             if (mod && event.code === 'KeyC') {
                 event.preventDefault();
@@ -529,6 +685,16 @@
             let row = state.selection.focus.row;
             let col = state.selection.focus.col;
             const page = Math.max(1, Math.floor(host.clientHeight / state.rowHeight) - 2);
+            if (event.key === 'F2' || event.key === 'Enter') {
+                event.preventDefault();
+                if (canEditCell(row, col)) beginEdit(row, col);
+                return;
+            }
+            if (mod && event.key === '0') {
+                event.preventDefault();
+                setNullAt(row, col);
+                return;
+            }
             if (event.key === 'ArrowDown') row += 1;
             else if (event.key === 'ArrowUp') row -= 1;
             else if (event.key === 'ArrowRight') col += 1;
@@ -565,6 +731,7 @@
         }
 
         function setSet(set) {
+            cancelEdit();
             const changed = set !== state.set;
             state.set = set || null;
             state.columns = null;
@@ -631,6 +798,37 @@
             selectAll: selectAll,
             clearSelection: clearSelection,
             getSelectionText: selectionText,
+            getSelection: normalizedSelection,
+            getFocusCell: function () {
+                return state.selection ? {
+                    row: state.selection.focus.row,
+                    col: state.selection.focus.col
+                } : null;
+            },
+            setFocusCell: function (row, col) {
+                const rows = currentRows();
+                const columns = state.set && state.set.columns ? state.set.columns : [];
+                if (!rows.length || !columns.length) return;
+                const r = Math.max(0, Math.min(rows.length - 1, Number(row) || 0));
+                const c = Math.max(0, Math.min(columns.length - 1, Number(col) || 0));
+                setSelection({ row: r, col: c }, { row: r, col: c });
+                const top = r * state.rowHeight;
+                if (top < host.scrollTop) host.scrollTop = top;
+                else if (top + state.rowHeight > host.scrollTop + host.clientHeight) {
+                    host.scrollTop = top + state.rowHeight - host.clientHeight;
+                }
+            },
+            selectedRows: function () {
+                const sel = normalizedSelection();
+                if (!sel) return [];
+                const out = [];
+                for (let r = sel.r1; r <= sel.r2; r += 1) out.push(r);
+                return out;
+            },
+            beginEdit: beginEdit,
+            commitEdit: commitEdit,
+            cancelEdit: cancelEdit,
+            isEditing: function () { return !!state.editing; },
             rowCount: function () { return currentRows().length; }
         };
     }

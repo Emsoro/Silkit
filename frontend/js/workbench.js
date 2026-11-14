@@ -24,7 +24,8 @@
             tree: null,
             connections: null,
             history: null,
-            hint: null
+            hint: null,
+            table: null
         };
 
         app.showDetail = function (sessionId, ref) {
@@ -86,12 +87,24 @@
             app.tree.addSession(session);
             if (app.hint) app.hint.prefetch(session);
 
+            // 重启恢复的表标签在连接建立后补上会话。
+            let adopted = 0;
+            state.tabs.forEach(function (tab) {
+                if (tab.kind === 'table' && !tab.sessionId) {
+                    tab.sessionId = session.id;
+                    adopted += 1;
+                }
+            });
+            if (adopted && state.activeTab() && state.activeTab().kind === 'table') {
+                app.tabs.activate(state.activeTab().id, true);
+            }
+
             const active = state.activeTab();
             if (active && active.kind === 'query' && !active.sessionId && isBlankSql(active.sql)) {
                 active.sessionId = session.id;
                 app.tabs.updateChrome(active);
                 app.tabs.render();
-            } else {
+            } else if (!(adopted && active && active.kind === 'table')) {
                 app.tabs.openQuery(session, { focus: true });
             }
             updateStatus();
@@ -211,14 +224,17 @@
             if (!saved || !saved.length) return false;
             const restored = [];
             saved.slice(0, 20).forEach(function (item) {
-                if (!item || typeof item.sql !== 'string') return;
+                if (!item) return;
+                const isTable = item.kind === 'table' && item.ref && item.ref.name;
+                if (!isTable && typeof item.sql !== 'string') return;
                 restored.push(state.addTab({
-                    kind: item.kind === 'table' ? 'query' : 'query',
-                    title: item.title || '查询',
+                    kind: isTable ? 'table' : 'query',
+                    title: item.title || (isTable ? '表: ' + item.ref.name : '查询'),
                     sessionId: null,
-                    sql: item.sql,
-                    dirty: !!item.dirty,
-                    filePath: item.filePath || null
+                    sql: isTable ? '' : item.sql,
+                    dirty: isTable ? false : !!item.dirty,
+                    ref: isTable ? item.ref : null,
+                    filePath: isTable ? null : (item.filePath || null)
                 }));
             });
             return restored.length > 0;
@@ -227,6 +243,7 @@
         app.results = window.SilkitResults.create(app);
         app.query = window.SilkitQuery.create(app);
         app.hint = window.SilkitHint ? window.SilkitHint.create(app) : null;
+        app.table = window.SilkitTable ? window.SilkitTable.create(app) : null;
         app.tabs = window.SilkitTabs.create(app);
         app.detail = window.SilkitDetail.create(app);
         app.tree = window.SilkitTree.create(app);
@@ -271,7 +288,7 @@
                 }
             }
             if (mode) {
-                mode.textContent = session ? 'M4 · 查询工作区' : 'M4 · 等待连接';
+                mode.textContent = session ? 'M5 · 查询与表数据' : 'M5 · 等待连接';
             }
             if (run) run.disabled = !!(state.activeTab() && state.activeTab().running);
         }
@@ -285,6 +302,7 @@
             dom.explain = byId('explainBtn');
 
             app.results.init();
+            if (app.table) app.table.init();
             app.detail.init();
             app.history.load(settings);
             // 先恢复标签，再初始化标签视图（tabs.init 在无标签时才建默认标签）。

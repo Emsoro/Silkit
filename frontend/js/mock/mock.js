@@ -590,6 +590,309 @@
         return session && session.profile ? (session.profile.engine || 'sqlite') : 'sqlite';
     }
 
+    // ---------------------------------------------------------------- M5 表数据（mock）
+    function quoteId(name) {
+        return '"' + String(name).replace(/"/g, '""') + '"';
+    }
+
+    function tableEntry(ref) {
+        const name = ref && ref.name;
+        const fromView = !!(ref && ref.kind === 'view') || (!TABLES[name] && !!VIEWS[name]);
+        const def = fromView ? VIEWS[name] : TABLES[name];
+        if (!def) throw { code: 'not_found', message: '对象不存在: ' + name };
+        return { name: name, def: def, isView: fromView };
+    }
+
+    function ensureRowIds(entry) {
+        if (!Array.isArray(entry.def._rowids) ||
+            entry.def._rowids.length !== entry.def.rows.length) {
+            entry.def._rowids = entry.def.rows.map(function (_, index) { return index + 1; });
+            entry.def._nextRowId = entry.def._rowids.reduce(function (max, id) {
+                return Math.max(max, id);
+            }, 0) + 1;
+        }
+    }
+
+    function tableIdentity(entry) {
+        if (entry.isView) return { type: 'none', columns: [] };
+        const pk = entry.def.columns.filter(function (column) {
+            return !!column.primaryKey;
+        }).map(function (column) { return column.name; });
+        if (pk.length) return { type: 'pk', columns: pk };
+        for (let i = 0; i < INDEXES.length; i += 1) {
+            const index = INDEXES[i];
+            if (!index.unique || index.table !== entry.name || index.columns.length !== 1) continue;
+            const column = entry.def.columns.find(function (item) {
+                return item.name === index.columns[0];
+            });
+            if (column && column.nullable === false) {
+                return { type: 'unique', columns: index.columns.slice() };
+            }
+        }
+        return { type: 'rowid', columns: ['rowid'] };
+    }
+
+    function editableInfo(entry, sessionId) {
+        const session = sessions.get(sessionId);
+        if (session && session.readOnly) {
+            return { editable: false, reason: '连接为只读模式' };
+        }
+        if (entry.isView) {
+            return { editable: false, reason: '视图没有可用于定位行的主键/唯一索引/rowid' };
+        }
+        const identity = tableIdentity(entry);
+        if (identity.type === 'none') {
+            return { editable: false, reason: '该表没有可用于定位行的主键/唯一索引/rowid' };
+        }
+        return { editable: true, reason: '' };
+    }
+
+    function matchFilter(value, filter) {
+        const op = String(filter.op || '=').toUpperCase();
+        if (op === 'IS NULL') return value == null;
+        if (op === 'IS NOT NULL') return value != null;
+        if (value == null) return false;
+        const text = String(value);
+        if (op === 'IN') {
+            const list = Array.isArray(filter.value)
+                ? filter.value
+                : String(filter.value == null ? '' : filter.value).split(',');
+            return list.some(function (item) { return String(item) === text; });
+        }
+        if (op === 'LIKE') {
+            const needle = String(filter.value == null ? '' : filter.value)
+                .replace(/[%_]/g, '').toLowerCase();
+            return text.toLowerCase().indexOf(needle) >= 0;
+        }
+        const right = filter.value == null ? '' : String(filter.value);
+        const leftNumber = Number(text);
+        const rightNumber = Number(right);
+        const numeric = text.trim() !== '' && right.trim() !== '' &&
+            isFinite(leftNumber) && isFinite(rightNumber);
+        const left = numeric ? leftNumber : text;
+        const rhs = numeric ? rightNumber : right;
+        switch (op) {
+            case '=':
+            case '==':
+                return numeric ? left === rhs : text === right;
+            case '<>':
+            case '!=':
+                return numeric ? left !== rhs : text !== right;
+            case '>': return left > rhs;
+            case '>=': return left >= rhs;
+            case '<': return left < rhs;
+            case '<=': return left <= rhs;
+            default: return true;
+        }
+    }
+
+    function tableEntries(entry, args) {
+        ensureRowIds(entry);
+        const columns = entry.def.columns;
+        const filters = Array.isArray(args.filters) ? args.filters : [];
+        const search = String(args.search || '').toLowerCase();
+        let entries = entry.def.rows.map(function (values, index) {
+            return { values: values, id: entry.def._rowids[index], index: index };
+        });
+        if (search) {
+            entries = entries.filter(function (item) {
+                return item.values.some(function (value) {
+                    return value != null && String(value).toLowerCase().indexOf(search) >= 0;
+                });
+            });
+        }
+        filters.forEach(function (filter) {
+            if (!filter || !filter.column) return;
+            const index = columns.findIndex(function (column) {
+                return column.name === filter.column;
+            });
+            if (index < 0) return;
+            entries = entries.filter(function (item) {
+                return matchFilter(item.values[index], filter);
+            });
+        });
+        if (args.order && args.order.column) {
+            const index = columns.findIndex(function (column) {
+                return column.name === args.order.column;
+            });
+            if (index >= 0) {
+                const desc = !!args.order.desc;
+                entries.sort(function (left, right) {
+                    const a = left.values[index];
+                    const b = right.values[index];
+                    if (a == null && b == null) return 0;
+                    if (a == null) return desc ? 1 : -1;
+                    if (b == null) return desc ? -1 : 1;
+                    const na = Number(a);
+                    const nb = Number(b);
+                    let order;
+                    if (isFinite(na) && isFinite(nb) && String(a).trim() !== '' &&
+                        String(b).trim() !== '') {
+                        order = na - nb;
+                    } else {
+                        order = String(a).localeCompare(String(b));
+                    }
+                    return desc ? -order : order;
+                });
+            }
+        }
+        return entries;
+    }
+
+    function rowKeysFor(entry, identity, item) {
+        const keys = {};
+        if (identity.type === 'rowid') {
+            keys.rowid = String(item.id);
+            return keys;
+        }
+        identity.columns.forEach(function (name) {
+            const index = entry.def.columns.findIndex(function (column) {
+                return column.name === name;
+            });
+            keys[name] = index >= 0 && item.values[index] != null
+                ? String(item.values[index])
+                : '';
+        });
+        return keys;
+    }
+
+    function sqlLiteral(value) {
+        if (value == null) return 'NULL';
+        const text = String(value);
+        if (/^-?\d+(\.\d+)?$/.test(text)) return text;
+        return "'" + text.replace(/'/g, "''") + "'";
+    }
+
+    function tableSqlPreview(entry, identity, changes) {
+        const preview = [];
+        (changes.inserts || []).forEach(function (insert) {
+            const values = insert.values || {};
+            const names = entry.def.columns.filter(function (column) {
+                return Object.prototype.hasOwnProperty.call(values, column.name);
+            }).map(function (column) { return column.name; });
+            if (!names.length) {
+                preview.push('INSERT INTO ' + quoteId(entry.name) + ' DEFAULT VALUES');
+                return;
+            }
+            preview.push('INSERT INTO ' + quoteId(entry.name) + ' (' +
+                names.map(quoteId).join(', ') + ') VALUES (' +
+                names.map(function (name) { return sqlLiteral(values[name]); }).join(', ') + ')');
+        });
+        (changes.updates || []).forEach(function (update) {
+            const keys = update.keys || {};
+            const values = update.changes || {};
+            const names = entry.def.columns.filter(function (column) {
+                return Object.prototype.hasOwnProperty.call(values, column.name);
+            }).map(function (column) { return column.name; });
+            const where = Object.keys(keys).map(function (name) {
+                return quoteId(name) + ' = ' + sqlLiteral(keys[name]);
+            }).join(' AND ');
+            preview.push('UPDATE ' + quoteId(entry.name) + ' SET ' +
+                names.map(function (name) {
+                    return quoteId(name) + ' = ' + sqlLiteral(values[name]);
+                }).join(', ') + ' WHERE ' + where);
+        });
+        (changes.deletes || []).forEach(function (remove) {
+            const keys = remove.keys || {};
+            const where = Object.keys(keys).map(function (name) {
+                return quoteId(name) + ' = ' + sqlLiteral(keys[name]);
+            }).join(' AND ');
+            preview.push('DELETE FROM ' + quoteId(entry.name) + ' WHERE ' + where);
+        });
+        return preview;
+    }
+
+    function rowMatchesKeys(entry, identity, item, keys) {
+        if (!keys || !Object.keys(keys).length) return false;
+        if (identity.type === 'rowid') return String(item.id) === String(keys.rowid);
+        return identity.columns.every(function (name) {
+            const index = entry.def.columns.findIndex(function (column) {
+                return column.name === name;
+            });
+            if (index < 0) return false;
+            const value = item.values[index];
+            return (value == null ? '' : String(value)) ===
+                (keys[name] == null ? '' : String(keys[name]));
+        });
+    }
+
+    function applyTableChanges(entry, identity, changes) {
+        const snapshotRows = clone(entry.def.rows);
+        const snapshotIds = entry.def._rowids ? entry.def._rowids.slice() : null;
+        const snapshotNext = entry.def._nextRowId;
+        const preview = tableSqlPreview(entry, identity, changes);
+        let affected = 0;
+        try {
+            (changes.inserts || []).forEach(function (insert, index) {
+                const values = insert.values || {};
+                const row = entry.def.columns.map(function (column) {
+                    return Object.prototype.hasOwnProperty.call(values, column.name)
+                        ? values[column.name]
+                        : null;
+                });
+                entry.def.columns.forEach(function (column, columnIndex) {
+                    if (column.nullable !== false || column.primaryKey) return;
+                    if (row[columnIndex] == null) {
+                        throw {
+                            code: 'not_null',
+                            message: 'NOT NULL constraint failed: ' + entry.name + '.' + column.name,
+                            kind: 'insert', clientIndex: insert.clientIndex || index,
+                            rolledBack: true
+                        };
+                    }
+                });
+                entry.def.columns.forEach(function (column, columnIndex) {
+                    if (!column.primaryKey) return;
+                    const exists = entry.def.rows.some(function (existing) {
+                        return String(existing[columnIndex]) === String(row[columnIndex]);
+                    });
+                    if (exists) {
+                        throw {
+                            code: 'constraint',
+                            message: 'UNIQUE constraint failed: ' + entry.name + '.' + column.name,
+                            kind: 'insert', clientIndex: insert.clientIndex || index,
+                            rolledBack: true
+                        };
+                    }
+                });
+                entry.def.rows.push(row);
+                entry.def._rowids.push(entry.def._nextRowId || (entry.def._rowids.length + 1));
+                entry.def._nextRowId = (entry.def._nextRowId || 1) + 1;
+                affected += 1;
+            });
+            (changes.updates || []).forEach(function (update) {
+                const keys = update.keys || {};
+                const values = update.changes || {};
+                const target = tableEntries(entry, {}).find(function (item) {
+                    return rowMatchesKeys(entry, identity, item, keys);
+                });
+                if (!target) return;
+                entry.def.columns.forEach(function (column, columnIndex) {
+                    if (!Object.prototype.hasOwnProperty.call(values, column.name)) return;
+                    if (column.generated) return;
+                    target.values[columnIndex] = values[column.name];
+                });
+                affected += 1;
+            });
+            (changes.deletes || []).forEach(function (remove) {
+                const keys = remove.keys || {};
+                const target = tableEntries(entry, {}).find(function (item) {
+                    return rowMatchesKeys(entry, identity, item, keys);
+                });
+                if (!target) return;
+                entry.def.rows.splice(target.index, 1);
+                entry.def._rowids.splice(target.index, 1);
+                affected += 1;
+            });
+        } catch (error) {
+            entry.def.rows = snapshotRows;
+            if (snapshotIds) entry.def._rowids = snapshotIds;
+            entry.def._nextRowId = snapshotNext;
+            throw error;
+        }
+        return { affected: affected, preview: preview };
+    }
+
     function startTask(args) {
         const reqId = args.reqId;
         const cmd = args.cmd;
@@ -856,6 +1159,144 @@
                     return node(item.kind, item.name, 'main', true, item.kind);
                 });
                 reply(reqId, { nodes: nodes, total: nodes.length, epoch: 0 });
+                return { ok: true, reqId };
+            }
+
+            // ---------------------------------------------------- 表数据（M5）
+            case 'table.rows': {
+                try {
+                    const entry = tableEntry(a.ref || {});
+                    const info = editableInfo(entry, a.sessionId);
+                    const identity = tableIdentity(entry);
+                    const pageSize = Math.max(1, Math.min(2000, Number(a.pageSize) || 500));
+                    const page = Math.max(0, Number(a.page) || 0);
+                    const entries = tableEntries(entry, a);
+                    const start = page * pageSize;
+                    const slice = entries.slice(start, start + pageSize);
+                    reply(reqId, {
+                        columns: entry.def.columns.map(function (column) {
+                            return {
+                                name: column.name,
+                                type: column.type,
+                                kind: column.kind,
+                                nullable: column.nullable !== false,
+                                primaryKey: !!column.primaryKey,
+                                autoIncrement: false,
+                                default: null,
+                                comment: ''
+                            };
+                        }),
+                        identity: identity,
+                        editable: info.editable,
+                        readOnlyReason: info.reason,
+                        rows: slice.map(function (item) { return clone(item.values); }),
+                        rowKeys: slice.map(function (item) {
+                            return rowKeysFor(entry, identity, item);
+                        }),
+                        page: page,
+                        pageSize: pageSize,
+                        hasMore: entries.length > start + pageSize,
+                        totalEstimate: entries.length,
+                        elapsedMs: 6,
+                        warnings: []
+                    });
+                } catch (error) {
+                    fail(reqId, error);
+                }
+                return { ok: true, reqId };
+            }
+
+            case 'table.count': {
+                try {
+                    const entry = tableEntry(a.ref || {});
+                    const entries = tableEntries(entry, a);
+                    reply(reqId, { count: entries.length, elapsedMs: 5 });
+                } catch (error) {
+                    fail(reqId, error);
+                }
+                return { ok: true, reqId };
+            }
+
+            case 'table.apply': {
+                try {
+                    const entry = tableEntry(a.ref || {});
+                    const info = editableInfo(entry, a.sessionId);
+                    if (!info.editable) throw { code: 'read_only', message: info.reason };
+                    const identity = tableIdentity(entry);
+                    const changes = a.changes || {};
+                    if (a.dryRun) {
+                        reply(reqId, {
+                            dryRun: true,
+                            sqlPreview: tableSqlPreview(entry, identity, changes),
+                            statements: [],
+                            affected: 0
+                        });
+                    } else {
+                        const result = applyTableChanges(entry, identity, changes);
+                        reply(reqId, {
+                            dryRun: false,
+                            sqlPreview: result.preview,
+                            statements: [],
+                            affected: result.affected,
+                            applied: (changes.inserts || []).length +
+                                (changes.updates || []).length +
+                                (changes.deletes || []).length,
+                            elapsedMs: 8,
+                            inTransaction: false
+                        });
+                    }
+                } catch (error) {
+                    fail(reqId, error);
+                }
+                return { ok: true, reqId };
+            }
+
+            case 'table.cell': {
+                try {
+                    const entry = tableEntry(a.ref || {});
+                    const identity = tableIdentity(entry);
+                    const columnIndex = entry.def.columns.findIndex(function (column) {
+                        return column.name === a.column;
+                    });
+                    if (columnIndex < 0) {
+                        throw { code: 'bad_args', message: '列不存在: ' + a.column };
+                    }
+                    const item = tableEntries(entry, {}).find(function (candidate) {
+                        return rowMatchesKeys(entry, identity, candidate, a.keys || {});
+                    });
+                    if (!item) throw { code: 'not_found', message: '该行已不存在或已被修改' };
+                    const column = entry.def.columns[columnIndex];
+                    const value = item.values[columnIndex];
+                    reply(reqId, {
+                        kind: column.kind || 'text',
+                        text: value == null ? '' : String(value),
+                        isNull: value == null,
+                        bytes: value == null ? 0 : String(value).length,
+                        truncated: false,
+                        columnType: column.type
+                    });
+                } catch (error) {
+                    fail(reqId, error);
+                }
+                return { ok: true, reqId };
+            }
+
+            case 'table.truncate': {
+                try {
+                    const entry = tableEntry(a.ref || {});
+                    const info = editableInfo(entry, a.sessionId);
+                    if (!info.editable) throw { code: 'read_only', message: info.reason };
+                    if (a.confirmName !== entry.name) {
+                        throw { code: 'bad_args', message: '表名不匹配' };
+                    }
+                    ensureRowIds(entry);
+                    const affected = entry.def.rows.length;
+                    entry.def.rows.length = 0;
+                    entry.def._rowids.length = 0;
+                    reply(reqId, { affected: affected, elapsedMs: 5 });
+                } catch (error) {
+                    fail(reqId, error);
+                }
                 return { ok: true, reqId };
             }
 

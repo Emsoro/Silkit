@@ -1,5 +1,6 @@
 #include "ipc/commands_query.h"
 
+#include "db/engine_dialect.h"
 #include "db/session.h"
 #include "db/sql_splitter.h"
 #include "db/sql_util.h"
@@ -192,14 +193,23 @@ void RegisterQueryCommands(AsyncRouter& router,
 
         return session->RunSync([&]() -> json {
             db::Connection& connection = session->Conn();
-            const std::string explain = "EXPLAIN QUERY PLAN " + sql;
+            const db::Engine engine = connection.EngineKind();
+            const std::string explain = db::ExplainSql(engine, sql, analyze);
             auto rows = dbutil::RunRows(connection, explain);
             if (!rows.ok()) throw IpcError(dbutil::ErrorJson(rows.result.error));
             json warnings = json::array();
-            if (analyze) {
+            if (analyze && engine == db::Engine::Sqlite) {
                 warnings.push_back("SQLite 的 EXPLAIN QUERY PLAN 不支持 ANALYZE，已忽略该选项");
             }
+            if (engine == db::Engine::MySql && analyze) {
+                warnings.push_back("EXPLAIN ANALYZE 需要 MySQL 8.0.18+，旧版本可能报错");
+            }
+            if (engine == db::Engine::Postgres && analyze) {
+                warnings.push_back("EXPLAIN ANALYZE 会真实执行语句，写语句会修改数据");
+            }
             return json{{"format", "text"},
+                        {"engine", engine == db::Engine::MySql ? "mysql"
+                                   : (engine == db::Engine::Postgres ? "postgres" : "sqlite")},
                         {"plan", RowsJson(rows.rows)},
                         {"warnings", std::move(warnings)}};
         });

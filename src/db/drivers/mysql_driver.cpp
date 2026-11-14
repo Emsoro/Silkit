@@ -62,12 +62,20 @@ std::string FieldTypeName(MYSQL_FIELD* field) {
     }
 }
 
+bool IsBinaryStringType(int field_type) {
+    // charsetnr == 63 仅对真正的字符串/BLOB 类型表示「二进制」；
+    // 数值/日期/时间/枚举/集合/JSON 列的字符集本就是 63，不能据此判为二进制。
+    return field_type == MYSQL_TYPE_STRING || field_type == MYSQL_TYPE_VAR_STRING ||
+           field_type == MYSQL_TYPE_BLOB || field_type == MYSQL_TYPE_TINY_BLOB ||
+           field_type == MYSQL_TYPE_MEDIUM_BLOB || field_type == MYSQL_TYPE_LONG_BLOB ||
+           field_type == MYSQL_TYPE_GEOMETRY;
+}
+
 bool IsBinaryField(MYSQL_FIELD* field) {
-    // 仅当字符集为 binary（charsetnr == 63）才视为二进制；
-    // information_schema 的 longtext 列虽以 BLOB 类型返回，但字符集非 binary，应作文本。
-    if (field->charsetnr == 63) return true;
-    const ValueKind kind = KindFromMySqlFieldType(field->type, field->flags, FieldTypeName(field));
-    return kind == ValueKind::Binary;
+    // information_schema 的 longtext 列虽以 BLOB 类型返回且字符集非 binary，应作文本；
+    // 真正的 BLOB/VARBINARY/BINARY 才判为二进制。
+    if (field->charsetnr != 63) return false;
+    return IsBinaryStringType(field->type);
 }
 
 Cell MakeCell(const char* data, unsigned long length, ValueKind kind, bool binary,
@@ -254,7 +262,8 @@ private:
             ColumnMeta meta;
             meta.name = fields[i].name ? fields[i].name : "";
             meta.db_type = ColumnDecl(&fields[i]);
-            const bool real_binary = fields[i].charsetnr == 63;
+            const bool real_binary =
+                (fields[i].charsetnr == 63) && IsBinaryStringType(fields[i].type);
             meta.kind = real_binary ? ValueKind::Binary
                                     : KindFromMySqlFieldType(fields[i].type, fields[i].flags,
                                                             meta.db_type);
@@ -382,7 +391,8 @@ private:
             ColumnMeta meta;
             meta.name = fields[i].name ? fields[i].name : "";
             meta.db_type = ColumnDecl(&fields[i]);
-            const bool real_binary = fields[i].charsetnr == 63;
+            const bool real_binary =
+                (fields[i].charsetnr == 63) && IsBinaryStringType(fields[i].type);
             meta.kind = real_binary ? ValueKind::Binary
                                     : KindFromMySqlFieldType(fields[i].type, fields[i].flags,
                                                             meta.db_type);

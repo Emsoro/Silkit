@@ -6,6 +6,7 @@
 #include "ipc/commands_conn.h"
 #include "ipc/commands_meta.h"
 #include "ipc/commands_query.h"
+#include "ipc/commands_table.h"
 
 #include <tauricpp/dialog.hpp>
 #include <tauricpp/window.hpp>
@@ -15,8 +16,13 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <cctype>
+#include <cstring>
+#include <filesystem>
+#include <fstream>
 #include <mutex>
 #include <string>
+#include <system_error>
 #include <thread>
 #include <unordered_map>
 #include <utility>
@@ -221,9 +227,80 @@ void RegisterCommands(AsyncRouter& router,
                     {"path", paths.empty() ? std::string{} : paths.front()}};
     });
 
+    // M4-8：.sql 文本文件读写。仅允许明确的文本扩展名，避免 IPC 被当作任意文件读取通道。
+    const auto is_text_path = [](const std::string& path) {
+        static const std::array<const char*, 6> exts{".sql", ".txt", ".csv", ".tsv", ".json", ".md"};
+        if (path.size() < 4 || path.size() > 1024) return false;
+        for (const char* ext : exts) {
+            const std::size_t len = std::strlen(ext);
+            if (path.size() >= len) {
+                std::string tail = path.substr(path.size() - len);
+                std::transform(tail.begin(), tail.end(), tail.begin(),
+                               [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+                if (tail == ext) return true;
+            }
+        }
+        return false;
+    };
+
+    router.Register("app.read_file", [is_text_path](const json& args, TaskContext&) -> json {
+        const std::string path = args.value("path", std::string{});
+        if (!is_text_path(path)) {
+            return json{{"ok", false},
+                        {"error", {{"code", "bad_args"},
+                                   {"message", "仅支持读取 .sql/.txt/.csv/.tsv/.json/.md 文本文件"}}}};
+        }
+        std::error_code ec;
+        const auto size = std::filesystem::file_size(path, ec);
+        if (ec || size > 16 * 1024 * 1024) {
+            return json{{"ok", false},
+                        {"error", {{"code", "io_error"},
+                                   {"message", ec ? "文件不存在或无法访问" : "文件超过 16 MB 上限"}}}};
+        }
+        std::ifstream file(std::filesystem::path(path), std::ios::binary);
+        if (!file) {
+            return json{{"ok", false},
+                        {"error", {{"code", "io_error"}, {"message", "无法打开文件"}}}};
+        }
+        std::string content(static_cast<std::size_t>(size), '\0');
+        file.read(content.data(), size);
+        content.resize(static_cast<std::size_t>(file.gcount()));
+        // 去掉 UTF-8 BOM，编辑器里按 UTF-8 处理。
+        if (content.size() >= 3 && content.compare(0, 3, "\xEF\xBB\xBF") == 0) {
+            content.erase(0, 3);
+        }
+        return json{{"ok", true},
+                    {"path", path},
+                    {"content", content},
+                    {"bytes", content.size()}};
+    });
+
+    router.Register("app.save_file", [is_text_path](const json& args, TaskContext&) -> json {
+        const std::string path = args.value("path", std::string{});
+        const std::string content = args.value("content", std::string{});
+        if (!is_text_path(path)) {
+            return json{{"ok", false},
+                        {"error", {{"code", "bad_args"},
+                                   {"message", "仅支持保存 .sql/.txt/.csv/.tsv/.json/.md 文本文件"}}}};
+        }
+        std::ofstream file(std::filesystem::path(path), std::ios::binary | std::ios::trunc);
+        if (!file) {
+            return json{{"ok", false},
+                        {"error", {{"code", "io_error"}, {"message", "无法写入文件（可能只读或被占用）"}}}};
+        }
+        file.write(content.data(), static_cast<std::streamsize>(content.size()));
+        file.close();
+        if (!file) {
+            return json{{"ok", false},
+                        {"error", {{"code", "io_error"}, {"message", "写入未完成"}}}};
+        }
+        return json{{"ok", true}, {"path", path}, {"bytes", content.size()}};
+    });
+
     RegisterConnectionCommands(router, profiles, sessions);
     RegisterMetadataCommands(router, sessions);
     RegisterQueryCommands(router, sessions, settings);
+    RegisterTableCommands(router, sessions, settings);
 }
 
 }  // namespace silkit::ipc

@@ -260,6 +260,56 @@
             const args = { sessionId: sessionId, sql: sql };
             if (opts.analyze) args.analyze = true;
             return call('query.explain', args);
+        },
+
+        // ------------------------------------------------------------ 表数据（M5）
+        tableRows: function (sessionId, ref, options) {
+            const opts = options || {};
+            const args = {
+                sessionId: sessionId,
+                ref: ref || {},
+                page: Number(opts.page) || 0,
+                pageSize: Number(opts.pageSize) || 500
+            };
+            if (opts.order && opts.order.column) args.order = opts.order;
+            if (Array.isArray(opts.filters) && opts.filters.length) args.filters = opts.filters;
+            if (opts.search) args.search = opts.search;
+            return call('table.rows', args);
+        },
+        tableCount: function (sessionId, ref, options) {
+            const opts = options || {};
+            const args = {
+                sessionId: sessionId,
+                ref: ref || {},
+                page: Number(opts.page) || 0,
+                pageSize: Number(opts.pageSize) || 500
+            };
+            if (Array.isArray(opts.filters) && opts.filters.length) args.filters = opts.filters;
+            if (opts.search) args.search = opts.search;
+            return call('table.count', args);
+        },
+        tableApply: function (sessionId, ref, changes, dryRun) {
+            return call('table.apply', {
+                sessionId: sessionId,
+                ref: ref || {},
+                changes: changes || {},
+                dryRun: !!dryRun
+            });
+        },
+        tableCell: function (sessionId, ref, column, keys) {
+            return call('table.cell', {
+                sessionId: sessionId,
+                ref: ref || {},
+                column: column,
+                keys: keys || {}
+            });
+        },
+        tableTruncate: function (sessionId, ref, confirmName) {
+            return call('table.truncate', {
+                sessionId: sessionId,
+                ref: ref || {},
+                confirmName: confirmName
+            });
         }
     };
 })();

@@ -202,7 +202,7 @@
     }
 
     function modalOpen() {
-        const ids = ['connDialog', 'cellViewer', 'detailDialog'];
+        const ids = ['connDialog', 'cellViewer', 'detailDialog', 'tablePreview'];
         for (let i = 0; i < ids.length; i += 1) {
             const node = $(ids[i]);
             if (node && !node.hidden) return true;
@@ -244,6 +244,7 @@
                 if (modalOpen()) return;
                 event.preventDefault();
                 const tab = activeTab();
+                if (workbench && tab && tab.kind === 'table') return;
                 if (workbench && tab) {
                     workbench.app.query.run(tab, event.shiftKey ? 'current' : undefined);
                 }
@@ -252,20 +253,24 @@
             if (mod && !event.shiftKey && event.code === 'KeyS') {
                 if (modalOpen()) return;
                 event.preventDefault();
-                if (workbench) workbench.app.saveSqlDialog(false);
+                if (!workbench) return;
+                const tab = activeTab();
+                if (tab && tab.kind === 'table') workbench.app.table.save(tab);
+                else workbench.app.saveSqlDialog(false);
                 return;
             }
             if (event.shiftKey && event.altKey && event.code === 'KeyF') {
                 if (modalOpen()) return;
                 event.preventDefault();
-                if (workbench) workbench.app.tabs.formatEditor();
+                const tab = activeTab();
+                if (workbench && tab && tab.kind !== 'table') workbench.app.tabs.formatEditor();
                 return;
             }
             if (mod && event.shiftKey && event.code === 'KeyP') {
                 if (modalOpen()) return;
                 event.preventDefault();
                 const tab = activeTab();
-                if (workbench && tab) workbench.app.query.explain(tab);
+                if (workbench && tab && tab.kind !== 'table') workbench.app.query.explain(tab);
                 return;
             }
             if (event.key === 'Escape') {

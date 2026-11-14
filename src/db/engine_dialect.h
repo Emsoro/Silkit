@@ -37,6 +37,10 @@ std::string ListTriggersSql(Engine engine, const std::string& scope,
                              const std::string& table);
 std::string ListPrimaryKeysSql(Engine engine, const std::string& scope,
                                const std::string& table);
+/// 唯一、非部分、非表达式索引的列；MySQL/PG 返回 (index_name, column_name)，
+/// SQLite 返回空串（由 PRAGMA index_list/index_info 处理）。
+std::string ListUniqueIndexColumnsSql(Engine engine, const std::string& scope,
+                                      const std::string& table);
 std::string DdlSql(Engine engine, const std::string& kind,
                     const std::string& scope, const std::string& name);
 std::string SearchObjectsSql(Engine engine, const std::string& scope,
@@ -47,5 +51,8 @@ std::string SwitchDatabaseSql(Engine engine, const std::string& database);
 
 /// conn.stats 的字符集/时区/版本查询（一行三列）。
 std::string ServerStatsSql(Engine engine);
+
+/// EXPLAIN 前缀按引擎生成；analyze 仅 MySQL/PostgreSQL 支持。
+std::string ExplainSql(Engine engine, const std::string& sql, bool analyze);
 
 }  // namespace silkit::db
