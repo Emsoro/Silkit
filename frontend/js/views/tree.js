@@ -94,6 +94,14 @@
             return engine === 'mysql' || engine === 'postgres';
         }
 
+        function dumpScopeOf(session, ref) {
+            const engine = engineOf(session);
+            if (engine === 'sqlite') return (ref && ref.database) || 'main';
+            if (engine === 'postgres') return (ref && ref.schema) || 'public';
+            if (ref && ref.database && ref.database !== 'main') return ref.database;
+            return (session && session.currentDb) || '';
+        }
+
         function addSession(session) {
             if (!dom.roots || !session) return;
             let group = dom.roots.querySelector('.tree-group[data-session="' + session.id + '"]');
@@ -465,6 +473,7 @@
             if (kind === 'connection') {
                 items.push({ action: 'refresh', label: '刷新对象树' });
                 items.push({ action: 'reconnect', label: '重新连接' });
+                items.push({ action: 'dump-database', label: '转储数据库…' });
                 if (supportsDatabase(session)) {
                     items.push({ action: 'create-database', label: '新建数据库…' });
                 }
@@ -478,6 +487,10 @@
                 items.push({ action: 'detail', label: '查看结构与索引' });
                 items.push({ action: 'ddl', label: '查看 DDL' });
                 items.push({ action: 'generate-select', label: '生成 SELECT' });
+                items.push({ separator: true });
+                items.push({ action: 'export-table', label: '导出表数据…' });
+                items.push({ action: 'import-csv', label: '导入 CSV…' });
+                items.push({ action: 'dump-table', label: '转储表为 SQL…' });
                 items.push({ separator: true });
                 items.push({ action: 'design-table', label: '设计表…' });
                 items.push({ action: 'truncate-table', label: '清空表…', danger: true });
@@ -499,6 +512,7 @@
                 items.push({ action: 'copy-name', label: '复制名称' });
             } else if (kind === 'database') {
                 items.push({ action: 'create-table', label: '新建表…' });
+                items.push({ action: 'dump-database', label: '转储数据库…' });
                 items.push({ action: 'refresh-node', label: '刷新' });
                 items.push({ action: 'copy-name', label: '复制名称' });
                 if (supportsDatabase(session)) {
@@ -557,6 +571,42 @@
             const ref = descriptorFor(node);
 
             switch (action) {
+                case 'export-table':
+                    if (ctx.io) {
+                        ctx.io.openExport({
+                            ref: { kind: 'table', name: name, database: ref.database, schema: ref.schema },
+                            label: '表 ' + name,
+                            format: 'csv',
+                            pathHint: name
+                        });
+                    }
+                    break;
+                case 'import-csv':
+                    if (ctx.io) {
+                        ctx.io.openImport({
+                            ref: { kind: 'table', name: name, database: ref.database, schema: ref.schema },
+                            label: '导入 CSV 到 ' + name
+                        });
+                    }
+                    break;
+                case 'dump-table':
+                    if (ctx.io) {
+                        ctx.io.openDump({
+                            label: '转储表 ' + name,
+                            scope: dumpScopeOf(session, ref),
+                            tables: [name]
+                        });
+                    }
+                    break;
+                case 'dump-database':
+                    if (ctx.io) {
+                        ctx.io.openDump({
+                            label: '转储数据库 ' + (ref.database && ref.database !== 'main'
+                                ? ref.database : (session.currentDb || name || '')),
+                            scope: dumpScopeOf(session, ref)
+                        });
+                    }
+                    break;
                 case 'design-table':
                     if (ctx.designer) ctx.designer.openTableDesigner(session, ref);
                     break;

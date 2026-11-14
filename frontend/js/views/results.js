@@ -88,15 +88,7 @@
             bindCellViewer();
         }
 
-        // ------------------------------------------------------------ 导出（M4-11 简易版）
-        function csvCell(value) {
-            const text = value == null ? '' : String(value);
-            if (/[",\n\r]/.test(text)) {
-                return '"' + text.replace(/"/g, '""') + '"';
-            }
-            return text;
-        }
-
+        // ------------------------------------------------------------ 导出（M7 向导）
         function exportResult(format) {
             const tab = state.activeTab();
             const set = tab && tab.result ? tab.result.displaySet : null;
@@ -104,42 +96,16 @@
                 toast('当前没有可导出的结果集', 'error');
                 return;
             }
-            const delimiter = (state.settings && state.settings.export && state.settings.export.csvDelimiter) || ',';
-            const columns = set.columns.map(function (column) { return column.name || ''; });
-            let text = '';
-            if (format === 'csv') {
-                text = columns.map(csvCell).join(delimiter) + '\r\n';
-                set.rows.forEach(function (row) {
-                    text += columns.map(function (name, index) {
-                        return csvCell(row[index]);
-                    }).join(delimiter) + '\r\n';
-                });
-            } else {
-                const payload = set.rows.map(function (row) {
-                    const item = {};
-                    columns.forEach(function (name, index) {
-                        item[name] = row[index] == null ? null : row[index];
-                    });
-                    return item;
-                });
-                text = JSON.stringify(payload, null, 2);
+            if (!ctx.io) {
+                toast('导出向导不可用', 'error');
+                return;
             }
-
-            const mime = format === 'csv' ? 'text/csv' : 'application/json';
-            const blob = new Blob(['\uFEFF' + text], { type: mime + ';charset=utf-8' });
-            const url = URL.createObjectURL(blob);
-            const anchor = document.createElement('a');
-            anchor.href = url;
-            anchor.download = 'result-' + (format === 'csv' ? 'csv' : 'json') + '-' +
-                new Date().toISOString().replace(/[:.]/g, '-') +
-                (format === 'csv' ? '.csv' : '.json');
-            document.body.appendChild(anchor);
-            anchor.click();
-            setTimeout(function () {
-                URL.revokeObjectURL(url);
-                anchor.remove();
-            }, 800);
-            toast('已导出 ' + U.formatNumber(set.rows.length) + ' 行');
+            ctx.io.openExport({
+                label: '当前结果集 · ' + U.formatNumber(set.rows.length) + ' 行',
+                format: format,
+                sql: (tab.runSql || '').trim(),
+                pathHint: 'result-' + new Date().toISOString().replace(/[:.]/g, '-')
+            });
         }
 
         // ------------------------------------------------------------ 标签状态

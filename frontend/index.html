@@ -33,13 +33,14 @@
 <div class="app">
     <header class="topbar">
         <div class="brand">
-            <span class="brand-tag">M6</span>
+            <span class="brand-tag">M7</span>
         </div>
 
         <div class="topbar-actions">
             <button id="newConnBtn" class="btn btn-ghost" type="button" data-icon="plug">新建连接</button>
             <button id="newQueryBtn" class="btn btn-ghost" type="button" data-icon="terminal">新建查询</button>
             <button id="openSqlBtn" class="btn btn-ghost" type="button" data-icon="folder">打开 SQL</button>
+            <button id="runSqlFileBtn" class="btn btn-ghost" type="button" data-icon="bolt">执行 SQL 文件</button>
             <span class="topbar-sep"></span>
             <button id="historyBtn" class="btn btn-ghost" type="button" data-icon="history"
                     aria-haspopup="dialog" aria-expanded="false">最近</button>
@@ -663,6 +664,203 @@
     </div>
 </div>
 
+<!-- ---------------------------------------------------------------- 导入/导出（M7） -->
+<div id="ioDialog" class="modal" hidden>
+    <div class="modal-dialog modal-wide modal-io" role="dialog" aria-modal="true" aria-labelledby="ioTitle">
+        <div class="modal-head">
+            <div class="modal-title">
+                <span data-icon="save"></span>
+                <span id="ioTitle">导入 / 导出</span>
+            </div>
+            <button class="icon-btn" type="button" data-icon="close" id="ioClose" aria-label="关闭"></button>
+        </div>
+        <div class="io-tabs" id="ioTabs" role="tablist" aria-label="导入导出模式">
+            <button class="io-tab is-active" type="button" role="tab" data-io-mode="export">导出</button>
+            <button class="io-tab" type="button" role="tab" data-io-mode="import">导入 CSV</button>
+            <button class="io-tab" type="button" role="tab" data-io-mode="dump">转储 SQL</button>
+            <button class="io-tab" type="button" role="tab" data-io-mode="run">执行 SQL 文件</button>
+        </div>
+        <div class="io-body">
+            <div class="io-source" id="ioSource" hidden></div>
+
+            <div class="io-pane" id="ioExportPane">
+                <div class="io-grid">
+                    <label class="field">
+                        <span class="field-label">格式</span>
+                        <select class="input" id="ioExportFormat">
+                            <option value="csv">CSV</option>
+                            <option value="json">JSON</option>
+                            <option value="sql">SQL INSERT</option>
+                            <option value="markdown">Markdown</option>
+                            <option value="html">HTML</option>
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span class="field-label">编码</span>
+                        <select class="input" id="ioExportEncoding"></select>
+                    </label>
+                    <label class="field io-span2">
+                        <span class="field-label">保存到</span>
+                        <div class="io-path">
+                            <input class="input mono" id="ioExportPath" placeholder="例如 D:\exports\result.csv"
+                                   autocomplete="off" spellcheck="false">
+                            <button class="btn" type="button" id="ioExportPick">选择…</button>
+                        </div>
+                    </label>
+                    <label class="field" id="ioExportDelimiterField">
+                        <span class="field-label">分隔符</span>
+                        <select class="input" id="ioExportDelimiter">
+                            <option value=",">逗号 ,</option>
+                            <option value=";">分号 ;</option>
+                            <option value="&#9;">制表符 Tab</option>
+                            <option value="|">竖线 |</option>
+                        </select>
+                    </label>
+                    <label class="field io-check" id="ioExportHeaderField">
+                        <input type="checkbox" id="ioExportHeader" checked>
+                        <span>包含表头</span>
+                    </label>
+                    <label class="field io-span2">
+                        <span class="field-label">NULL 字面量</span>
+                        <input class="input mono" id="ioExportNull" placeholder="留空表示空字符串" autocomplete="off">
+                    </label>
+                </div>
+                <p class="io-hint">导出会重新执行查询并流式写入 <code>.part</code> 临时文件，完成后再替换正式文件；取消或失败会清理临时文件。</p>
+            </div>
+
+            <div class="io-pane" id="ioImportPane" hidden>
+                <div class="io-grid">
+                    <label class="field io-span2">
+                        <span class="field-label">CSV 文件</span>
+                        <div class="io-path">
+                            <input class="input mono" id="ioImportPath" placeholder="选择 .csv 文件"
+                                   autocomplete="off" spellcheck="false">
+                            <button class="btn" type="button" id="ioImportPick">选择…</button>
+                        </div>
+                    </label>
+                    <label class="field">
+                        <span class="field-label">编码</span>
+                        <select class="input" id="ioImportEncoding">
+                            <option value="auto">自动探测</option>
+                            <option value="utf-8">UTF-8</option>
+                            <option value="utf-8-bom">UTF-8 BOM</option>
+                            <option value="utf-16le">UTF-16 LE</option>
+                            <option value="gbk">GBK</option>
+                        </select>
+                    </label>
+                    <label class="field">
+                        <span class="field-label">分隔符</span>
+                        <select class="input" id="ioImportDelimiter">
+                            <option value="auto">自动探测</option>
+                            <option value=",">逗号 ,</option>
+                            <option value=";">分号 ;</option>
+                            <option value="&#9;">制表符 Tab</option>
+                            <option value="|">竖线 |</option>
+                        </select>
+                    </label>
+                    <label class="field io-check">
+                        <input type="checkbox" id="ioImportHeader" checked>
+                        <span>首行为表头</span>
+                    </label>
+                    <label class="field io-check">
+                        <input type="checkbox" id="ioImportEmptyNull" checked>
+                        <span>空字段作为 NULL</span>
+                    </label>
+                    <label class="field">
+                        <span class="field-label">目标 Schema / 库</span>
+                        <input class="input mono" id="ioImportScope" placeholder="默认当前库" autocomplete="off">
+                    </label>
+                    <label class="field">
+                        <span class="field-label">目标表</span>
+                        <input class="input mono" id="ioImportTable" placeholder="表名" autocomplete="off">
+                    </label>
+                    <label class="field io-check io-span2">
+                        <input type="checkbox" id="ioImportCreate">
+                        <span>表不存在时自动创建（所有列 TEXT）</span>
+                    </label>
+                    <div class="io-actions io-span2">
+                        <button class="btn btn-soft" type="button" id="ioImportPreviewBtn">重新预览</button>
+                        <span class="muted" id="ioImportSummary">选择文件后自动预览</span>
+                    </div>
+                </div>
+                <div class="io-preview" id="ioImportPreview"><p class="muted">尚未预览</p></div>
+            </div>
+
+            <div class="io-pane" id="ioDumpPane" hidden>
+                <div class="io-grid">
+                    <label class="field io-span2">
+                        <span class="field-label">保存到</span>
+                        <div class="io-path">
+                            <input class="input mono" id="ioDumpPath" placeholder="例如 D:\backup\dump.sql"
+                                   autocomplete="off" spellcheck="false">
+                            <button class="btn" type="button" id="ioDumpPick">选择…</button>
+                        </div>
+                    </label>
+                    <label class="field">
+                        <span class="field-label">Schema / 库</span>
+                        <input class="input mono" id="ioDumpScope" placeholder="默认当前库" autocomplete="off">
+                    </label>
+                    <label class="field">
+                        <span class="field-label">编码</span>
+                        <select class="input" id="ioDumpEncoding"></select>
+                    </label>
+                    <label class="field io-span2">
+                        <span class="field-label">表（逗号分隔，留空表示全部）</span>
+                        <input class="input mono" id="ioDumpTables" placeholder="users, orders" autocomplete="off">
+                    </label>
+                    <label class="field io-check">
+                        <input type="checkbox" id="ioDumpStructure" checked>
+                        <span>包含结构</span>
+                    </label>
+                    <label class="field io-check">
+                        <input type="checkbox" id="ioDumpData" checked>
+                        <span>包含数据</span>
+                    </label>
+                    <label class="field io-check io-span2">
+                        <input type="checkbox" id="ioDumpDrop" checked>
+                        <span>生成 DROP TABLE IF EXISTS</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="io-pane" id="ioRunPane" hidden>
+                <div class="io-grid">
+                    <label class="field io-span2">
+                        <span class="field-label">SQL 文件</span>
+                        <div class="io-path">
+                            <input class="input mono" id="ioRunPath" placeholder="选择 .sql 文件"
+                                   autocomplete="off" spellcheck="false">
+                            <button class="btn" type="button" id="ioRunPick">选择…</button>
+                        </div>
+                    </label>
+                    <label class="field io-check io-span2">
+                        <input type="checkbox" id="ioRunContinue">
+                        <span>遇错继续执行剩余语句</span>
+                    </label>
+                </div>
+                <p class="io-hint">按语句逐条执行并回传进度；取消后已执行的语句不会回滚。</p>
+            </div>
+
+            <div class="io-progress" id="ioProgressWrap" hidden>
+                <div class="io-bar"><span id="ioProgressBar"></span></div>
+                <div class="io-status">
+                    <span id="ioStatus"></span>
+                    <span class="spacer"></span>
+                    <span id="ioPercent"></span>
+                </div>
+            </div>
+            <div class="form-error" id="ioError" hidden></div>
+        </div>
+        <div class="modal-foot">
+            <span class="muted" id="ioFootNote"></span>
+            <span class="spacer"></span>
+            <button class="btn" type="button" id="ioCancelBtn" hidden>取消任务</button>
+            <button class="btn" type="button" id="ioCloseBtn">关闭</button>
+            <button class="btn btn-primary" type="button" id="ioStartBtn">开始</button>
+        </div>
+    </div>
+</div>
+
 <div id="toastHost" class="toast-host" aria-live="polite"></div>
 
 <script src="js/mock/mock.js"></script>
@@ -691,6 +889,7 @@
 <script src="js/views/detail.js"></script>
 <script src="js/views/designer.js"></script>
 <script src="js/views/history.js"></script>
+<script src="js/views/io.js"></script>
 <script src="js/workbench.js"></script>
 <script src="js/app.js"></script>
 </body>

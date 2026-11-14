@@ -200,6 +200,11 @@ set(SILKIT_SOURCES
     src/db/drivers/sqlite_driver.cpp
     src/db/drivers/mysql_driver.cpp
     src/db/drivers/postgres_driver.cpp
+    src/io/encoding.cpp
+    src/io/csv.cpp
+    src/io/exporter.cpp
+    src/io/importer.cpp
+    src/io/dumper.cpp
     src/ipc/async_router.cpp
     src/ipc/commands.cpp
     src/ipc/commands_db_common.cpp
@@ -209,6 +214,7 @@ set(SILKIT_SOURCES
     src/ipc/commands_query.cpp
     src/ipc/commands_table.cpp
     src/ipc/commands_ddl.cpp
+    src/ipc/commands_io.cpp
     src/util/base64.cpp
 )
 

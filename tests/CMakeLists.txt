@@ -23,6 +23,11 @@ set(SILKIT_TEST_LIB_SOURCES
     "${CMAKE_SOURCE_DIR}/src/db/drivers/sqlite_driver.cpp"
     "${CMAKE_SOURCE_DIR}/src/db/drivers/mysql_driver.cpp"
     "${CMAKE_SOURCE_DIR}/src/db/drivers/postgres_driver.cpp"
+    "${CMAKE_SOURCE_DIR}/src/io/encoding.cpp"
+    "${CMAKE_SOURCE_DIR}/src/io/csv.cpp"
+    "${CMAKE_SOURCE_DIR}/src/io/exporter.cpp"
+    "${CMAKE_SOURCE_DIR}/src/io/importer.cpp"
+    "${CMAKE_SOURCE_DIR}/src/io/dumper.cpp"
     "${CMAKE_SOURCE_DIR}/src/util/base64.cpp"
 )
 
@@ -87,6 +92,11 @@ target_compile_definitions(test_sqlite_fixture PRIVATE
 )
 add_test(NAME sqlite_fixture COMMAND test_sqlite_fixture)
 set_tests_properties(sqlite_fixture PROPERTIES TIMEOUT 30)
+
+add_executable(test_io test_io.cpp)
+target_link_libraries(test_io PRIVATE silkit_test_lib)
+add_test(NAME io COMMAND test_io)
+set_tests_properties(io PROPERTIES TIMEOUT 180)
 
 add_executable(integration_db integration_db.cpp)
 target_link_libraries(integration_db PRIVATE silkit_test_lib)

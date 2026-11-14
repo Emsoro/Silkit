@@ -1617,6 +1617,14 @@
                 return { ok: true, reqId };
 
             case 'app.pick_file': {
+                if (a.kind === 'csv') {
+                    reply(reqId, { ok: true, path: a.save ? 'C:\\data\\export.csv' : 'C:\\data\\sample.csv' });
+                    return { ok: true, reqId };
+                }
+                if (a.kind === 'sql') {
+                    reply(reqId, { ok: true, path: a.save ? 'C:\\data\\dump.sql' : 'C:\\mock\\sample.sql' });
+                    return { ok: true, reqId };
+                }
                 const name = a.save ? (a.defaultName || 'silkit.db') : 'sample.sqlite';
                 reply(reqId, { ok: true, path: 'C:\\data\\' + name });
                 return { ok: true, reqId };
@@ -2073,6 +2081,92 @@
                     format: 'text', engine: engine,
                     plan: plan, warnings: warnings
                 });
+                return { ok: true, reqId };
+            }
+
+            // ---------------------------------------------------- 导入 / 导出（M7）
+            case 'export.result': {
+                const path = String(a.path || 'C:\\exports\\result.' + (a.format || 'csv'));
+                progress(reqId, { rows: 400, bytes: 24576 });
+                later(function () { progress(reqId, { rows: 800, bytes: 49152 }); }, 30);
+                later(function () {
+                    reply(reqId, {
+                        rows: 1280,
+                        bytes: 78600,
+                        elapsedMs: 140,
+                        path: path,
+                        format: a.format || 'csv',
+                        encoding: a.encoding || 'utf-8'
+                    });
+                }, 60);
+                return { ok: true, reqId };
+            }
+
+            case 'import.preview': {
+                const headers = ['id', 'name', 'email'];
+                const rows = [];
+                for (let i = 1; i <= 20; i += 1) {
+                    rows.push([String(i), '用户 ' + i, 'user' + i + '@example.com']);
+                }
+                reply(reqId, {
+                    path: String(a.path || 'C:\\data\\sample.csv'),
+                    bytes: 4096,
+                    encoding: a.encoding && a.encoding !== 'auto' ? a.encoding : 'utf-8',
+                    delimiter: a.delimiter && a.delimiter !== 'auto' ? a.delimiter : ',',
+                    header: a.header !== false,
+                    headers: headers,
+                    columns: headers.map(function (name, index) {
+                        return { index: index, name: name };
+                    }),
+                    rows: rows,
+                    total: 128
+                });
+                return { ok: true, reqId };
+            }
+
+            case 'import.csv': {
+                progress(reqId, { rows: 64, total: 128 });
+                later(function () { progress(reqId, { rows: 128, total: 128 }); }, 40);
+                later(function () {
+                    reply(reqId, {
+                        rows: 128,
+                        batches: 1,
+                        elapsedMs: 90,
+                        table: a.table || 'imported',
+                        encoding: a.encoding || 'utf-8'
+                    });
+                }, 80);
+                return { ok: true, reqId };
+            }
+
+            case 'dump.sql': {
+                progress(reqId, { tableIndex: 1, total: 3, table: 'users', rows: 128 });
+                later(function () { progress(reqId, { tableIndex: 2, total: 3, table: 'orders', rows: 64 }); }, 35);
+                later(function () {
+                    reply(reqId, {
+                        tables: 3,
+                        rows: 256,
+                        bytes: 32768,
+                        path: String(a.path || 'C:\\data\\dump.sql'),
+                        encoding: a.encoding || 'utf-8'
+                    });
+                }, 90);
+                return { ok: true, reqId };
+            }
+
+            case 'query.execute_file': {
+                const statements = 6;
+                progress(reqId, { index: 2, total: statements });
+                event(reqId, 'statement', { index: 2, total: statements, offset: 120, sql: 'UPDATE users SET name = ...' });
+                later(function () { progress(reqId, { index: statements, total: statements }); }, 40);
+                later(function () {
+                    reply(reqId, {
+                        statements: Array.from({ length: statements }, function (_, index) {
+                            return { index: index, rows: 0, affected: 1, elapsedMs: 8 };
+                        }),
+                        elapsedMs: 60
+                    });
+                }, 80);
                 return { ok: true, reqId };
             }
 

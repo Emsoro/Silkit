@@ -327,6 +327,23 @@
         },
         ddlApply: function (args) {
             return call('ddl.apply', args || {});
+        },
+
+        // ------------------------------------------------------------ 导入/导出/转储（M7）
+        exportResult: function (args, options) {
+            return start('export.result', args || {}, options);
+        },
+        importPreview: function (args) {
+            return call('import.preview', args || {});
+        },
+        importCsv: function (args, options) {
+            return start('import.csv', args || {}, options);
+        },
+        dumpSql: function (args, options) {
+            return start('dump.sql', args || {}, options);
+        },
+        queryExecuteFile: function (args, options) {
+            return start('query.execute_file', args || {}, options);
         }
     };
 })();

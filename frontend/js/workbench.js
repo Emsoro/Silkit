@@ -275,6 +275,7 @@
         app.tree = window.SilkitTree.create(app);
         app.connections = window.SilkitConnections.create(app);
         app.history = window.SilkitHistory.create(app);
+        app.io = window.SilkitIo ? window.SilkitIo.create(app) : null;
 
         function byId(id) { return document.getElementById(id); }
 
@@ -294,7 +295,7 @@
             const mode = byId('statusMode');
             const run = byId('runBtn');
             if (mode) {
-                mode.textContent = session ? 'M6 · 表设计与 DDL' : 'M6 · 等待连接';
+                mode.textContent = session ? 'M7 · 导入导出与转储' : 'M7 · 等待连接';
             }
             if (run) run.disabled = !!(state.activeTab() && state.activeTab().running);
         }
@@ -303,6 +304,7 @@
             dom.newConn = byId('newConnBtn');
             dom.newQuery = byId('newQueryBtn');
             dom.openSql = byId('openSqlBtn');
+            dom.runSqlFile = byId('runSqlFileBtn');
             dom.treeRefresh = byId('treeRefresh');
             dom.format = byId('formatBtn');
             dom.explain = byId('explainBtn');
@@ -319,6 +321,7 @@
             app.tabs.bindDragDrop();
             app.tree.init();
             app.connections.init();
+            if (app.io) app.io.init();
 
             if (dom.newConn) dom.newConn.addEventListener('click', function () { app.connections.openDialog(); });
             if (dom.newQuery) {
@@ -328,6 +331,11 @@
             }
             if (dom.openSql) {
                 dom.openSql.addEventListener('click', openSqlDialog);
+            }
+            if (dom.runSqlFile) {
+                dom.runSqlFile.addEventListener('click', function () {
+                    if (app.io) app.io.openExecuteFile();
+                });
             }
             if (dom.format) {
                 dom.format.addEventListener('click', function () { app.tabs.formatEditor(); });
