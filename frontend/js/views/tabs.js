@@ -517,7 +517,7 @@
             return tab;
         }
 
-        function closeTab(id) {
+        async function closeTab(id) {
             const tab = state.tab(id);
             if (!tab) return;
             if (tab.running && tab.task) {
@@ -525,8 +525,14 @@
             }
             if (tab.kind === 'table') {
                 if (ctx.table && ctx.table.hasChanges(tab) &&
-                    !window.confirm('表「' + ((tab.ref && tab.ref.name) || tab.title) +
-                        '」还有未保存的修改，仍要关闭？')) {
+                    !(await U.confirm({
+                        title: '关闭标签',
+                        message: '表「' + ((tab.ref && tab.ref.name) || tab.title) +
+                            '」还有未保存的修改，仍要关闭？',
+                        hint: '未保存的增删改会丢失。',
+                        okText: '关闭',
+                        danger: true
+                    }))) {
                     return;
                 }
                 if (ctx.table) ctx.table.close(tab);

@@ -1,7 +1,9 @@
 cmake_minimum_required(VERSION 3.21)
-project(Silkit VERSION 1.0.0 LANGUAGES CXX)
+project(Silkit VERSION 1.0.1 LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 17)
+# C++20（MSVC /std:c++20，VS 2022 17.x+）；C++ 标准由顶层统一控制，
+# TauriCPP 内置副本的源码通过 file(GLOB) 直接编译，同样继承该标准。
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 

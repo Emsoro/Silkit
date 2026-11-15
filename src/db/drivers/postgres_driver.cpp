@@ -248,28 +248,35 @@ public:
         std::vector<Oid> oids;
         std::vector<ValueKind> kinds;
 
+        // 单行模式下，只有拿到 PGRES_SINGLE_TUPLE 才能取列元数据；0 行结果集只会给
+        // PGRES_TUPLES_OK。两处共用同一段采集逻辑，保证空表也能回传列头（与 MySQL 一致）。
+        auto capture_columns = [&](PGresult* meta_res) {
+            if (have_columns) return;
+            const int fields = PQnfields(meta_res);
+            if (fields <= 0) return;
+            have_columns = true;
+            oids.resize(fields);
+            kinds.resize(fields);
+            for (int c = 0; c < fields; ++c) {
+                const Oid oid = PQftype(meta_res, c);
+                ColumnMeta meta;
+                meta.name = PQfname(meta_res, c) ? PQfname(meta_res, c) : "";
+                meta.db_type = TypeLabel(oid);
+                meta.kind = KindFromPgOid(oid);
+                meta.nullable = true;
+                result.columns.push_back(std::move(meta));
+                oids[c] = oid;
+                kinds[c] = result.columns.back().kind;
+            }
+            batch.columns = result.columns;
+        };
+
         PGresult* res = nullptr;
         while ((res = PQgetResult(conn_)) != nullptr) {
             const ExecStatusType status = PQresultStatus(res);
             if (status == PGRES_SINGLE_TUPLE) {
+                capture_columns(res);
                 const int columns = PQnfields(res);
-                if (!have_columns) {
-                    have_columns = true;
-                    oids.resize(columns);
-                    kinds.resize(columns);
-                    for (int c = 0; c < columns; ++c) {
-                        const Oid oid = PQftype(res, c);
-                        ColumnMeta meta;
-                        meta.name = PQfname(res, c) ? PQfname(res, c) : "";
-                        meta.db_type = TypeLabel(oid);
-                        meta.kind = KindFromPgOid(oid);
-                        meta.nullable = true;
-                        result.columns.push_back(std::move(meta));
-                        oids[c] = oid;
-                        kinds[c] = result.columns.back().kind;
-                    }
-                    batch.columns = result.columns;
-                }
                 std::vector<Cell> cells(static_cast<std::size_t>(columns));
                 for (int c = 0; c < columns; ++c) {
                     cells[c] = MakeCell(res, 0, c, oids[static_cast<std::size_t>(c)],
@@ -288,6 +295,9 @@ public:
                         stop = true;
                     }
                 }
+            } else if (status == PGRES_TUPLES_OK) {
+                // 0 行 SELECT 的唯一结果，仍需把列元数据交给上层。
+                capture_columns(res);
             } else if (status == PGRES_COMMAND_OK) {
                 const char* tuples = PQcmdTuples(res);
                 if (tuples && tuples[0]) {
@@ -307,8 +317,10 @@ public:
         if (!stop && !batch.rows.empty() && sink) {
             result.rows += batch.rows.size();
             sink(batch);
-        } else if (!stop && result.rows == 0 && !have_columns && sink) {
-            sink(batch);  // 无结果集语句无需补发列元数据，保持与 SQLite 行为一致由上层判断
+        } else if (!stop && result.rows == 0 && sink &&
+                   (!have_columns || !batch.columns.empty())) {
+            // 无结果集语句补发空批次；0 行 SELECT 则连同列头一起回传。
+            sink(batch);
         }
         if (stop) DrainResults();
         result.elapsed_ms = Elapsed(started);
@@ -327,6 +339,11 @@ public:
 
     std::string ServerVersion() const override {
         const int version = PQserverVersion(conn_);
+        // PG 10 起版本号为 major * 10000 + minor（如 18.7 -> 180007），
+        // 不再有第三段；旧三段式格式只适用于 9.x 及更早版本。
+        if (version >= 100000) {
+            return std::to_string(version / 10000) + "." + std::to_string(version % 10000);
+        }
         const int major = version / 10000;
         const int minor = (version / 100) % 100;
         const int patch = version % 100;

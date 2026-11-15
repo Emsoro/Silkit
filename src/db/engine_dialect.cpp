@@ -79,6 +79,10 @@ void DecorateError(Engine engine, DbError& error) {
         case 2003:
             error.hint = "无法连接到服务器，请检查主机、端口与防火墙。";
             break;
+        case 2026:  // CR_SSL_CONNECTION_ERROR
+            error.hint = "TLS/SSL 握手失败，或服务端不支持 SSL（如 MySQL 协议代理）。"
+                         "可将「字符集 / SSL」设为 disable；prefer 会自动降级为明文连接。";
+            break;
         default:
             break;
         }

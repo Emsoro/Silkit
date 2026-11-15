@@ -32,10 +32,6 @@
 <body>
 <div class="app">
     <header class="topbar">
-        <div class="brand">
-            <span class="brand-tag" data-i18n="app.brandTag">M8</span>
-        </div>
-
         <div class="topbar-actions">
             <button id="newConnBtn" class="btn btn-ghost" type="button" data-icon="plug"><span data-i18n="topbar.newConn">新建连接</span></button>
             <button id="newQueryBtn" class="btn btn-ghost" type="button" data-icon="terminal"><span data-i18n="topbar.newQuery">新建查询</span></button>
@@ -257,11 +253,10 @@
     </div>
 
     <footer class="statusbar">
-        <span class="status-item" id="statusMode" data-i18n="status.mode">M8 · 等待连接</span>
         <span class="spacer"></span>
         <span class="status-item" id="ipcStatus" data-i18n="status.ipc">IPC 就绪</span>
         <span class="status-item" id="statusTheme">晨樱</span>
-        <span class="status-item" id="statusVersion">v1.0.0</span>
+        <span class="status-item" id="statusVersion">v1.0.1</span>
     </footer>
 </div>
 
@@ -287,7 +282,11 @@
             </aside>
 
             <section class="conn-form">
-                <div id="connError" class="form-error" hidden></div>
+                <div id="connError" class="form-error" hidden>
+                    <span id="connErrorText" class="form-error-text"></span>
+                    <button id="connErrorCopy" class="form-error-copy" type="button"
+                            title="复制完整错误信息与连接诊断（不含密码）">复制信息</button>
+                </div>
 
                 <label class="field">
                     <span class="field-label">连接名称</span>
@@ -680,6 +679,31 @@
             <span class="spacer"></span>
             <button class="btn" type="button" id="ddlConfirmCancel">取消</button>
             <button class="btn btn-primary" type="button" id="ddlConfirmRun" disabled>执行</button>
+        </div>
+    </div>
+</div>
+
+<!-- ---------------------------------------------------------------- 通用确认框（主题化，替代 window.confirm） -->
+<div id="appConfirm" class="modal" hidden>
+    <div class="modal-dialog modal-confirm" role="alertdialog" aria-modal="true"
+         aria-labelledby="appConfirmTitle" aria-describedby="appConfirmMessage">
+        <div class="modal-head">
+            <div class="modal-title">
+                <span data-icon="warning"></span>
+                <span id="appConfirmTitle">确认操作</span>
+            </div>
+            <button class="icon-btn" type="button" data-icon="close"
+                    id="appConfirmClose" aria-label="关闭"></button>
+        </div>
+        <div class="confirm-body">
+            <div class="confirm-message" id="appConfirmMessage"></div>
+            <div class="confirm-hint" id="appConfirmHint" hidden></div>
+            <pre class="confirm-preview" id="appConfirmPreview" hidden></pre>
+        </div>
+        <div class="modal-foot">
+            <span class="spacer"></span>
+            <button class="btn" type="button" id="appConfirmCancel">取消</button>
+            <button class="btn btn-danger-soft" type="button" id="appConfirmOk">确认</button>
         </div>
     </div>
 </div>

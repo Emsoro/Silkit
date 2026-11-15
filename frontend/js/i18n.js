@@ -9,7 +9,6 @@
 
     const dict = {
         'zh-CN': {
-            'app.brandTag': 'M8',
             'topbar.newConn': '新建连接',
             'topbar.newQuery': '新建查询',
             'topbar.openSql': '打开 SQL',
@@ -50,8 +49,6 @@
             'results.rows': '{n} 行',
             'results.hint': '双击单元格查看全文 · Ctrl+C 复制选区',
 
-            'status.mode': 'M8 · 等待连接',
-            'status.modeConnected': 'M8 · 已连接',
             'status.ipc': 'IPC 就绪',
             'status.busy': 'IPC 执行中…',
             'status.perf': '{ms} ms · 内存 {mem}',
@@ -120,7 +117,6 @@
             'danger.cancel': '取消'
         },
         'en-US': {
-            'app.brandTag': 'M8',
             'topbar.newConn': 'New Connection',
             'topbar.newQuery': 'New Query',
             'topbar.openSql': 'Open SQL',
@@ -161,8 +157,6 @@
             'results.rows': '{n} rows',
             'results.hint': 'Double-click a cell to view · Ctrl+C copies selection',
 
-            'status.mode': 'M8 · Waiting for connection',
-            'status.modeConnected': 'M8 · Connected',
             'status.ipc': 'IPC ready',
             'status.busy': 'IPC busy…',
             'status.perf': '{ms} ms · memory {mem}',

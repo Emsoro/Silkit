@@ -1,12 +1,14 @@
 # Silkit CodePlan：轻量跨库数据库管理工具
 
-> **目标**：基于 **TauriCPP（C++17 + Win32 + WebView2）** 的 StepDraw 工程骨架，开发一个 **单 exe、离线可用、启动快** 的桌面数据库管理工具。首版支持 **MySQL / MariaDB、PostgreSQL、SQLite**，交互对标 **Navicat 的完成度、HeidiSQL 的轻量、DBX/GoNavi 的现代工作台**。
+> **目标**：基于 **TauriCPP（C++20 + Win32 + WebView2）** 的 StepDraw 工程骨架，开发一个 **单 exe、离线可用、启动快** 的桌面数据库管理工具。首版支持 **MySQL / MariaDB、PostgreSQL、SQLite**，交互对标 **Navicat 的完成度、HeidiSQL 的轻量、DBX/GoNavi 的现代工作台**。
 >
 > **参考代码**：`D:\Work\CPlusPlus\StepDraw`（框架与前端组织，可直接复用）、`D:\Work\CPlusPlus\Silkit\HeidiSQL-12.22`（只读参考，**不参与构建**）。
 >
 > **产品名**：**Silkit**（silk + kit，“丝滑的数据库工具箱”）｜ 构建产物 `Silkit.exe` ｜ 数据目录 `%APPDATA%\Silkit` ｜ 代码目录 `D:\Work\CPlusPlus\Silkit`
 >
-> **规划日期**：2026-11-13 ｜ **当前版本**：v1.0.0（M0–M9 已交付，发布准备完成）｜ **文档状态**：实施基线 + 进度回写
+> **规划日期**：2026-11-13 ｜ **当前版本**：v1.0.1（M0–M9 已交付；v1.0.1 维护版已发布）｜ **文档状态**：实施基线 + 进度回写
+>
+> **最近对标**：2026-11-15 对照 `D:\Cplusplus\dbx-0.6.69` 与 `D:\Cplusplus\GoNavi-1.2.2` 完成功能 Gap 梳理（§19），据此重排路线图（§14）并补齐 E2E 测试项与执行入口（§12.4 / §12.9）。
 
 ---
 
@@ -20,17 +22,19 @@
 | 里程碑 | 内容 | 状态 | 估算 | 版本 |
 |---|---|---|---|---|
 | M0 | 工程骨架、构建、异步 IPC、UI 外壳与主题切换 | ✅ | 4–5 d | v0.0.1 |
-| M1 | SQLite 垂直切片（连接→树→查询→结果） | 🟡 | 5–6 d | v0.1.0 |
+| M1 | SQLite 垂直切片（连接→树→查询→结果） | ✅ | 5–6 d | v0.1.0 |
 | M2 | MySQL / MariaDB 驱动 | ✅ | 6–7 d | v0.2.0 |
 | M3 | PostgreSQL 驱动 | ✅ | 6–7 d | v0.3.0 |
-| M4 | 查询工作区（编辑器/多结果/历史/补全） | 🟡 | 6–7 d | v0.4.0 |
-| M5 | 表格数据编辑（CRUD/筛选/分页/单元格查看） | 🟢 | 8–10 d | v0.5.0 |
-| M6 | 表设计器与 DDL 管理 | 🟡 | 8–10 d | v0.6.0 |
-| M7 | 导入 / 导出 / 转储 | 🟡 | 5–6 d | v0.7.0 |
-| M8 | 设置、主题、会话恢复、安全与打磨 | 🟡 | 5–6 d | v0.8.0 |
-| M9 | 发布 1.0（图标/文档/兼容性/安装包） | 🟡 | 3–4 d | v1.0.0 |
+| M4 | 查询工作区（编辑器/多结果/历史/补全） | ✅ | 6–7 d | v0.4.0 |
+| M5 | 表格数据编辑（CRUD/筛选/分页/单元格查看） | ✅ | 8–10 d | v0.5.0 |
+| M6 | 表设计器与 DDL 管理 | ✅ | 8–10 d | v0.6.0 |
+| M7 | 导入 / 导出 / 转储 | ✅ | 5–6 d | v0.7.0 |
+| M8 | 设置、主题、会话恢复、安全与打磨 | ✅ | 5–6 d | v0.8.0 |
+| M9 | 发布 1.0（图标/文档/兼容性/安装包） | ✅ | 3–4 d | v1.0.0 |
 
 > 2026-11-14 回写：M0 全部交付；M1 的「连接 → 对象树 → 查询 → 结果」链路已端到端跑通，当前 `v0.1.0`。**M2 / M3 已实现并对照真实服务器验收**（MySQL 8.4.13 / PostgreSQL 18.0.7）。**M4 已交付并运行时验收**。**M5 已交付并运行时验收**：表格数据编辑（CRUD/筛选/分页/单元格查看/事务回滚）经 CDP 探针对照 MySQL 8.4.13 / PostgreSQL 18.0.7 全绿，CTest `table_ops`（SQLite）通过。期间修复一个影响 M1–M4 的 MySQL 数值列误判为二进制而 base64 编码的潜伏 bug。**M6 已交付垂直切片**：三引擎 DDL 生成器、表设计器（列/索引/外键/选项/SQL 预览）、`ddl.preview`/`ddl.apply` 令牌确认、删除/清空/新建删除库、视图/函数/触发器 DDL 保存 `.sql`；CTest `ddl_builder` 全绿（SQLite roundtrip + MySQL/PG SQL 断言），Mock 后端经 Node 模拟桥联调通过。**M7 已交付垂直切片**：CSV 解析/五种流式导出/导入向导/转储/SQL 文件执行/编码；CTest `io` 69 项检查通过（含 100 万行导出、10 万行导入、错误回滚、整库恢复）。**M8 已交付垂直切片**：设置页（通用/编辑器/查询/网格/导出/关于）、设置 `.bak` 备份与损坏恢复、安全模式危险语句令牌确认、日志脱敏与崩溃日志、侧栏拖拽/折叠与激活标签恢复、中英文主要界面；CTest `m8` 25 项检查与 `contrast_check.py` 125 项对比度全部通过；DPI 200% 与多显示器尚未留档。**M9 已交付**：版本号统一 `1.0.0`（CMake/vcpkg/version.h/前端/Mock）、exe 多分辨率图标与窗口标题、关于页版本与路径、README 功能概览与支持矩阵、`THIRD-PARTY-NOTICES.md`、`tools/check_version.py` 与 `tools/package.ps1` 便携包（`dist/Silkit-1.0.0-win-x64.zip`）、`CHANGELOG.md`；Release 构建下 CTest 9/9、MySQL 8.4.13 与 PostgreSQL 18.0.7 读写/DDL 集成回归全绿、对比度 125 项通过；干净 Windows 11 虚拟机冒烟与 Git tag 待人工执行/提交后完成。
+
+> 2026-11-15 回写：M0–M9 已按 README / CHANGELOG / M9 发布验收统一刷新为「已完成」，此前表里残留的 🟡/🟢 是进度未回写造成的过期状态。**v1.1 起不再沿用 M 编号**，后续工作按 §19 的 Gap 优先级（P0/P1/P2）排期，并同步刷新 §14 路线图。
 
 **总量**：约 56–68 个开发日（单人，含自测），按每周 5.5 天计约 **10–12 周**。
 
@@ -72,12 +76,23 @@
 | 2026-11-14 | M9-6 安装包 | v1.0 只产出 portable zip（`dist/Silkit-1.0.0-win-x64.zip`），不提供安装程序 | 与计划一致（安装包排期 v1.1） | 解压即用；WebView2 缺失由应用内中文引导 |
 | 2026-11-14 | M9-8 Git tag | `CHANGELOG.md` 已建立，`v1.0.0` 标签需在本次变更提交后创建 | 未提交的工作区无法打标签 | 提交后执行 `git tag -a v1.0.0 -m "Silkit 1.0.0"` |
 | 2026-11-14 | `build.ps1` 固定 `VCPKG_MANIFEST_MODE=ON` | 改为读取 `build/CMakeCache.txt` 的 `Z_VCPKG_CHECK_MANIFEST_MODE` 沿用首次配置模式；全新目录若已按 classic 装好依赖则用 `OFF` | vcpkg 禁止在已配置目录切换 manifest 模式，原脚本在 classic 预装依赖的机器上必然报错 | 两种模式均可构建；需强制 manifest 时先 `-Clean` 删除 `build/` |
+| 2026-11-15 | §12.1 测试环境为 Docker `mysql:8.4` / `postgres:16`，集成测试读 `SILKIT_TEST_MYSQL_DSN` / `SILKIT_TEST_PG_DSN` | 本机直连 `C:\mysql-8.4.13-winx64`（8.4.13，`employees` 30 万员工 / 284 万薪资）与系统 PostgreSQL 18.7（`postgres/123456`）；实际实现读 `SILKIT_MYSQL_*` / `SILKIT_PG_*` 分项变量 | 本机已有可用服务，Docker 方案与代码里的环境变量名都不一致 | 以本机真实服务为 E2E 基准（§12.1），Docker 仅保留作 CI 备选；新增 `tools/e2e_runner.py` 统一注入变量 |
+| 2026-11-15 | 系统 PostgreSQL 应有 `employees` 库 | `\l` 实测只有 `postgres` / `silkit_test` / `template0` / `template1` | 用户口述的测试源与实际环境不符 | 新增 `tests/e2e/seed_pg_employees.sql` 精简镜像（9 部门 / 12 员工 / 18 薪资行），`e2e_runner.py --seed-pg-employees` 建库；runner 自动探测，缺失时退回 `silkit_test` 并告警 |
+| 2026-11-15 | §12.4 计划用 Playwright + `mock.js` 跑 UI/E2E | 先在真实库落地 `tests/e2e/e2e_real_db.cpp`（14 项 × 双引擎 = 28 项），Playwright/CDP 用例保留为前端自动化待办与手工清单 | 仓库没有 Playwright 依赖；而当前最缺的是「真实服务器上的后端行为」回归 | 后端 E2E 已纳入 CTest（`e2e_real_db`）；前端 Playwright 归入 §19 P1，验收矩阵见 §12.4 / §12.5 |
+| 2026-11-15 | §6.7「首批携带列元数据」三引擎一致 | E2E-05 发现 PostgreSQL 对 **0 行 SELECT** 不回传列头（单行模式只在 `PGRES_SINGLE_TUPLE` 取元数据，空结果只有 `PGRES_TUPLES_OK`） | `postgres_driver.cpp` 未处理 `PGRES_TUPLES_OK`；MySQL 侧正常 | 已修：`capture_columns()` 同时用于两种状态，空结果补发带列头的批次；E2E-05 双引擎转绿 |
+| 2026-11-15 | 状态栏展示 PostgreSQL 服务端版本 | `ServerVersion()` 把 `PQserverVersion=180007` 格式化成 `18.0.7` | 三段式格式化只适用于 PG 9.x；PG 10+ 的版本号是 `major*10000+minor` | 已修：`>=100000` 时输出 `major.minor`，实测显示 `18.7` |
+| 2026-11-15 | §12.2 单元测试清单 | 表里列的 `test_sql_splitter` / `test_identifier` / `test_type_map` / `test_csv` 从未落地，实际是 10 个 CTest 目标 | 规划清单未随实现回写 | §12.2 已按 `tests/CMakeLists.txt` 重写；纯逻辑检查集中在 `silkit_smoke` / `engine_dialect` / `io` / `m8` |
+| 2026-11-15 | MySQL 连接 `ssl_mode` 语义（`prefer` 可降级 / `disable` 可关 TLS） | 连接 3307 的 SQLTiny（MySQL 协议、握手不声明 `CLIENT_SSL`）时，连 `disable` 都报 `2026 TLS/SSL error: SSL is required, but the server does not support it` | vcpkg 的 libmariadb 是 **Connector/C 3.4.5**：默认要求校验证书（`tls_allow_invalid_server_cert=0`），认证阶段无条件把 `use_ssl` 置 1，使 `MYSQL_OPT_SSL_ENFORCE=0` 单独设置失效（实测三种设置结果相同） | 已修 `mysql_driver.cpp`：在 `mysql_ssl_set()` **之后**显式写 `MYSQL_OPT_SSL_VERIFY_SERVER_CERT` + `MYSQL_OPT_SSL_ENFORCE`（prefer=1/0 自动降级，disable=0/0 明文，require/verify-*=1/1 严格）；`DecorateError` 对 2026 补可行动提示；新增可选 E2E `SSL-01~03` |
+| 2026-11-15 | 连接失败错误信息只展示 `message + detail` | 错误条新增最右侧「复制信息」按钮，错误 toast 也可复制；复制内容为完整诊断（时间/引擎/主机/端口/用户/库/SSL 模式/字符集 + 错误码/SQLSTATE/详情/提示，**不含密码**），并补显示 `hint` | 报障时用户只能截图，缺失原生错误码与上下文；`api.js` 已经透传 `code/sqlState/hint` 但连接视图未用 | 手工验收项 U-13；`U.copyText` 改为始终返回 Promise，保证 WebView2 下 `execCommand` 回退的失败可被 `.catch()` 捕获 |
+| 2026-11-15 | `CMakeLists.txt` 与文档的编译标准 | `CMAKE_CXX_STANDARD 17` → **20**（`REQUIRED ON` / `EXTENSIONS OFF` 不变）；README、§0 / §12.1 / §16.1 / §19.1 及 CHANGELOG 的对应文字同步 | 项目统一升级到 C++20；TauriCPP 内置副本源码由顶层 `file(GLOB)` 直接编译，自动继承顶层标准，其自带 `CMakeLists.txt`/README 属于上游框架说明、不参与 Silkit 构建，保留 C++17 表述 | 全量 Release 重建 + `ctest -C Release` 10/10 通过、`e2e_real_db` 31 PASS；MSVC 需 VS 2022（`/std:c++20`） |
+| 2026-11-15 | §14 v1.1/v1.2/v2.0 排期 | 按 dbx / GoNavi 对标结果重排优先级 | 原排期凭直觉，未区分「日常必需」与「平台化能力」 | 见 §19 Gap 矩阵与 §14 新路线图；明确列出「不做」项及理由 |
+| 2026-11-15 | 版本号 `1.0.0` 与 CHANGELOG「未发布」段 | 递增为 **`1.0.1`** 并正式发版；README 新增版本说明表并同步发布包/验收清单/已知限制标题，§0.3 / §16.1 / §16.2 / §19.1 同步 | 未发布段已有 SSL 修复、连接诊断复制与 C++20 升级三项交付，patch 递增即可；`v1.1` 已排给 SSH / ER 图等里程碑，不宜占用 | `tools/check_version.py` 校验 8 处一致；`tools/package.ps1` 从 CMake 读取版本号，产出 `dist/Silkit-1.0.1-win-x64.zip` |
 
 ### 0.3 版本标识位置
 
 | 位置 | 内容 |
 |---|---|
-| `CMakeLists.txt` | `project(Silkit VERSION 1.0.0 LANGUAGES CXX)` |
+| `CMakeLists.txt` | `project(Silkit VERSION 1.0.1 LANGUAGES CXX)` |
 | `src/app/version.h` | `SILKIT_VERSION` 兜底宏 |
 | `src/main.cpp` | 启动日志、窗口标题、`app.info` |
 | `frontend/index.html` | 右上角版本号，由 `app.info` 填充 |
@@ -107,11 +122,13 @@
 |---|---|---|
 | **Navicat** | 连接树信息密度、表设计器、导入导出向导、对象右键菜单完整度 | 功能过重、收费、启动慢 |
 | **HeidiSQL** | 轻量 Win32、表格数据直接编辑、批量 SQL 执行、SQL 日志、表设计器 | 界面陈旧、仅 Windows、无现代编辑器 |
-| **DBX** | 单二进制约 25MB、CodeMirror、虚拟表格、明暗主题、连接加密、导入导出 | Rust/Tauri/CMake 体系不同，不能直接复用 |
-| **GoNavi** | Wails（系统 WebView）+ Web 前端的架构、大数据网格、多数据源、驱动管理 | Go/React 技术栈、内存占用偏高 |
+| **DBX 0.6.69** | 单二进制约 25MB、CodeMirror 6、虚拟表格、明暗主题、连接加密、导入导出；此外有 ER 图、Schema Diff、数据同步、定时备份、AI、MCP、签名插件市场、100+ 数据源 | Rust/Tauri/CMake 体系不同，不能直接复用；平台化能力与「单 exe 离线轻量」定位冲突 |
+| **GoNavi 1.2.2** | Wails（系统 WebView）+ Web 前端架构、虚拟大数据网格、可选驱动代理（45+ 数据源）、AI/MCP/插件、数据同步与 SQL 审计、Web/CLI 部署 | Go/React 技术栈、内存占用偏高；后台调度与服务端形态不照搬 |
 | **StepDraw** | TauriCPP 壳、前端资源内嵌、Bridge、DPI、开发模式、单文件分发 | 画布/图形相关代码与数据库无关，不复用 |
 
 **Silkit 的定位**：HeidiSQL 的轻量 + Navicat 的完成度 + DBX/GoNavi 的现代 Web UI。
+
+> **对标口径（2026-11-15）**：dbx / GoNavi 已是「数据库工作平台」而非轻量客户端（详见 §19），不能逐项照抄。对标只取「单机桌面 + 已支持的三引擎」范围内用户可感知的能力；异构数据源、云同步、Web/CLI/MCP、插件市场、后台调度等按 §19 判定为 P2 或「明确不做」。
 
 ### 1.4 v1 范围
 
@@ -364,23 +381,21 @@ D:\Work\CPlusPlus\Silkit\
 │        ├─ mock.js             # 浏览器开发用假后端
 │        └─ fixtures.js
 ├─ tools\
-│  └─ contrast_check.py          # 校验 5 套主题的文本/图标对比度（CI 用）
+│  ├─ contrast_check.py          # 校验 5 套主题的文本/图标对比度（CI 用）
+│  ├─ make_test_db.py            # 生成 data/silkit_test.db（SQLite 夹具）
+│  └─ e2e_runner.py              # E2E 入口：探测测试源 → 增量构建 → CTest → 报告
 ├─ tests\
-│  ├─ unit\
-│  │  ├─ test_sql_splitter.cpp
-│  │  ├─ test_identifier.cpp
-│  │  ├─ test_type_map.cpp
-│  │  ├─ test_ddl_builder.cpp
-│  │  ├─ test_csv.cpp
-│  │  └─ test_sqlite_driver.cpp
-│  ├─ integration\
-│  │  ├─ integration_main.cpp   # 读 env DSN，跑三库冒烟
-│  │  └─ seed\mysql.sql / postgres.sql / sqlite.sql
-│  ├─ docker-compose.yml        # mysql:8.4 / postgres:16
-│  └─ e2e\                      # Playwright + mock（可选）
+│  ├─ CMakeLists.txt             # 10 个 CTest 目标（含 e2e_real_db）
+│  ├─ test_main.cpp              # silkit_smoke：纯逻辑聚合
+│  ├─ test_sqlite_driver.cpp / test_sqlite_fixture.cpp
+│  ├─ test_engine_dialect.cpp / test_table_ops.cpp / test_ddl_builder.cpp
+│  ├─ test_io.cpp / test_m8.cpp
+│  ├─ integration_db.cpp         # M2/M3 冒烟 + M5/M6 真实库写路径
+│  └─ e2e\
+│     ├─ e2e_real_db.cpp        # 14 项 × 双引擎真实库用例（§12.4）
+│     └─ seed_pg_employees.sql  # 可选：PG employees 精简镜像夹具
 ├─ docs\
-│  ├─ screenshots\
-│  └─ third-party-licenses.md
+│  ├─ dev-story.md / silkit-vs-others.md / zhihu-1.0-launch.md
 └─ build\                       # 构建产物（.gitignore）
 ```
 
@@ -1318,7 +1333,7 @@ private:
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────────┐
-│ 顶栏 44px  Logo Silkit │ 新建连接 新建查询 打开SQL │ 最近 │ 主题·晨樱 ▾ │ v1.0.0 │
+│ 顶栏 44px  Logo Silkit │ 新建连接 新建查询 打开SQL │ 最近 │ 主题·晨樱 ▾ │ v1.0.1 │
 ├───────────────┬──────────────────────────────────────────────────────────────┤
 │ 侧栏 264px    │ 标签栏 36px  [查询 1 ×][表: users ×][设计: orders ×]        │
 │ ┌───────────┐ ├──────────────────────────────────────────────────────────────┤
@@ -1467,7 +1482,7 @@ private:
 
 ```js
 const state = {
-  meta: { version: '1.0.0', engines: ['mysql', 'postgres', 'sqlite'] },
+  meta: { version: '1.0.1', engines: ['mysql', 'postgres', 'sqlite'] },
   connections: [],                    // 无密码
   sessions: {                         // sessionId -> runtime
     s1: { connectionId: 'c1', status: 'connected', serverVersion: '8.4.3',
@@ -1824,7 +1839,7 @@ INSERT INTO `users` (`name`, `age`) VALUES (?, ?);
 **目标**：能构建、能启动、能完成一次异步 IPC 往返，UI 骨架可见，五套主题与切换器可用。
 
 - [x] M0-1 复制 `StepDraw\TauriCPP` 到本项目的 `TauriCPP\`（排除 `build/.git`），记录来源 commit。
-- [x] M0-2 `CMakeLists.txt`：C++17、`/utf-8`、`/W4`、`/permissive-`、静态 CRT、TauriCPP、前端打包、版本/图标/manifest。
+- [x] M0-2 `CMakeLists.txt`：C++20（M0 交付时为 C++17，2026-11-15 升级）、`/utf-8`、`/W4`、`/permissive-`、静态 CRT、TauriCPP、前端打包、版本/图标/manifest。
 - [x] M0-3 `vcpkg.json` + `build.ps1`（toolchain、triplet、`-DevMode`）。
 - [x] M0-4 `src/main.cpp`：窗口 1120×700、窗口底色 `#FFF7F9`、DevTools、标题、单实例。
 - [x] M0-5 `util/logger`、`store/paths`、`store/settings`、`store/profiles` 骨架。
@@ -2054,58 +2069,77 @@ INSERT INTO `users` (`name`, `age`) VALUES (?, ?);
 **验收**
 - 新机器解压即用；WebView2 缺失有中文引导（框架内已实现，待 VM 复核）。
 - 三库连接/查询/编辑/设计/导入导出全流程通过：本机 Release 下 CTest 9/9；MySQL 8.4.13 与 PostgreSQL 18.0.7 的写路径与 DDL 路径集成回归均 0 failures。
-- 无 P0/P1 缺陷；已知限制写入 README（v1.0.0 章节）。
+- 无 P0/P1 缺陷；已知限制写入 README「已知限制」章节（标题随版本递增）。
 - 发布产物：`dist/Silkit-1.0.0-win-x64.zip`（3.83 MB，exe 9.13 MB），exe 版本资源为 `1.0.0`。
 
 ---
 
 ## 12. 测试与质量
 
-### 12.1 测试环境
+### 12.1 测试环境（2026-11-15 实测基准）
 
-| 组件 | 版本 | 方式 |
-|---|---|---|
-| Windows | 10 22H2 / 11 23H2+ | 本机 + VM |
-| MySQL | 8.0 / 8.4 | Docker `mysql:8.4` |
-| MariaDB | 10.11 / 11.4 | Docker `mariadb:11` |
-| PostgreSQL | 13 / 16 / 17 | Docker `postgres:16` |
-| SQLite | 3.45+ | 文件/内存 |
-| 构建 | VS 2022、CMake 3.21+、vcpkg、Python 3 | `build.ps1` |
+**主基准：本机真实服务**，不是 Docker。E2E 的价值在于拿真实数据 + 真实方言跑通链路。
 
-`tests/docker-compose.yml` 暴露：
+| 组件 | 版本 / 路径 | 连接参数 | 库与夹具 |
+|---|---|---|---|
+| MySQL | 8.4.13 · `C:\mysql-8.4.13-winx64\bin\mysql.exe` | `127.0.0.1:3306` · `root` / `123456` | `employees`（30 万员工 / 284 万薪资 / 9 部门，含 `enum`、`date`、外键、视图）；另有 `silkit_test`（`t_demo`） |
+| PostgreSQL | 18.7 · `C:\Program Files\PostgreSQL\18\bin\psql.exe`（服务 `postgresql-x64-18`） | `127.0.0.1:5432` · `postgres` / `123456` · schema `public` | `employees`（`tests/e2e/seed_pg_employees.sql` 精简镜像：9 部门 / 12 员工 / 18 薪资行 / 视图 / 外键）；`silkit_test` 为自动回退库 |
+| SQLite | 3.4x（vcpkg 静态库） | 文件 / 内存 | `data/silkit_test.db`（`tools/make_test_db.py` 生成：自增主键、唯一/普通索引、外键、BLOB、视图、触发器） |
+| 构建 | VS 2022 Enterprise（`/std:c++20`）、C++20、CMake 3.21+、vcpkg、Python 3 | `build.ps1` / `tools/e2e_runner.py` | `build/Release` |
+
+> **环境事实核对**：初次盘点时系统 PG **没有** `employees` 库（只有 `postgres` / `silkit_test` / `template0` / `template1`）。现已通过 `tools/e2e_runner.py --seed-pg-employees` 补建同名同结构精简镜像；若他人的机器上没有该库，runner 会自动退回 `silkit_test` 并打印 WARN，不会假装通过。MySQL 的 `employees` 是完整标准示例库，PG 侧刻意只放几十行，用于「大表 vs 小表」的跨引擎对照。
+
+**环境变量（与代码一致，均为分项变量，没有 DSN 字符串）**
+
+| 变量 | 作用 |
+|---|---|
+| `SILKIT_MYSQL_HOST/PORT/USER/PASSWORD/DATABASE` | 设置 `HOST` 才启用 MySQL 组；未设置整组 SKIP |
+| `SILKIT_PG_HOST/PORT/USER/PASSWORD/DATABASE/SCHEMA` | 设置 `HOST` 才启用 PG 组；`SCHEMA` 默认 `public` |
+| `SILKIT_INTEGRATION_WRITE=1` | 放开 `integration_db` 的 M5 / M6 写路径（影子表/库） |
+| `SILKIT_E2E_WRITE=1` | 放开 E2E-11 的 CSV 导入影子表 |
+| 二者都不设置 | 全部为只读用例；适合接入生产库的冒烟 |
+
+**CI 备选（Docker，非本机基准）**
 
 ```yaml
 services:
   mysql:
     image: mysql:8.4
     environment:
-      MYSQL_ROOT_PASSWORD: silkit
+      MYSQL_ROOT_PASSWORD: 123456
       MYSQL_DATABASE: silkit_test
-    ports: ["3307:3306"]
+    ports: ["3306:3306"]
     command: --character-set-server=utf8mb4 --collation-server=utf8mb4_0900_ai_ci
   postgres:
-    image: postgres:16
+    image: postgres:18
     environment:
-      POSTGRES_PASSWORD: silkit
+      POSTGRES_PASSWORD: 123456
       POSTGRES_DB: silkit_test
-    ports: ["5433:5432"]
+    ports: ["5432:5432"]
 ```
 
-集成测试读取 `SILKIT_TEST_MYSQL_DSN` / `SILKIT_TEST_PG_DSN`；未设置则跳过并标记 SKIP。
+CI 上把 `SILKIT_MYSQL_DATABASE` / `SILKIT_PG_DATABASE` 指向 `silkit_test` 即可；E2E-07 / E2E-12 在缺表时会自动使用等价数据，不依赖 `employees` 大表。
+
+**构建注意**：本机环境同时存在 `HTTPS_PROXY`/`https_proxy`（及 HTTP 大小写两份），MSBuild 的 CL 任务会因 .NET 进程环境变量字典大小写不敏感抛 `MSB6001: 已添加项`。`tools/e2e_runner.py` 已在构建子进程中剔除小写重复键；手工构建可用 `env -u https_proxy -u http_proxy cmake --build build --config Release`。
 
 ### 12.2 单元测试（CTest，不引第三方框架）
 
-| 测试 | 覆盖 |
-|---|---|
-| `test_sql_splitter` | 引号/注释/`$tag$`/`DELIMITER`/空语句/偏移 |
-| `test_identifier` | 三引擎引用/转义/非法字符 |
-| `test_type_map` | 类型→ValueKind；边界类型 |
-| `test_ddl_builder` | CREATE/ALTER 快照对比 |
-| `test_csv` | RFC4180、多行、引号、BOM、GBK |
-| `test_sqlite_driver` | 内存库 CRUD、NULL、BLOB、取消、事务 |
-| `test_table_ops` | 筛选/排序/分页 SQL 生成、参数顺序 |
+按 `tests/CMakeLists.txt` 的**实际 10 个目标**回写（此前表里的 `test_sql_splitter` / `test_identifier` / `test_type_map` / `test_csv` 从未落地，纯逻辑检查被合并进下列目标）：
 
-**要求**：核心纯逻辑覆盖率 ≥ 70%；新增解析/生成逻辑必须带测试。
+| # | CTest 目标 | 覆盖 |
+|---|---|---|
+| 1 | `silkit_smoke` | SQL 分割（引号/注释/`$tag$`/`DELIMITER`/偏移）、标识符引用转义、类型映射、基础工具 |
+| 2 | `sqlite_driver` | SQLite 内存库 CRUD、NULL、BLOB、取消、事务 |
+| 3 | `engine_dialect` | 三引擎方言 SQL、类型/错误映射 |
+| 4 | `table_ops` | 筛选/排序/分页 SQL 生成、参数顺序、变更语句构造 |
+| 5 | `ddl_builder` | CREATE/ALTER 快照对比、三引擎 DDL 断言 |
+| 6 | `sqlite_fixture` | `data/silkit_test.db` 文件夹具：索引/外键/视图/触发器元数据 |
+| 7 | `io` | RFC4180 CSV（多行/引号/BOM/GBK）、五种格式流式导出、100 万行导出、10 万行导入、错误回滚 |
+| 8 | `m8` | 设置合并/备份恢复、日志脱敏、安全模式、崩溃日志、会话恢复（25 项） |
+| 9 | `integration_db` | 真实 MySQL/PG 连接、M5 CRUD、M6 DDL 全链路（`SILKIT_INTEGRATION_WRITE=1` 时） |
+| 10 | `e2e_real_db` | §12.4 的 14 项 × 双引擎真实库用例矩阵 |
+
+**要求**：核心纯逻辑覆盖率 ≥ 70%；新增解析/生成逻辑必须带测试；新增跨引擎行为必须同时加真实库 E2E 用例（避免「单测全绿、真库出错」——MySQL 数值列误判二进制与 PG 空表丢列头都是这样漏掉的）。
 
 ### 12.3 集成测试
 
@@ -2114,16 +2148,66 @@ services:
 - 错误矩阵：错误密码、库不存在、语法错误、唯一键冲突、外键冲突、权限不足、连接中断。
 - 大数据：10 万/100 万行分页与导出。
 
-### 12.4 UI / E2E
+> 2026-11-15 回写：`integration_db` 覆盖连接 + M5/M6 写路径；上表里的类型矩阵、错误矩阵、大数据已从「描述」落成 `e2e_real_db` 的可断言用例（§12.4.1）。100 万行导出 / 10 万行导入由 `io` 单测覆盖，不再只写在计划里。
 
-- `frontend` 支持浏览器 mock（`mock.js` 返回固定数据），用 Playwright 跑：
-  - 树展开/过滤；
-  - 编辑器执行/多结果/错误高亮；
-  - 网格滚动/编辑/保存预览；
-  - 表设计器增删列/预览；
-  - 主题/语言切换；
-  - 五套主题的 token 对比度（`tools/contrast_check.py` 输出接入 CI）。
-- WebView2 特有行为（拖放、文件对话框、DPI）走手工清单。
+### 12.4 UI / E2E（2026-11-15 重排）
+
+三层分工：**① 真实库后端 E2E**（已自动化，CTest）/ **② 前端交互 E2E**（Playwright + `frontend/js/mock/mock.js`，待接入）/ **③ WebView2 特有行为**（手工清单）。
+
+#### 12.4.1 自动化：真实库 E2E（`tests/e2e/e2e_real_db.cpp`）
+
+每台引擎 14 项，MySQL `employees` + PG `employees` 各跑一遍，共 **28 项**；另有一组可选的「服务端不支持 TLS」回归 **3 项**（`SILKIT_MYSQL_NOSSL_HOST` 启用）。未设置 `*_HOST` 时对应整组 SKIP 且不计失败。
+
+| 编号 | 用例 | 数据源 | 验收点 | 守护的 Gap / 历史缺陷 |
+|---|---|---|---|---|
+| E2E-01 | 连接握手/版本/能力 | MySQL + PG | `Ping`、版本、当前库、占位符 `?`/`$1`、cancel/explain 能力位 | §19 A1 驱动能力矩阵；PG 版本号 18.0.7 缺陷 |
+| E2E-02 | 错误密码被拒绝 | MySQL + PG | 拒绝连接且错误信息非空；trust 认证环境记 SKIP 不误报 | 错误矩阵；凭据处理 |
+| E2E-03 | 不存在的库被拒绝 | MySQL + PG | 连接失败且带原生错误码 | 错误矩阵 |
+| E2E-04 | 错误可读 + 方言语句分割 | MySQL + PG | 语法/对象错误有 code+message；引号/`;`/注释/`$tag$` 内不误切，3 条语句 | §19 D8 语义诊断 / SQL 分割双实现一致性 |
+| E2E-05 | 对象树/列元数据 | MySQL + PG | `information_schema` 可读、首表 `SELECT *` 返回列头（**含 0 行表**） | 新发现并修复：PG 空结果丢列头 |
+| E2E-06 | 类型矩阵/数值非二进制/UTF-8 | MySQL + PG | `9223372036854775807` 不被 base64、DECIMAL 精度、NULL、emoji 原样 | M1–M4 MySQL `charsetnr==63` 潜伏 bug 防回归 |
+| E2E-07 | 5000 行流式分批读取 | MySQL `salaries` + PG `generate_series` | 5000 行、≥50 批、首批带列元数据、耗时记录 | §12.6 性能预算；§19 E1 虚拟网格后端 |
+| E2E-08 | `maxRows` 截断标记 | MySQL + PG | 恰好 37 行且 `truncated=true` | §6.7 行数上限；§19 E2 背压前置 |
+| E2E-09 | 取消后连接可恢复 | MySQL + PG | `Cancel()` 后 `SELECT 1` 仍可用 | §19 E3 取消/慢查询 |
+| E2E-10 | 只读连接拦截写语句 | MySQL + PG | `SetReadOnly(true)` 后 `CREATE TABLE` 在驱动层被拒，恢复可写 | §19 B7 只读连接；安全模式 |
+| E2E-11 | CSV 导出/解析/导入回环 | MySQL + PG | 带逗号/引号/中文/空值 → `ExportWriter` → `CsvParser` → `ImportCsv` 影子表 → 3 行回读 → DROP | §19 G1 XLSX/多格式之前的基线回归 |
+| E2E-12 | 真实数据聚合正确性 | MySQL + PG `departments` | 部门数 = 9，跨引擎一致 | dev-story 的 30 万员工验收脚本化 |
+| E2E-13 | 语句分割与错误定位偏移 | MySQL + PG | 2 条语句且偏移递增 | §19 D8 前端/后端分割语义一致 |
+| E2E-14 | `EXPLAIN` 执行计划 | MySQL + PG | 返回计划行且无错误 | §19 I4 计划可视化的数据前置 |
+
+> 写路径默认关闭；`SILKIT_E2E_WRITE=1` 时 E2E-11 建删 `silkit_e2e_csv_probe`，`SILKIT_INTEGRATION_WRITE=1` 时 `integration_db` 建删 `silkit_m5_probe` / `silkit_m6_*` / `silkit_m6_db_probe`。均为独立影子对象，不触碰业务表。
+
+**可选：无 TLS 的 MySQL 协议服务端**（本机 3307 SQLTiny，握手 capability 不含 `CLIENT_SSL`）。由 `SILKIT_MYSQL_NOSSL_HOST/PORT/USER/PASSWORD` 或 `e2e_runner.py --mysql-nossl-host` 启用；未设置时整组 SKIP。用于守住 MariaDB Connector/C 3.4 的 SSL 语义回归（§0.2）。
+
+| 编号 | 用例 | 验收点 |
+|---|---|---|
+| SSL-01 | `prefer` 自动降级为明文 | 连接成功且 `SELECT 1` 返回 1 行 |
+| SSL-02 | `disable` 强制明文连接 | 连接成功且 `SELECT 1` 返回 1 行 |
+| SSL-03 | `require` 拒绝无 TLS 服务端 | 连接失败、code=2026、hint 提示改用 `disable` |
+
+#### 12.4.2 前端交互 E2E（Playwright + `mock.js`，待接入）
+
+| 编号 | 用例 | 方式 | 验收点 | Gap 依据 |
+|---|---|---|---|---|
+| U-01 | 连接树展开 / 过滤 / 右键菜单 | Playwright + mock | 懒加载节点、`meta.search` 与本地过滤一致 | §19 C1 远程搜索（当前后端先行、前端未接） |
+| U-02 | 编辑器执行当前/选中/全部、多结果子标签、错误高亮 | Playwright + mock | 执行范围与后端 `SplitSql` 语义一致 | §19 D1/D8 |
+| U-03 | 结果网格虚拟滚动、列宽、排序、复制（TSV/CSV/JSON/INSERT） | Playwright + mock | 10 万行不卡、复制值不丢精度 | §19 E4 复制为 SQL |
+| U-04 | 表格数据 CRUD、保存预览、事务回滚、唯一键冲突 | Playwright + mock | 冲突后整体回滚、单元格定位 | §19 E5 变更预览 |
+| U-05 | 表设计器增删列 / SQL 预览 / 影响行数 / 令牌确认 | Playwright + mock | 危险操作二次确认，SQL 与执行同源 | §19 F1 设计器深度 |
+| U-06 | CSV 导入向导（编码/分隔符/列映射/错误行号） | Playwright + mock | 错误定位到第 N 行、事务回滚 | §19 G2 导入向导 |
+| U-07 | 五套主题 / 中英文切换 / 对比度 | Playwright + `tools/contrast_check.py` | 无白闪、125 项对比度达 4.5、CodeMirror/网格同步 | §19 J2 i18n 覆盖度 |
+| U-08 | 安全模式：`DROP`/`TRUNCATE`/无 `WHERE` 的 `UPDATE` 拦截 | Playwright + mock | 取消后消息区明确提示且未执行 | dev-story 手工项自动化 |
+| U-09 | 会话恢复：标签/SQL/滚动/侧栏 | Playwright + mock | 重启后激活标签与内容还原 | §19 J3 会话恢复完整性 |
+| U-10 | 断线/重连：状态栏、标签保留 | Playwright + mock | 8s 内返回、可重试 | §19 B6 自动重连 |
+| U-11 | 快捷键全流程（除拖拽外无鼠标） | Playwright | 全流程可达 | §12.5 手工项自动化 |
+| U-12 | 大结果集滚动 / 取消 / 继续加载 | Playwright + mock | 首屏 < 1.5s、取消 < 500ms | §12.6 性能预算 |
+| U-13 | 连接失败错误条「复制信息」 | 手工 / Playwright + mock（构造 2026、1045 等错误） | 错误条最右侧按钮与错误 toast 均可复制；剪贴板含错误码/SQLSTATE/hint 与连接上下文且**不含密码**；按钮反馈「已复制」 | §0.2 2026-11-15 偏差记录 |
+
+> 现状：`frontend/js/mock/mock.js`（2259 行）已能模拟 `ipc.call`/`ipc.event` 与流式查询，但仓库没有 Playwright 依赖与 CI 任务。按 §19 判定为 **P1**，先用 §12.5 手工矩阵兜底；接入时复用 mock 数据，不得连真实库跑 UI 用例。
+
+#### 12.4.3 WebView2 特有 / 手工
+
+拖放 `.sql`/`.db`/`.csv`、原生文件对话框、125/150/200% DPI 与多显示器、窗口关闭时未保存确认与事务提示、干净虚拟机冷启动，走 §12.5 手工验收矩阵并留档。
 
 ### 12.5 手工验收矩阵
 
@@ -2183,6 +2267,43 @@ services:
 
 - 集成测试在 CI 可选（service containers 仅 Linux；Windows runner 用 `docker compose` 或跳过）。
 - 发布 tag 触发构建 + zip + SHA256。
+- 2026-11-15：Windows self-hosted runner 若已按 §12.1 装好 MySQL/PG，追加 `python tools/e2e_runner.py --no-build --full`，报告 `build/e2e-report.md` 作为 CI artifact；无真实服务时只跑 1–8 号纯逻辑 CTest（9/10 号自动 SKIP）。
+
+### 12.9 E2E 执行入口（2026-11-15 新增）
+
+```powershell
+# 默认：探测两个测试源 → 增量构建 → 跑 integration_db + e2e_real_db → 写报告
+python tools/e2e_runner.py
+
+# 全量 CTest（10 个目标）
+python tools/e2e_runner.py --full
+
+# 只读冒烟：关闭所有影子表写入，适合指向生产库
+python tools/e2e_runner.py --read-only
+
+# 首次准备 PG employees 镜像库（CREATE DATABASE + 建表导数据；已存在则跳过，不覆盖）
+python tools/e2e_runner.py --seed-pg-employees
+
+# 可选：额外跑「服务端不支持 TLS」的 SSL-01~03（本机 3307 SQLTiny）
+python tools/e2e_runner.py --mysql-nossl-host 127.0.0.1 --mysql-nossl-port 3307 `
+    --mysql-nossl-user root --mysql-nossl-password 123456
+
+# 指定库 / 指定可执行文件路径（换机器时用）
+python tools/e2e_runner.py --mysql-db silkit_test --pg-db silkit_test `
+    --mysql-bin "C:\mysql-8.4.13-winx64\bin\mysql.exe" `
+    --psql-bin "C:\Program Files\PostgreSQL\18\bin\psql.exe"
+
+# 手工等价入口（不经过 runner，注意清理大小写重复的代理变量）
+$env:SILKIT_MYSQL_HOST="127.0.0.1"; $env:SILKIT_MYSQL_USER="root"
+$env:SILKIT_MYSQL_PASSWORD="123456"; $env:SILKIT_MYSQL_DATABASE="employees"
+$env:SILKIT_PG_HOST="127.0.0.1"; $env:SILKIT_PG_USER="postgres"
+$env:SILKIT_PG_PASSWORD="123456"; $env:SILKIT_PG_DATABASE="employees"
+ctest --test-dir build -C Release -R "integration_db|e2e_real_db" -V
+```
+
+`tools/e2e_runner.py` 做四件事：① 用 `mysql.exe`/`psql.exe` 预检版本与目标库，PG 有 `employees` 就优先用，否则退回 `silkit_test` 并告警；② 清理 MSBuild 的大小写重复代理变量后增量构建 `e2e_real_db` / `integration_db`；③ 注入 §12.1 环境变量并跑 CTest（`-V` 保留逐项输出）；④ 把 PASS/FAIL/SKIP 统计与原始输出写入 `build/e2e-report.md`。密码通过 `MYSQL_PWD` / `PGPASSWORD` 传递，不出现在命令行与报告里。
+
+**当前基线（2026-11-15 实测）**：MySQL 8.4.13 `employees` + PostgreSQL 18.7 `employees`，`ctest -C Release` **10/10 通过**；`e2e_real_db` 基础 **28 passed**，加上 `--mysql-nossl-host` 的无 TLS 组共 **31 passed / 0 failed / 0 skipped**；`integration_db` 双引擎 M5/M6 写路径全绿，报告 `build/e2e-report.md`。
 
 ---
 
@@ -2224,9 +2345,12 @@ services:
 | v0.7 | 导入导出/转储 | M7 |
 | v0.8 | 设置/主题/会话/安全 | M8 |
 | **v1.0** | Windows 单文件正式版 | M9 |
-| v1.1 | SSH 隧道、ER 图、Schema Diff、XLSX、用户管理、深分页 keyset、PG 计划可视化 | 后续 |
-| v1.2 | 数据传输/同步、数据对比、SQL Server/Oracle 驱动、连接导入导出 | 后续 |
-| v2.0 | 插件驱动、MCP Server、AI SQL 助手（显式授权、默认不执行） | 远期 |
+| **v1.1**（P0，日常完成度） | XLSX 导入/导出、结果复制为 INSERT/UPDATE、ER 图（只读、基于现有 FK 元数据）、EXPLAIN 计划树、连接配置导入导出、查询历史落 `history.jsonl`、断线自动重连、i18n 补齐动态视图、DML 只读预览、前端 Playwright E2E | §19 P0 |
+| **v1.2**（P1，专业增强） | SSH 隧道/代理、SSL 证书 UI、Schema Diff 只读对比、数据对比（按主键）、查询结果图表、单元格值格式化/掩码、模拟数据生成、会话/锁等待面板、深分页 keyset、SQL 审计中心（本地） | §19 P1 |
+| **v2.0**（P2，平台化，需重新评估定位） | 数据传输/同步、定时备份、SQL Server/Oracle 等新驱动、插件 SDK、MCP Server、AI SQL 助手（显式授权、默认不执行） | §19 P2 |
+| **明确不做**（与「单 exe / 离线 / 无账号 / <10MB」冲突） | 100+ 异构数据源、Web Server / Docker / CLI 形态、云同步与团队账号、插件市场与签名沙箱、后台常驻调度进程、Win7 兼容构建 | §19「不做」 |
+
+> 2026-11-15 重排依据：原 v1.1 把「SSH、ER 图、Schema Diff、XLSX、用户管理」混在一起，没有区分「开发者每天会碰到」与「DBA 平台能力」。按 §19 对标后，**XLSX / 复制为 SQL / ER 图 / 计划可视化 / 历史与重连** 属于完成度底线（P0）；SSH、Schema Diff、同步属于专业增强（P1/P2）；用户权限管理、云/Web/MCP 与轻量定位冲突，降级或明确不做。E2E 用例（§12.4）优先覆盖 P0 涉及的既有链路回归。
 
 **v1.1 预留接口**
 - `DriverRegistry::Register(std::unique_ptr<Driver>)`：新增数据库不动 UI。
@@ -2286,10 +2410,11 @@ powershell -ExecutionPolicy Bypass -File build.ps1 -DevMode
 
 ```cmake
 cmake_minimum_required(VERSION 3.21)
-project(Silkit VERSION 1.0.0 LANGUAGES CXX)
+project(Silkit VERSION 1.0.1 LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
 if(MSVC)
@@ -2335,7 +2460,7 @@ target_link_libraries(Silkit PRIVATE
 ```json
 {
   "name": "silkit",
-  "version-string": "1.0.0",
+  "version-string": "1.0.1",
   "dependencies": [
     "libmariadb",
     "libpq",
@@ -2460,4 +2585,240 @@ SortIncludes: CaseSensitive
 > 本文随代码演进；任何与实现不一致的地方，以 §0.2 偏差记录为准，并在里程碑结束时回写。
 
 **界面也是产品力**：默认的晨樱配色不是装饰，而是让“每天打开的数据库工具”不冰冷。做 UI 时优先保证数据可读与操作可预期，再谈风格；任何为了好看牺牲对比度或响应速度的改动都应被拒绝。
+
+---
+
+## 19. 功能 Gap 分析：dbx 0.6.69 / GoNavi 1.2.2（2026-11-15）
+
+### 19.1 对标基线与判定口径
+
+| 项目 | 定位 | 技术底座 | 规模证据 |
+|---|---|---|---|
+| **Silkit v1.0.1** | 单 exe、离线、Windows 轻量数据库工作台 | C++20 + TauriCPP（Win32 + WebView2）+ 原生 JS | 3 引擎、10 个 CTest 目标、约 9MB exe |
+| **dbx 0.6.69** | 100+ 数据源的「数据库工作平台」 | Rust/Tauri 2 + Vue 3 + CodeMirror 6 | 27 个 Rust crate、88 个 `dbType`、82 个 Tauri command、299 个 app-tests + 1948 个前端 spec、125 个 Rust 集成测试 |
+| **GoNavi 1.2.2** | 桌面优先 + MCP 原生的多数据源工作台 | Go 1.24 + Wails v2 + React/Monaco | 12 内置 + 45+ 可选驱动代理、1097 个 `internal/app` Go 文件、1596 个 Go 测试 + 1355 个前端测试 |
+
+**结论先行**：两者都已超出「轻量 SQL 客户端」，是叠加了 DBA 管理面、数据同步调度、AI/MCP/插件平台与服务端形态的工作平台。Silkit 的差距主要不在「连查改导」主链路（这部分已对齐），而在 **格式广度、可审查/可视化、专业诊断、扩展与部署形态**。逐项照抄会破坏「单 exe / <10MB / 无账号 / 离线」底线，因此按下述口径分级：
+
+| 标记 | 含义 |
+|---|---|
+| ✅ / ◐ / ✗ | 已具备可用 / 部分或简化 / 缺失 |
+| **P0** | v1.1 必补：日常使用会直接碰到，且不改变产品定位 |
+| **P1** | v1.2 增强：专业场景，可显著提升完成度 |
+| **P2** | v2.0 平台化：需重新评估定位与体积预算 |
+| **—** | 明确不做：与轻量/离线/单 exe 冲突，写清理由 |
+| **=** | 已对齐，保持现状 |
+
+> 状态口径：Silkit 列以 `README.md` / `CHANGELOG.md` / `src` / `frontend` / 实测为准，规划但未落地的（如 `connections.json` 的 `group`/`color`、`history.jsonl`）记 ◐ 而非 ✅。dbx / GoNavi 列以仓库 README、功能文档与源码模块为准。
+
+### 19.2 功能 Gap 矩阵
+
+#### A. 数据源与驱动
+
+| # | 功能项 | Silkit | dbx | GoNavi | Gap | 建议 / 排期 |
+|---|---|---|---|---|---|---|
+| A1 | MySQL / MariaDB / PostgreSQL / SQLite | ✅ | ✅ | ✅ | = | 主链路已对齐，继续用真实库回归 |
+| A2 | 国产/商业库（达梦、金仓、openGauss、OceanBase、GoldenDB…） | ✗ | ✅ | ✅ | — | 需要各厂商客户端 SDK，违背单 exe 体积与离线分发 |
+| A3 | 非关系型（Redis/Mongo/向量/MQ/ES/时序/KV） | ✗ | ✅ | ✅ | — | 不是 SQL 客户端范畴；`DriverRegistry` 仅留接口 |
+| A4 | 可选驱动代理（独立进程、按需下载、版本管理） | ✗ | ✅ | ✅ | — | 引入后台进程与更新体系，与轻量定位冲突 |
+| A5 | 自定义 JDBC / DSN 驱动扩展 | ✗ | ✅ | ✅ | P2 | 与 v2.0 插件化一并评估 |
+| A6 | `DriverRegistry` + `Capabilities` 能力门控 | ◐ 有接口，UI 未按能力隐藏入口 | ✅ Connect/Browse/Understand/Operate 四级 | ✅ 逐库能力矩阵 | P1 | 补齐 Capabilities 字段并让菜单按能力显隐 |
+| A7 | 服务端版本 / 会话诊断 / 进程列表 | ◐ 仅版本（本轮修复显示） | ✅ | ✅ | P1 | 先做只读会话列表与锁等待 |
+| A8 | 多引擎版本矩阵实测 | ◐ MySQL 8.4.13 / PG 18.7 | ✅ 多版本 | ✅ 契约矩阵 | P1 | MariaDB 11、PG 13–16 未逐版本验证 |
+
+#### B. 连接、安全与凭据
+
+| # | 功能项 | Silkit | dbx | GoNavi | Gap | 建议 / 排期 |
+|---|---|---|---|---|---|---|
+| B1 | 连接保存 / 测试 / 最近使用 | ✅ | ✅ | ✅ | = | — |
+| B2 | 分组 / 颜色 / 备注 / 置顶 / 多选批量 | ◐ 仅 schema 有 `group`/`color`，UI 未接 | ✅ | ✅ | P0 | 补全连接树分组与颜色，成本低、感知强 |
+| B3 | 连接配置导入导出（含加密包） | ◐ 仅 settings 备份 | ✅ DBeaver/Navicat 导入 | ✅ Navicat `.ncx` + Excel/JSON | P0 | 先做自有 JSON 导入导出，再考虑 Navicat |
+| B4 | SSH 隧道 / SOCKS / HTTP 隧道 | ✗ | ✅ 三类 + Profile | ✅ SSH + 代理 + Navicat 隧道 | P1 | 原 v1.1 项，需引入 libssh，排到 P1 |
+| B5 | SSL/TLS 客户端证书 UI | ◐ 基础 `sslmode` | ✅ CA/钱包/Oracle OCI | ✅ CA/证书/SQL Server TLS | P1 | 证书三件套 UI + 连接级隔离 |
+| B6 | 断线自动重连 / 连接健康 | ◐ 手工验收有，未自动化 | ✅ | ✅ 健康检查 | P0 | 自动重连 + U-10 E2E |
+| B7 | 只读连接 / 临时写解锁 / 生产保护 | ◐ 只读已实现（E2E-10） | ✅ 1/5 分钟临时解锁、生产水印 | ✅ 生产风险确认 | P1 | 临时解锁窗口 + 库级生产标记 |
+| B8 | 危险 SQL 分类与二次确认 | ✅ 安全模式 | ✅ 风险分类 + 报告 | ✅ AI 安全三级 + Guard | = | 保持；补充 U-08 自动化 |
+| B9 | 凭据加密（DPAPI / keyring / 迁移向导） | ✅ DPAPI | ✅ 平台凭据存储 + 迁移 | ✅ keyring + 每日密钥 | = | 仅 Windows，定位使然 |
+| B10 | SQL 审计中心（脱敏、保留、导出、完整性） | ◐ 日志脱敏 | ✅ MCP/CLI 调用历史 | ✅ 审计中心 + WAL 完整性 | P1 | 本地 `audit.jsonl` + 导出，不引服务端 |
+
+#### C. 对象浏览与元数据
+
+| # | 功能项 | Silkit | dbx | GoNavi | Gap | 建议 / 排期 |
+|---|---|---|---|---|---|---|
+| C1 | 库/模式/表/视图/函数/触发器懒加载树 | ✅ | ✅ | ✅ | = | — |
+| C2 | 本地过滤 + 远程 `meta.search` | ◐ 后端已实现，前端仅本地过滤（§0.2） | ✅ 正则/类型/大 schema 索引 | ✅ 元数据发现范围 | P0 | 前端接后端搜索，U-01 验收 |
+| C3 | 对象信息面板 / 表概览 / 行数统计 | ◐ 详情面板 + DDL | ✅ Object Browser 三形态 | ✅ 表概览/访问计数 | P1 | 补行数/大小/创建时间统计 |
+| C4 | 列、索引、外键、触发器完整元数据 | ✅ 表设计器已用 | ✅ 含 Oracle TYPE/序列/扩展 | ✅ 含唯一键组/字符长度语义 | = | 三引擎范围内已够用 |
+| C5 | 数据字典 / 数据库文档 / DBML / PDF | ✗ | ✅ Markdown 笔记 + DBML + 数据字典 PDF | ✗ | P1 | 先做表/列注释导出 Markdown |
+| C6 | 字段血缘 / 对象依赖分析 | ✗ | ✅ 置信度分级 | ✗ | P2 | 需要查询历史与视图解析，成本高 |
+| C7 | 隐藏系统 schema / 可见范围控制 | ◐ 设置粗略 | ✅ | ✅ 隐藏对象/发现范围 | P1 | 按前缀/系统库白名单过滤 |
+| C8 | 视图/函数/触发器定义编辑 | ✗ 只能查看并另存 `.sql` | ✅ 触发器源码编辑 + enable/compile | ✅ 定义查看器 | P1 | 复用 `ddl.preview` 令牌机制（§0.2 已留口） |
+
+#### D. SQL 编辑器与执行
+
+| # | 功能项 | Silkit | dbx | GoNavi | Gap | 建议 / 排期 |
+|---|---|---|---|---|---|---|
+| D1 | 多标签、语法高亮、元数据补全、执行范围 | ✅ CodeMirror 5 | ✅ CodeMirror 6 | ✅ Monaco | = | 已对齐 |
+| D2 | SQL 格式化 / 折叠 / 片段 / 历史 | ✅ | ✅ 9 种编辑器主题 + Vim 模式 | ✅ Slash 命令 + AI 内联补全 | ◐ P1 | 主题数、Vim、Slash 命令属体验增强 |
+| D3 | 查询历史落盘（`history.jsonl`） | ◐ `localStorage` + `settings.json`（§0.2） | ✅ 200–10000 条 | ✅ 来源可切换 MCP | P0 | 落 `history.jsonl` 并轮转 |
+| D4 | 多结果集 / 消息 / 取消 / 执行计时 | ✅ | ✅ | ✅ | = | 取消语义由 E2E-09 守护 |
+| D5 | DML 只读预览（UPDATE/INSERT/DELETE → SELECT） | ✗ | ✅ | ◐ 变更预览（写侧） | P0 | 保存/执行前先看影响行，契合「显式安全」原则 |
+| D6 | 参数/变量（`:name`、`${}`、`@set`） | ✗ | ✅ | ◐ | P2 | 轻量客户端使用频率低 |
+| D7 | 多库执行 / 多源结果合并 | ✗ | ✅ | ✅ 批量连接工作台 | P2 | 需会话编排 |
+| D8 | SQL 语义诊断 / 风险分类 / 前后端分割一致性 | ◐ 仅执行报错 | ✅ 语义诊断 + `sql_risk` | ✅ SQL 分类器 | P1 | 先保证前端 `SilkitSqlTools` 与后端 `SplitSql` 语义一致（E2E-04/13） |
+| D9 | 全局文件内容搜索 / Quick Open | ✗ | ✅ | ✅ | P2 | — |
+| D10 | PL/SQL 调试器（断点/调用栈） | ✗ | ✅ Oracle/OceanBase | ✗ | — | 远超三引擎桌面工具范围 |
+
+#### E. 结果网格与数据编辑
+
+| # | 功能项 | Silkit | dbx | GoNavi | Gap | 建议 / 排期 |
+|---|---|---|---|---|---|---|
+| E1 | 虚拟滚动、分页、服务端筛选/排序 | ✅ | ✅ | ✅ | = | E2E-07/08 守护 |
+| E2 | 结果流式背压 `query.ack` | ✗（§0.2 未实现） | ✅ 分批 + 快照 | ✅ 行预算/压缩 | P1 | 超大结果集依赖 `maxRows`，需前端节流配合 |
+| E3 | 查询取消 / 语句级进度 | ✅ 取消 | ✅ | ✅ | = | — |
+| E4 | 复制为 TSV/CSV/JSON/INSERT/UPDATE | ◐ 计划含 INSERT，UPDATE 未见 | ✅ | ✅ 含列注释/排除主键 | P0 | 补齐 UPDATE 与批量 INSERT 复制 |
+| E5 | 变更 SQL 预览 / 反向回滚 SQL / DML 快照 | ◐ 保存预览 | ✅ 预览 | ✅ Change Reverse + DML 快照 | P1 | 可审计变更链 |
+| E6 | 批量粘贴、克隆行、Set NULL、默认值 | ◐ 基础 CRUD | ✅ | ✅ | P1 | 网格编辑效率 |
+| E7 | 模拟数据生成器 | ✗ | ✅ | ✅ 语义/字典/采样 | P1 | 造测试数据，开发者高频 |
+| E8 | 单元格详情：JSON 路径 / HEX / 图片 / 几何 | ◐ 长文本/JSON/BLOB | ✅ 时区/SRID/地图 | ✅ 大字段弹窗编辑 | P1 | 先补 JSON 树与 HEX 视图 |
+| E9 | 列格式化器 / 值掩码 / 转置视图 | ✗ | ✅ | ✅ | P2 | — |
+| E10 | 外键跳转到引用记录 | ✗ | ✅ | ◐ | P1 | 已有 FK 元数据，实现成本低 |
+
+#### F. 表设计与 DDL
+
+| # | 功能项 | Silkit | dbx | GoNavi | Gap | 建议 / 排期 |
+|---|---|---|---|---|---|---|
+| F1 | 列/索引/外键/表选项 + SQL 预览 | ✅ 三引擎 | ✅ 五页含触发器/分区 | ✅ 含触发器列表 | ◐ P1 | 补触发器页与分区选项 |
+| F2 | CREATE/ALTER/DROP/RENAME/TRUNCATE + 影响行数 | ✅ | ✅ | ✅ | = | `integration_db` DDL 全链路已绿 |
+| F3 | 完整 DDL 还原（PG 目录重建偏差） | ◐ `pg_catalog` 简化重建 | ✅ | ✅ `SHOW CREATE` | P0 | README 已知限制；向 `pg_dump --schema-only` 对齐 |
+| F4 | 视图/函数/触发器 DDL 保存与编辑 | ◐ 另存 `.sql` | ✅ | ✅ | P1 | 见 C8 |
+| F5 | 跨方言 DDL 差异矩阵 / 类型改写 | ◐ `engine_dialect` | ✅ `DdlDialectProfile` + `type_rewrite` | ✅ 迁移内核 | P1 | 为 Schema Diff 铺路 |
+| F6 | SQLite ALTER 能力边界提示 | ✅ 明确报错 | ✅ 表重建 | ✅ | = | 保持「不静默降级」 |
+| F7 | 源码「Verify without writing」恢复模型 | ✗ | ✅ | ◐ | P2 | — |
+
+#### G. 导入导出、转储与备份
+
+| # | 功能项 | Silkit | dbx | GoNavi | Gap | 建议 / 排期 |
+|---|---|---|---|---|---|---|
+| G1 | CSV/JSON/SQL/Markdown/HTML 流式导出 | ✅ 五种 | ✅ +XLSX/TSV/INSERT/DBML | ✅ +XLSX/Parquet/NDJSON | **P0** | 补 XLSX（最常被要求），其余按使用频率排 |
+| G2 | CSV 导入向导（编码/映射/自动建表/错误行） | ✅ | ✅ +XLSX/Parquet/Navicat `.nb3` | ✅ +XLSX/JSON/SQL.GZ | **P0** | 补 XLSX 导入；E2E-11 已建立回环基线 |
+| G3 | 整库/整表 SQL 转储（结构+数据） | ◐ 结构与数据，视图等另存 | ✅ 多库编排 + 分卷 ZIP | ✅ 表/库/视图转储 | P1 | 转储纳入视图/函数/触发器定义 |
+| G4 | SQL 文件执行（分块流式、语句级进度/重试） | ◐ 整文件读入（≤512MB） | ✅ 分块 | ✅ `.sql.gz` + GTID/回滚计划 | P1 | README 已知限制，改流式 |
+| G5 | 定时逻辑备份 + 保留策略 + 选表恢复 | ✗ | ✅ | ✅ 表级备份 + 云备份 | P2 | 需后台常驻调度，与「关掉即结束」冲突 |
+| G6 | Navicat `.nb3` / DBeaver 等第三方格式互操作 | ✗ | ✅ | ✅ `.ncx` | — | 闭源格式，优先级低 |
+| G7 | 导出原子提交 / 取消 / 进度 / 历史 | ◐ 流式 + 进度 | ✅ | ✅ 原子导出 + 任务历史 | P1 | 补临时文件原子替换 |
+| G8 | 数据字典 PDF / 安全报告 / 影响报告 | ✗ | ✅ | ✅ | P2 | — |
+| G9 | 加密配置导出 / 云同步（WebDAV/S3/Gist） | ◐ 本地 `.bak` | ✅ | ✅ WebDAV/S3 | — | 与「无账号、本地优先」冲突 |
+
+#### H. 数据同步 / 迁移 / 对比
+
+| # | 功能项 | Silkit | dbx | GoNavi | Gap | 建议 / 排期 |
+|---|---|---|---|---|---|---|
+| H1 | Schema Diff（结构对比 + 修复 SQL） | ✗ | ✅ 企业级（重命名检测/影响报告/回滚完整性） | ✅ 结构迁移 + HTML 报告 | P1 | 先做**只读对比**，不做自动部署 |
+| H2 | Data Compare（按主键行级比对） | ✗ | ✅ | ✅ 行 diff | P1 | 与 H1 同一工作台 |
+| H3 | 数据传输 / 跨库迁移（含类型映射） | ✗ | ✅ | ✅ 跨内核迁移 | P2 | 需任务编排与长事务 |
+| H4 | CDC 增量同步 / 水位线 | ✗ | ◐ Dolt 版本 | ✅ MongoDB CDC + watermark | — | 后台服务范畴 |
+| H5 | 定时任务调度 + 后台 worker + 开机自启 | ✗ | ✅ 后台备份 | ✅ 三平台自启 | — | 违背单 exe、无常驻进程 |
+| H6 | 结果集 Diff / 数据校验向导 | ✗ | ✗ | ✅ | P2 | 低成本可先做两结果集对比 |
+
+#### I. 可视化、诊断与监控
+
+| # | 功能项 | Silkit | dbx | GoNavi | Gap | 建议 / 排期 |
+|---|---|---|---|---|---|---|
+| I1 | ER 图（外键关系图） | ✗ | ✅ Vue Flow + ELK + SVG/PNG 导出 | ✅ React Flow 节点列级展示 | **P0** | 已有 FK 元数据，做只读轻量版；导出 SVG |
+| I2 | 查询结果图表（ECharts） | ✗ | ✅ | ✅ 计划图/Graph 视图 | P1 | 折线/柱状/饼图即可 |
+| I3 | 建库草稿直接生成建表 SQL | ✗ | ✅ 图草稿同步数据库 | ✗ | P2 | — |
+| I4 | EXPLAIN 计划树 / 热点 / 计划对比 | ◐ 文本 EXPLAIN（E2E-14） | ✅ 树/成本/原始 | ✅ 14+ 方言 + 洞察 | **P0** | 先解析 MySQL/PG 文本计划成树 |
+| I5 | 慢查询 / 会话 / 锁等待 / 长事务 / kill | ✗ | ✅ 进程列表 + 会话诊断 | ✅ 会话告警 + kill | P1 | 只读视图优先 |
+| I6 | 数据库 Dashboard / 驱动运行时监控 | ✗ | ✅ 多库仪表盘 | ✅ JVM/Nacos/XXL-JOB 面板 | — | 明确定位为「检视工具」，不做长期监控 |
+| I7 | 用户/角色/授权管理 | ✗ | ✅ | ✅ 8 类 provider | — | DBA 管理能力，超出目标用户 |
+| I8 | 数据生成 / 模型生成 | ✗ | ✅ | ✅ | P1 | 见 E7 |
+
+#### J. AI / MCP / 插件 / 部署形态
+
+| # | 功能项 | Silkit | dbx | GoNavi | Gap | 建议 / 排期 |
+|---|---|---|---|---|---|---|
+| J1 | AI SQL 助手（多 Provider / Agent / Skills） | ✗ | ✅ 10 类 Provider + CLI Agents + Skills | ✅ 内置 AI + Run Harness + Provider 插件 | P2 | 需联网与密钥管理，与离线定位冲突；若做必须默认不执行 |
+| J2 | MCP Server（工具集 / 策略 / 审批 / 审计） | ✗ | ✅ 18+ 工具 + 中央策略 | ✅ stdio/http + SQL 审计 | P2 | 需要对外服务进程，v2.0 再评估 |
+| J3 | 插件 SDK / 市场 / 签名沙箱 / Host API | ✗ | ✅ Ed25519 + 沙箱 + Marketplace | ✅ Go/TS SDK + 能力白名单 | — | 引入外部代码执行与包管理，违背单 exe |
+| J4 | CLI（headless 查询/导出/批量） | ✗ | ✅ 6 平台二进制 | ✅ 共享数据根 | P2 | 可复用 `src/db`，但要新建入口与发布链 |
+| J5 | Web Server / Docker / K8s / 自托管 | ✗ | ✅ Web + 登录验证码 | ✅ admin/viewer + TOTP + Prometheus | — | 与「桌面单机、无账号」定位冲突 |
+| J6 | 云同步 / 团队空间 / 配置中心 | ✗ | ✅ WebDAV/Gist | ✅ WebDAV/S3 | — | 同上 |
+| J7 | 自动更新 / 代码签名 / 多架构分发 | ✗ 便携 zip | ✅ | ✅ 安全更新引擎 + 三源下载 | P1 | 至少做版本检查与手动更新引导 |
+| J8 | 深链接 / 单实例 / 分离窗口 / 多显示器 | ◐ 单实例 | ✅ | ✅ 原生分离窗口 | P2 | — |
+| J9 | 主题：5 套 + 明暗 | ✅ | ✅ 深色 + 9 编辑器主题 | ✅ 多套 + 自定义主题 + 背景/字体画廊 | ◐ P1 | 补自定义主题，画廊不做 |
+| J10 | 国际化：中/英（动态视图未覆盖） | ◐ 2 语言，部分中文硬编码 | ✅ 14 语言 | ✅ 6 语言 + CI 扫描门禁 | **P0** | 补齐对象树/历史/设计器/导入导出文案 + 缺 key 检查 |
+
+#### K. 工程与测试体系
+
+| # | 功能项 | Silkit | dbx | GoNavi | Gap | 建议 / 排期 |
+|---|---|---|---|---|---|---|
+| K1 | 单元测试规模 | 10 个 CTest 目标 | 299 app-tests + 1948 spec + 125 Rust 集成 | 1596 Go 测试 + 1355 前端测试 | P1 | 不追数量，按「纯逻辑 + 真库」双轨补 |
+| K2 | 真实库集成测试（live / 契约矩阵） | ✅ `integration_db` + `e2e_real_db`（本轮新增） | ✅ 60+ `live_*.rs` + Docker 矩阵 | ✅ `*_live_test.go` + `tools/contract-test` | = | 已补齐双引擎真实库基准 |
+| K3 | 断言式 UI E2E（Playwright/Cypress） | ✗（仅 §12.5 手工矩阵） | ◐ 仅 UI 预览录制（非断言） | ✅ Vitest 集成/组件测试 | **P0** | §12.4.2 的 U-01~U-12 待接入 |
+| K4 | CI 门禁（构建/测试/对比度/i18n/架构契约） | ◐ CTest + 对比度 125 项 | ✅ 1737 行 ci.yml + 33 工作流 | ✅ 9 工作流 + i18n 扫描 + actionlint | P1 | 接入 E2E runner 与 i18n 缺 key 检查 |
+| K5 | 性能基准与内存/DOM 审计 | ◐ §12.6 预算，未实测 | ✅ 大 schema / DOM / 内存审计 | ✅ 请求追踪 / IPC profile | P1 | 把 §12.6 预算变成可跑的基准 |
+| K6 | 崩溃 minidump / 复现包 / 请求诊断 | ◐ 文本崩溃日志 | ✅ 请求诊断 | ✅ 脱敏复现包 | P2 | 可选 minidump |
+| K7 | 文档：功能文档站 / 变更日志 / 路线图 | ◐ README + CODEPLAN + CHANGELOG | ✅ 70+ 篇 docs | ✅ 专题文档 + Roadmap | P1 | 按功能补「使用说明」而非堆文档 |
+| K8 | 版本兼容（Win7 / 多架构 / 跨平台） | ✗ Windows + WebView2 | ✅ Win7 兼容构建 | ✅ 三平台 | — | TauriCPP 是 Win32 壳，跨平台需另做 |
+
+### 19.3 优先级结论
+
+**P0（v1.1，完成度底线，不改变定位）**
+1. XLSX 导入/导出（G1/G2）——对标中最普遍的格式缺口。
+2. 结果复制为 INSERT/UPDATE、DML 只读预览（E4/D5）——延续「写操作可预览」底线。
+3. ER 只读关系图（I1）与 EXPLAIN 计划树（I4）——已有元数据/计划数据源，投入产出比高。
+4. 连接分组/颜色落地、配置导入导出、断线自动重连（B2/B3/B6）。
+5. 对象树远程搜索接前端（C2）、查询历史落 `history.jsonl`（D3）、PG 完整 DDL 还原（F3）。
+6. i18n 补齐动态视图（J10）、前端 Playwright E2E 与 CI 接入（K3/K4）。
+
+**P1（v1.2，专业增强）**：SSH/代理、SSL 证书 UI、只读 Schema/Data Diff、结果图表、单元格详情增强、模拟数据、会话/锁等待面板、SQL 审计、流式 SQL 文件执行、转储纳入视图定义、`query.ack` 背压、触发器/分区设计器、`Capabilities` 门控、多引擎版本矩阵、版本检查。
+
+**P2（v2.0，需重新评估定位）**：新驱动（SQL Server/Oracle）、数据传输同步、定时备份、插件 SDK、MCP Server、AI 助手（显式授权、默认不执行）、CLI、Vim/Slash 命令、字段血缘、结果集 Diff、minidump。
+
+**明确不做（写清理由）**：100+ 异构数据源与可选驱动代理（需厂商 SDK/后台进程）、Web/Docker/K8s/CLI 服务端形态（需账号体系与网络暴露）、云同步与团队空间（违背本地优先）、插件市场与签名沙箱（引入外部代码执行）、后台常驻调度与 CDC（违背「关掉即结束」）、用户权限管理与长期监控（目标用户不是 DBA）、PL/SQL 调试器（超出三引擎范围）、Win7/跨平台（TauriCPP 是 Win32 + WebView2 壳）。
+
+### 19.4 Gap → E2E 映射
+
+| 已有 E2E 守护 | 覆盖的 Gap / 风险 |
+|---|---|
+| E2E-01/02/03/04/13 | A6 能力位、A7 版本号、B3/B6 连接错误、D8 分割一致性 |
+| E2E-05/06/12 | C1/C4 元数据、数值精度回归、真实数据正确性、PG 空表列头 |
+| E2E-07/08/09 | E1 虚拟网格后端、E2 背压前置、E3 取消、§12.6 性能预算 |
+| E2E-10/11/14 | B7/B8 只读与安全、G1/G2 格式基线、I4 计划数据源 |
+
+**新增功能必须同步补的 E2E 项**（沿用 `E2E-xx` 编号，双引擎各跑一遍）：
+
+| 拟编号 | 触发功能 | 断言要点 |
+|---|---|---|
+| E2E-15 | XLSX 导入/导出（P0） | 中文/数字/日期/NULL 往返，>1,048,575 行分 sheet |
+| E2E-16 | 复制为 INSERT/UPDATE（P0） | 生成 SQL 可直接在三引擎执行且值不丢精度 |
+| E2E-17 | DML 只读预览（P0） | 预览不产生副作用，影响行数与执行一致 |
+| E2E-18 | ER 图 / EXPLAIN 树（P0） | FK 边数与 `information_schema` 一致；计划节点非空 |
+| E2E-19 | 断线重连 / 配置导入导出（P0） | 重连后标签保留；配置 roundtrip 密码不出进程 |
+| E2E-20 | PG 完整 DDL（P0） | 重建 SQL 与 `pg_dump --schema-only` 关键对象一致 |
+| E2E-21 | Schema Diff / Data Compare（P1） | 只读对比不写库；Added/Removed/Modified 计数正确 |
+| E2E-22 | 审计 / i18n / 主题（P0-P1） | 日志不含密码；动态视图无硬编码中文；对比度 ≥4.5 |
+
+### 19.5 本轮实测发现与修复（2026-11-15）
+
+| # | 发现 | 处理 |
+|---|---|---|
+| 1 | PG 对 0 行 `SELECT` 不回传列元数据（E2E-05 首轮 FAIL） | 修 `src/db/drivers/postgres_driver.cpp`：抽出 `capture_columns()`，`PGRES_TUPLES_OK` 也采集列头并补发空批次；双引擎转绿 |
+| 2 | PG 服务端版本显示为 `18.0.7`（实际 18.7） | 同文件 `ServerVersion()` 对 `PQserverVersion >= 100000` 使用 `major.minor`；实测 `18.7` |
+| 3 | 系统 PG 无 `employees` 库，与口述测试源不符 | 新增 `tests/e2e/seed_pg_employees.sql` 精简镜像 + runner `--seed-pg-employees`；自动探测/回退并告警 |
+| 4 | 大小写重复的代理变量触发 MSBuild `MSB6001`，CL.exe 无法启动 | `tools/e2e_runner.py` 构建子进程剔除小写重复键；§12.1 记录手工等价命令 |
+| 5 | §0.1 里程碑状态、§12.1 环境、§12.2 测试清单、§12.4 E2E 均与实现不符 | 全文回写，见 §0.2 新增偏差记录 |
+
+**验证结果**：`ctest -C Release` 10/10 通过；`e2e_real_db` 28 passed / 0 failed / 0 skipped（MySQL 8.4.13 `employees` + PostgreSQL 18.7 `employees`）；`integration_db` 双引擎 M5 CRUD / M6 DDL 写路径全绿；报告 `build/e2e-report.md`。
+
+### 19.6 证据索引
+
+| 用途 | 路径 |
+|---|---|
+| dbx 功能与文档 | `D:\Cplusplus\dbx-0.6.69\README.md` / `README.zh-CN.md`、`docs/content/docs/`（databases / schema-browser / query-editor / data-grid / table-structure / table-import / database-export / schema-diff / data-transfer / database-backup / ai-assistant / mcp / plugin-development / production-safety / ssh-tunnel / specialized-workspaces）、`handoff.md`、`crates/dbx-core/assets/database-drivers.manifest.json`、`plugins/`、`packages/app-tests/`、`crates/dbx-core/tests/` |
+| GoNavi 功能与文档 | `D:\Cplusplus\GoNavi-1.2.2\README.md` / `README.zh-CN.md`、`AGENTS.md`、`AI_EXTENSIONS_ROADMAP.md`、`DATA_SYNC_TASKS.md`、`HIVE_SUPPORT.md`、`cmd/gonavi-mcp-server/README.md`、`internal/{app,db,ai,mcpserver,sync,plugin,dbuser,sqlaudit,webserver}/`、`frontend/src/components/`、`tools/contract-test/README.md`、`.github/workflows/backend-tests.yml` |
+| Silkit 本轮产物 | `CODEPLAN.md` §0/§1.3/§4/§12/§14/§19、`tests/e2e/e2e_real_db.cpp`、`tests/e2e/seed_pg_employees.sql`、`tests/CMakeLists.txt`、`tools/e2e_runner.py`、`src/db/drivers/postgres_driver.cpp`、`build/e2e-report.md` |
+
+> 本章是「唯一计划源」的增量：任何与实现不一致的地方仍以 §0.2 偏差记录为准；Gap 优先级调整时同步刷新 §14 路线图与 §12.4 测试矩阵。
 

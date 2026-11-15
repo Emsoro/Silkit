@@ -739,9 +739,15 @@
             }
         }
 
-        function requestClose() {
+        async function requestClose() {
             if (!current) return;
-            if (dirty() && !window.confirm('有未应用的变更，确定关闭设计器？')) return;
+            if (dirty() && !(await U.confirm({
+                title: '关闭设计器',
+                message: '有未应用的变更，确定关闭设计器？',
+                hint: '未应用的列 / 索引 / 外键变更会丢失。',
+                okText: '关闭',
+                danger: true
+            }))) return;
             close();
         }
 

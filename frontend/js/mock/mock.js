@@ -1564,7 +1564,7 @@
         switch (cmd) {
             case 'app.info':
                 reply(reqId, {
-                    ok: true, name: 'Silkit', version: '1.0.0', build: 'browser mock',
+                    ok: true, name: 'Silkit', version: '1.0.1', build: 'browser mock',
                     platform: 'web', engines: ['sqlite', 'mysql', 'postgres'],
                     plannedEngines: [], dataDir: '(browser mock)'
                 });

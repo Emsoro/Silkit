@@ -18,21 +18,40 @@
     let workbench = null;
 
     // ------------------------------------------------------------------ Toast
-    function toast(message, variant) {
+    // options.copyText：错误提示可附带「复制信息」按钮，并延长停留时间以便点击。
+    function toast(message, variant, options) {
         const host = $('toastHost');
         if (!host) return;
+        const copyValue = options && options.copyText ? String(options.copyText) : '';
 
         const node = document.createElement('div');
         node.className = 'toast' + (variant ? ' toast-' + variant : '');
         node.innerHTML = (window.Icons ? window.Icons.svg(variant === 'error' ? 'warning' : 'sparkle', 16) : '') +
             '<span class="toast-text"></span>';
         node.querySelector('.toast-text').textContent = message;
+        if (copyValue) {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'toast-copy';
+            button.textContent = '复制信息';
+            button.title = '复制完整错误信息与连接诊断（不含密码）';
+            button.addEventListener('click', function () {
+                const copy = window.SilkitUtil && window.SilkitUtil.copyText;
+                if (!copy) return;
+                Promise.resolve(copy(copyValue)).then(function () {
+                    button.textContent = '已复制';
+                }).catch(function () {
+                    button.textContent = '复制失败';
+                });
+            });
+            node.appendChild(button);
+        }
         host.appendChild(node);
 
         setTimeout(function () {
             node.classList.add('is-out');
             setTimeout(function () { node.remove(); }, 220);
-        }, 2800);
+        }, copyValue ? 8000 : 2800);
     }
 
     // ------------------------------------------------------------ 主题面板
@@ -225,7 +244,8 @@
     }
 
     function modalOpen() {
-        const ids = ['connDialog', 'cellViewer', 'detailDialog', 'tablePreview', 'ioDialog', 'settingsDialog'];
+        const ids = ['connDialog', 'cellViewer', 'detailDialog', 'tablePreview', 'ioDialog',
+                     'settingsDialog', 'ddlConfirm', 'designerDialog', 'appConfirm'];
         for (let i = 0; i < ids.length; i += 1) {
             const node = $(ids[i]);
             if (node && !node.hidden) return true;
@@ -396,7 +416,7 @@
 
         try {
             const info = await api.info();
-            const version = 'v' + (info.version || '1.0.0');
+            const version = 'v' + (info.version || '1.0.1');
             if ($('statusVersion')) $('statusVersion').textContent = version;
         } catch (error) {
             if ($('ipcStatus')) $('ipcStatus').textContent = 'IPC 不可用';
@@ -404,8 +424,6 @@
         }
 
         if (!bridge.isNative) {
-            const tag = document.querySelector('.brand-tag');
-            if (tag) tag.textContent = 'M8 · Mock';
             if ($('ipcStatus')) $('ipcStatus').textContent = 'IPC 就绪（浏览器 Mock）';
         }
 

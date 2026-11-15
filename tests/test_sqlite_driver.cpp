@@ -18,6 +18,12 @@ namespace {
 int g_failed = 0;
 int g_total = 0;
 
+// C++20 起 path::u8string() 返回 std::u8string(char8_t)，ConnectParams.file 是 std::string。
+std::string Utf8Path(const std::filesystem::path& path) {
+    const std::u8string text = path.u8string();
+    return std::string(reinterpret_cast<const char*>(text.data()), text.size());
+}
+
 void Expect(bool condition, const std::string& name) {
     ++g_total;
     if (condition) return;
@@ -138,7 +144,7 @@ int main() {
         fs::create_directories(dir, ec);
 
         ConnectParams params;
-        params.file = (dir / "grid.db").u8string();
+        params.file = Utf8Path(dir / "grid.db");
         silkit::session::SessionManager manager;
         silkit::session::OpenOutcome outcome;
         DbError err;
@@ -217,7 +223,7 @@ int main() {
         std::error_code ec;
         fs::remove(file, ec);
         ConnectParams writable;
-        writable.file = file.u8string();
+        writable.file = Utf8Path(file);
         DbError err;
         SqliteDriver driver;
         auto seed = driver.Open(writable, err);

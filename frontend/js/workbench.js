@@ -335,14 +335,7 @@
         }
 
         function updateStatus() {
-            const session = state.activeSession();
-            const mode = byId('statusMode');
             const run = byId('runBtn');
-            if (mode) {
-                mode.textContent = session
-                    ? (I ? I.t('status.modeConnected') : 'M8 · 已连接')
-                    : (I ? I.t('status.mode') : 'M8 · 等待连接');
-            }
             if (run) run.disabled = !!(state.activeTab() && state.activeTab().running);
         }
 

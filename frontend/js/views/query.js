@@ -38,7 +38,7 @@
         }
 
         // 安全模式：后端返回 confirm_required 时展示危险语句并二次确认。
-        function confirmDanger(details) {
+        async function confirmDanger(details) {
             const info = details || {};
             const statements = Array.isArray(info.statements) ? info.statements : [];
             const I = window.SilkitI18n;
@@ -50,7 +50,14 @@
                 return '#' + (Number(item.index) + 1) + '  ' +
                     String(item.sql || '').replace(/\s+/g, ' ').slice(0, 120);
             }).join('\n');
-            return window.confirm(title + '\n\n' + summary + (preview ? '\n\n' + preview : ''));
+            return window.SilkitUtil.confirm({
+                title: title,
+                message: summary,
+                hint: '这些语句会直接作用于当前数据库，可在「设置」中关闭安全模式。',
+                preview: preview,
+                okText: '仍然执行',
+                danger: true
+            });
         }
 
         async function run(tab, scope, confirm) {
@@ -116,7 +123,7 @@
                 } else if (error && error.code === 'confirm_required') {
                     tab.task = null;
                     setRunning(tab, false);
-                    if (confirmDanger(error.details)) {
+                    if (await confirmDanger(error.details)) {
                         return run(tab, scope, {
                             confirmDestructive: true,
                             confirmToken: error.details && error.details.token

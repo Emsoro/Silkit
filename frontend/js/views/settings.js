@@ -151,9 +151,14 @@
             });
         }
 
-        function reset() {
+        async function reset() {
             if (busy) return;
-            if (!window.confirm(t('settings.resetConfirm'))) return;
+            if (!(await U.confirm({
+                title: '恢复默认设置',
+                message: t('settings.resetConfirm'),
+                okText: '恢复默认',
+                danger: true
+            }))) return;
             busy = true;
             api.settingsReset().then(function (result) {
                 const settings = (result && result.settings) || {};

@@ -507,14 +507,22 @@ std::unique_ptr<Connection> MySqlDriver::Open(const ConnectParams& params, DbErr
                       params.ssl_ca.empty() ? nullptr : params.ssl_ca.c_str(),
                       nullptr, nullptr);
     }
-    if (params.ssl_mode == "require" || params.ssl_mode == "verify-ca" ||
-        params.ssl_mode == "verify-full") {
-        my_bool enforce = 1;
-        mysql_options(handle, MYSQL_OPT_SSL_ENFORCE, &enforce);
-    } else if (params.ssl_mode == "disable") {
-        my_bool enforce = 0;
-        mysql_options(handle, MYSQL_OPT_SSL_ENFORCE, &enforce);
-    }
+    // MariaDB Connector/C 3.4 起默认要求校验服务端证书（tls_allow_invalid_server_cert=0），
+    // 认证阶段会无条件把 options.use_ssl 置 1；此时单独设置 MYSQL_OPT_SSL_ENFORCE=0 无效，
+    // 对不声明 CLIENT_SSL 的服务端（如 MySQL 协议代理）仍报 2026
+    // "SSL is required, but the server does not support it"。
+    // 因此必须显式写 MYSQL_OPT_SSL_VERIFY_SERVER_CERT：
+    //   prefer           -> enforce=1, verify=0：可用则加密，服务端不支持时明文回退
+    //   disable          -> enforce=0, verify=0：始终明文
+    //   require/verify-* -> enforce=1, verify=1：必须 TLS，服务端不支持时明确报错
+    // 注意 mysql_ssl_set() 内部会把 enforce 置 1，故 SSL 选项必须在它之后设置。
+    const bool strict_tls = params.ssl_mode == "require" ||
+                            params.ssl_mode == "verify-ca" ||
+                            params.ssl_mode == "verify-full";
+    my_bool verify_server_cert = strict_tls ? 1 : 0;
+    mysql_options(handle, MYSQL_OPT_SSL_VERIFY_SERVER_CERT, &verify_server_cert);
+    my_bool enforce = params.ssl_mode == "disable" ? 0 : 1;
+    mysql_options(handle, MYSQL_OPT_SSL_ENFORCE, &enforce);
 
     const unsigned int port = static_cast<unsigned int>(
         params.port.empty() ? std::strtoul(DefaultPort(Engine::MySql), nullptr, 10)

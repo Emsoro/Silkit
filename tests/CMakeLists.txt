@@ -107,3 +107,10 @@ add_executable(integration_db integration_db.cpp)
 target_link_libraries(integration_db PRIVATE silkit_test_lib)
 add_test(NAME integration_db COMMAND integration_db)
 set_tests_properties(integration_db PROPERTIES TIMEOUT 90)
+
+# E2E：真实 MySQL / PostgreSQL 服务器上的用例矩阵（CODEPLAN §12.4 / §12.9）。
+# 通过 SILKIT_MYSQL_HOST / SILKIT_PG_HOST 启用；未设置时整组 SKIP 且不计入失败。
+add_executable(e2e_real_db e2e/e2e_real_db.cpp)
+target_link_libraries(e2e_real_db PRIVATE silkit_test_lib)
+add_test(NAME e2e_real_db COMMAND e2e_real_db)
+set_tests_properties(e2e_real_db PROPERTIES TIMEOUT 180)

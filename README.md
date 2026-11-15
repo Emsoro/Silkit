@@ -1,10 +1,21 @@
 # Silkit
 
-跨库数据库工作台（MySQL / MariaDB / PostgreSQL / SQLite），Windows 桌面端。
-C++17 + Win32 + WebView2，前端为原生 HTML/CSS/JS，无 Node 构建步骤。
+**简体中文** · [English](README.en.md)
 
-> 当前版本：**v1.0.0**。进度：**M0–M9 全部交付**：连接 → 对象树 → CodeMirror SQL 编辑器 → 流式结果（多结果/EXPLAIN）→ 表格数据编辑 → 表设计器 → 历史/片段 → CSV 导入、五种格式流式导出、SQL 转储 → 设置面板、安全模式与日志脱敏 → 发布打包。
+跨库数据库工作台（MySQL / MariaDB / PostgreSQL / SQLite），Windows 桌面端。
+C++20 + Win32 + WebView2，前端为原生 HTML/CSS/JS，无 Node 构建步骤。
+
+> 当前版本：**v1.0.1**（2026-11-15）。进度：**M0–M9 全部交付**：连接 → 对象树 → CodeMirror SQL 编辑器 → 流式结果（多结果/EXPLAIN）→ 表格数据编辑 → 表设计器 → 历史/片段 → CSV 导入、五种格式流式导出、SQL 转储 → 设置面板、安全模式与日志脱敏 → 发布打包。
 > 完整计划与偏差记录见 [CODEPLAN.md](CODEPLAN.md)。
+
+## 版本说明
+
+| 版本 | 日期 | 类型 | 说明 |
+|---|---|---|---|
+| **v1.0.1** | 2026-11-15 | 维护版 | 修复 MariaDB Connector/C 3.4.5 在无 TLS 的 MySQL 协议服务端（如 SQLTiny）上即使选择 `disable` 仍强制 SSL 的连接失败；连接失败错误条与 toast 新增「复制信息」一键复制完整诊断；编译标准升级到 **C++20**；补充真实库 E2E 矩阵与一键执行入口；界面移除顶栏 `M8` 徽章与状态栏 M8 连接状态，右下角版本号改用徽章小胶囊样式；所有确认弹窗统一为主题化界面，不再弹出系统原生白框。详见 [CHANGELOG.md](CHANGELOG.md)。 |
+| v1.0.0 | 2026-11-14 | 首个正式版 | M0–M9 全部交付，Windows 单 exe 便携发布（`Silkit-1.0.0-win-x64.zip`），内置 MySQL / MariaDB / PostgreSQL / SQLite 驱动。 |
+
+> 版本号以 `CMakeLists.txt` 的 `project(Silkit VERSION ...)` 为唯一来源；`vcpkg.json`、`src/app/version.h`、状态栏、Mock 后端与本文档保持一致，exe 版本资源由 CMake 自动生成。执行 `python tools/check_version.py` 校验一致性。
 
 ## 功能概览
 
@@ -26,22 +37,22 @@ C++17 + Win32 + WebView2，前端为原生 HTML/CSS/JS，无 Node 构建步骤�
 | SQLite 3.45+ | ✅ | ✅ | ✅ | ✅ | ✅ | 自动化测试全绿 |
 | MySQL 8.x | ✅ | ✅ | ✅ | ✅ | ✅ | 对照 8.4.13 实机验收 |
 | MariaDB 10.x / 11.x | ✅ | ✅ | ✅ | ✅ | ✅ | 共用 libmariadb 驱动，未逐版本部署 |
-| PostgreSQL 13–18 | ✅ | ✅ | ✅ | ✅ | ✅ | 对照 18.0.7 实机验收 |
+| PostgreSQL 13–18 | ✅ | ✅ | ✅ | ✅ | ✅ | 对照 18.7 实机验收 |
 
 > 平台：Windows 10 1809+ / Windows 11（x64）。依赖系统 Microsoft Edge WebView2 Runtime。
 
-## M9 发布 1.0 已交付
+## 发布与打包（M9 于 v1.0.0 交付）
 
-- **版本信息**：`CMakeLists.txt`、`vcpkg.json`、`src/app/version.h`、状态栏与 Mock 后端统一为 `1.0.0`；`tools/check_version.py` 校验各处一致。
+- **版本信息**：`CMakeLists.txt`、`vcpkg.json`、`src/app/version.h`、状态栏与 Mock 后端统一为 `1.0.1`（首发版 `1.0.0`）；exe 版本资源由 CMake 依据 `PROJECT_VERSION` 生成，`tools/check_version.py` 校验各处一致。
 - **图标与窗口**：exe 内嵌多分辨率 `app_icon.ico`，标题栏/任务栏使用大小两种尺寸；窗口标题为「Silkit — 跨库数据库工作台」。
 - **关于页**：显示版本、数据目录、日志目录、配置文件与当前日志，可直接打开数据/日志目录。
 - **许可声明**：[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) 列出 TauriCPP、nlohmann/json、WebView2 SDK、SQLite、libmariadb、libpq 与 CodeMirror 的许可证与源码地址。
-- **发布包**：`tools/package.ps1` 构建 Release 并生成 `dist/Silkit-1.0.0-win-x64.zip`（exe + README + LICENSE + 第三方声明），解压即用。
+- **发布包**：`tools/package.ps1` 构建 Release 并生成 `dist/Silkit-1.0.1-win-x64.zip`（exe + README + LICENSE + 第三方声明），解压即用；压缩包名中的版本号从 `CMakeLists.txt` 读取，无需手工同步。
 - **验收**：CTest 全绿、对比度检查通过、版本一致性检查通过；干净 Windows 11 虚拟机冒烟待人工执行（见下方清单）。
 
 ## 发布验收清单
 
-- [ ] 干净 Windows 11（有 WebView2）：解压 `dist/Silkit-1.0.0-win-x64.zip`，双击 `Silkit.exe` 能启动并显示晨樱主题。
+- [ ] 干净 Windows 11（有 WebView2）：解压 `dist/Silkit-1.0.1-win-x64.zip`，双击 `Silkit.exe` 能启动并显示晨樱主题。
 - [ ] 无 WebView2 的 Windows 10：启动时出现中文安装引导，安装运行时后可用。
 - [ ] 三库回归：SQLite 文件库、MySQL 8.x、PostgreSQL 13+ 各完成连接 → 对象树 → 查询 → 编辑表数据 → 设计表 → 导出/导入。
 - [ ] 重启后标签、SQL、侧栏布局恢复；五套主题切换无白闪。
@@ -129,9 +140,10 @@ C++17 + Win32 + WebView2，前端为原生 HTML/CSS/JS，无 Node 构建步骤�
 - **PostgreSQL**：`libpq` 静态库；`PQconnectdbParams`（`search_path`、`bytea_output=hex`）、`PQsetSingleRowMode` 单行流式、`PQsendQueryParams` 参数化、`PQcancel` 取消、`pg_catalog` 元数据、`pg_get_*def` DDL 与目录简化重建、SQLSTATE 错误映射。
 - **共用**：`db/engine_dialect.*` 汇总类型映射 / 错误提示 / 元数据 SQL；`ipc/commands_meta_engine.*` 为 `meta.*` 做引擎分派，SQLite 路径保持不变；`conn.set_database` 按引擎分别用 `USE` / 重连 / ATTACH。
 - **前端**：连接对话框启用引擎选择，MySQL/PG 表单（主机/端口/用户/密码/库/schema/字符集/SSL/超时/初始 SQL）、密码 DPAPI 保存、测试连接；对象树按引擎显示徽章并传递 `schema`。
-- **测试**：`engine_dialect`（类型/错误/SQL 生成，无需服务器）、`integration_db`（按 `SILKIT_MYSQL_*` / `SILKIT_PG_*` 环境变量连接真实服务器，未设置时跳过）。
+- **测试**：`engine_dialect`（类型/错误/SQL 生成，无需服务器）、`integration_db`（按 `SILKIT_MYSQL_*` / `SILKIT_PG_*` 环境变量连接真实服务器，未设置时跳过）、`e2e_real_db`（14 项 × 双引擎真实库 E2E 矩阵；可选 `SSL-01~03` 覆盖不声明 `CLIENT_SSL` 的 MySQL 协议服务端，用 `--mysql-nossl-host` 启用）。一键执行 `python tools/e2e_runner.py`，详见 `CODEPLAN.md` §12.4 / §12.9。
+- **连接失败诊断**：错误条与错误提示最右侧均有「复制信息」，复制完整错误（错误码 / SQLSTATE / 详情 / 提示）与连接上下文，不含密码。MySQL 报 `2026 TLS/SSL error` 时按提示把「字符集 / SSL」设为 `disable`（或保持 `prefer` 自动降级）。
 
-> 验收记录：MySQL 8.4.13 与 PostgreSQL 18.0.7 均完成连接、`SELECT 1`、对象树（库/文件夹/表/列/详情/搜索/DDL）、取消与错误提示的端到端验证（含本机部署的 MySQL 8.4.13 与 PostgreSQL 18）。
+> 验收记录：MySQL 8.4.13 与 PostgreSQL 18.7 均完成连接、`SELECT 1`、对象树（库/文件夹/表/列/详情/搜索/DDL）、取消与错误提示的端到端验证（含本机部署的 MySQL 8.4.13 与 PostgreSQL 18；此前状态栏把 PG 版本显示为 `18.0.7`，已修复为 `18.7`）。
 > 已知缺口：PG 表 DDL 为目录简化重建，与 `pg_dump --schema-only` 有差距；MariaDB 11、PostgreSQL 13–16 未逐版本部署（同驱动路径）；类型矩阵与性能验收（5000 表 / 1000 表元数据）未实测。
 
 ## 构建
@@ -141,7 +153,8 @@ C++17 + Win32 + WebView2，前端为原生 HTML/CSS/JS，无 Node 构建步骤�
 | 依赖 | 版本 / 说明 |
 |---|---|
 | Windows | 10 1809+ / 11 |
-| Visual Studio | 2022（Desktop development with C++） |
+| Visual Studio | 2022（Desktop development with C++，需支持 `/std:c++20`） |
+| C++ 标准 | C++20（`CMAKE_CXX_STANDARD 20`、`CMAKE_CXX_EXTENSIONS OFF`） |
 | CMake | 3.21+ |
 | vcpkg | 安装在 `C:\vcpkg`，或设置 `VCPKG_ROOT` |
 | Python | 3.8+（前端资源打包、对比度检查） |
@@ -175,7 +188,7 @@ C:\vcpkg\vcpkg.exe install webview2:x64-windows-static sqlite3:x64-windows-stati
 ### 发布包
 
 ```powershell
-# 构建 Release、运行 CTest 并生成 dist/Silkit-1.0.0-win-x64.zip
+# 构建 Release、运行 CTest 并生成 dist/Silkit-1.0.1-win-x64.zip
 .\tools\package.ps1
 
 # 跳过测试 / 只打包已构建的产物
@@ -255,14 +268,14 @@ Silkit/
 - **会话亲和**：每个连接一条 Session 线程，驱动对象不跨线程使用；`Cancel()` 单独设计，可跨线程调用。
 - **流式结果**：`query.execute` 按语句发 `statement` / `batch`，首批携带列元数据，达到 `maxRows` 后标记 `truncated`。
 
-## 已知限制（v1.0.0）
+## 已知限制（v1.0.1）
 
 - **平台**：目前仅 Windows 桌面端，依赖系统 WebView2 运行时；macOS / Linux 尚未支持。
 - **导入 / 导出 / 转储**：CSV 导入需整文件读入（上限 256MB）；SQL 文件执行整文件读入（上限 512MB）后逐条执行，尚未按块流式拆分；SQL 转储只覆盖表结构与数据，视图/函数/触发器定义请从详情面板另存 `.sql`。
 - **转储兼容性**：PostgreSQL 的结构由 `LoadDdlDefinition` 重建，与 `pg_dump` 输出存在差异；跨引擎恢复需自行调整类型方言。
 - **结果流式背压**：`query.ack` 背压尚未实现，超大结果集依赖 `maxRows` 截断，建议显式限制返回行数。
 - **PostgreSQL 表 DDL**：为目录简化重建，与 `pg_dump --schema-only` 存在差异；视图 / 函数 / 触发器的定义编辑需在详情面板查看 DDL 后手动保存 `.sql`，表设计器暂仅覆盖表对象。
-- **引擎版本覆盖**：已对照真实 MySQL 8.4.13 与 PostgreSQL 18.0.7 验收；MariaDB 11、PostgreSQL 13–16 等未逐版本部署（共用驱动路径，未单独验证）。
+- **引擎版本覆盖**：已对照真实 MySQL 8.4.13 与 PostgreSQL 18.7 验收；MariaDB 11、PostgreSQL 13–16 等未逐版本部署（共用驱动路径，未单独验证）。
 - **性能验收**：5000 表 / 1000 表元数据等大规模场景、类型矩阵尚未实测。
 - **i18n**：中英文覆盖顶栏、侧栏、编辑器工具栏、结果标签、状态栏、设置与危险确认；对象树、历史、表设计器、导入导出对话框的动态文案仍为中文，后续逐步补齐。
 - **会话恢复**：恢复激活标签、编辑器滚动与侧栏布局；结果网格与对象树的滚动位置不持久化。

@@ -28,15 +28,8 @@
     z-index: 30;
 }
 
-.brand {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding-right: 6px;
-    user-select: none;
-}
-
-.brand-tag {
+/* 状态栏版本号沿用原顶栏徽章的小胶囊样式（顶栏 M8 徽章已移除） */
+#statusVersion {
     font-size: 10px;
     font-weight: 600;
     letter-spacing: .06em;
@@ -1057,10 +1050,42 @@
     animation: toast-in var(--dur) var(--ease);
 }
 
+.toast-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
 .toast svg {
+    flex: 0 0 auto;
     width: 15px;
     height: 15px;
     color: var(--accent);
+}
+
+/* 错误 toast 右侧的「复制信息」按钮 */
+.toast-copy {
+    flex: 0 0 auto;
+    padding: 1px 7px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--text-dim);
+    font-family: inherit;
+    font-size: 11px;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.toast-copy:hover {
+    color: var(--text);
+    border-color: var(--accent);
+}
+
+.toast-copy:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
 }
 
 .toast-error svg {

@@ -27,6 +27,13 @@ namespace {
 int g_failed = 0;
 int g_total = 0;
 
+// C++20 起 path::u8string() 返回 std::u8string(char8_t)，而 ConnectParams/printf
+// 需要 UTF-8 的 std::string；逐字节 reinterpret 保持路径编码不变。
+std::string Utf8Path(const std::filesystem::path& path) {
+    const std::u8string text = path.u8string();
+    return std::string(reinterpret_cast<const char*>(text.data()), text.size());
+}
+
 void Expect(bool condition, const std::string& name) {
     ++g_total;
     if (condition) return;
@@ -250,7 +257,7 @@ int main() {
             std::error_code ec;
             fs::remove(file, ec);
             ConnectParams write_params = params;
-            write_params.file = file.u8string();
+            write_params.file = Utf8Path(file);
             auto writable = driver.Open(write_params, error);
             Expect(writable != nullptr, "SQLite 打开临时文件");
             if (writable) {
@@ -280,7 +287,7 @@ int main() {
         silkit::session::SessionManager manager;
         silkit::db::ConnectParams params;
         params.engine = silkit::db::Engine::Sqlite;
-        params.file = (dir / "session.db").u8string();
+        params.file = Utf8Path(dir / "session.db");
 
         silkit::session::OpenOutcome outcome;
         silkit::db::DbError error;
@@ -313,7 +320,7 @@ int main() {
 
         silkit::Logger::Instance().Init(dir);
         std::printf("  logger path: %s\n",
-                    silkit::Logger::Instance().CurrentFile().u8string().c_str());
+                    Utf8Path(silkit::Logger::Instance().CurrentFile()).c_str());
         silkit::LogInfo("logger smoke test");
         silkit::Logger::Instance().Shutdown();
 

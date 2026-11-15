@@ -13,6 +13,7 @@
         let editingId = '';
         let busy = false;
         let profilesLoaded = false;
+        let lastErrorReport = '';
 
         function byId(id) { return document.getElementById(id); }
 
@@ -34,7 +35,8 @@
             [
                 'connDialog', 'connDialogClose', 'connTitle', 'connCloseX', 'connName', 'connEngine',
                 'connFile', 'connBrowse', 'connNewFile', 'connReadOnly', 'connBusyTimeout',
-                'connForeignKeys', 'connJournal', 'connError', 'connTestStatus', 'connList',
+                'connForeignKeys', 'connJournal', 'connError', 'connErrorText',
+                'connErrorCopy', 'connTestStatus', 'connList',
                 'connTest', 'connSaveBtn', 'connConnectBtn', 'connDelete', 'sqliteFields',
                 'connEmptyList', 'connAdvanced', 'serverFields', 'connHost', 'connPort',
                 'connUser', 'connPassword', 'connDatabase', 'connSchemaField', 'connSchema',
@@ -56,6 +58,9 @@
                 }
             });
 
+            if (dom.connErrorCopy) {
+                dom.connErrorCopy.addEventListener('click', copyErrorReport);
+            }
             dom.connBrowse.addEventListener('click', function () { pickFile(false); });
             dom.connNewFile.addEventListener('click', function () { pickFile(true); });
             dom.connTest.addEventListener('click', testConnection);
@@ -168,16 +173,83 @@
             if (dom.connDelete) dom.connDelete.hidden = !editingId;
         }
 
-        function clearError() {
-            if (!dom.connError) return;
-            dom.connError.hidden = true;
-            dom.connError.textContent = '';
+        // 复制的诊断信息带上连接上下文，但不包含密码或任何凭据。
+        function diagnosticContext() {
+            const engine = engineValue();
+            const lines = [
+                'Silkit 连接诊断',
+                '时间：' + new Date().toLocaleString(),
+                '引擎：' + (ENGINE_LABELS[engine] || engine)
+            ];
+            if (engine === 'sqlite') {
+                lines.push('数据库文件：' + (dom.connFile.value.trim() || '(未设置)'));
+                lines.push('只读：' + (dom.connReadOnly.checked ? '是' : '否'));
+            } else {
+                lines.push('主机：' + (dom.connHost.value.trim() || '127.0.0.1') + ':' +
+                           (dom.connPort.value.trim() || DEFAULT_PORTS[engine] || '(默认)'));
+                lines.push('用户：' + (dom.connUser.value.trim() || '(未设置)'));
+                lines.push('数据库：' + (dom.connDatabase.value.trim() || '(未设置)'));
+                lines.push('SSL 模式：' + (dom.connSslMode ? dom.connSslMode.value : 'prefer'));
+                lines.push('字符集：' + (dom.connCharset.value.trim() || '(默认)'));
+            }
+            lines.push('说明：不含密码与凭据');
+            return lines;
         }
 
-        function setError(message) {
+        function buildErrorReport(message, error) {
+            const text = String(message || '连接失败');
+            const visible = [text];
+            const lines = diagnosticContext();
+            lines.push('错误信息：' + text);
+            if (error) {
+                if (error.code != null && error.code !== 'unknown') {
+                    lines.push('错误码：' + error.code);
+                }
+                if (error.sqlState) lines.push('SQLSTATE：' + error.sqlState);
+                if (error.detail && text.indexOf(String(error.detail)) === -1) {
+                    lines.push('详情：' + error.detail);
+                    visible.push(String(error.detail));
+                }
+                if (error.hint) {
+                    lines.push('提示：' + error.hint);
+                    visible.push('提示：' + error.hint);
+                }
+            }
+            return { visible: visible.join('\n'), full: lines.join('\n') };
+        }
+
+        function clearError() {
+            lastErrorReport = '';
             if (!dom.connError) return;
+            dom.connError.hidden = true;
+            if (dom.connErrorText) dom.connErrorText.textContent = '';
+            if (dom.connErrorCopy) dom.connErrorCopy.textContent = '复制信息';
+        }
+
+        // 返回 { visible, full }：错误条显示 visible，复制按钮/错误 toast 使用 full。
+        function setError(message, error) {
+            const report = buildErrorReport(message, error);
+            lastErrorReport = report.full;
+            if (!dom.connError) return report;
+            if (dom.connErrorText) dom.connErrorText.textContent = report.visible;
             dom.connError.hidden = false;
-            dom.connError.textContent = message;
+            if (dom.connErrorCopy) dom.connErrorCopy.textContent = '复制信息';
+            return report;
+        }
+
+        function copyErrorReport() {
+            if (!lastErrorReport) return;
+            Promise.resolve().then(function () {
+                return U.copyText(lastErrorReport);
+            }).then(function () {
+                if (dom.connErrorCopy) dom.connErrorCopy.textContent = '已复制';
+                toast('诊断信息已复制');
+                setTimeout(function () {
+                    if (dom.connErrorCopy) dom.connErrorCopy.textContent = '复制信息';
+                }, 1800);
+            }).catch(function (error) {
+                toast('复制失败：' + (error.message || error), 'error');
+            });
         }
 
         function setStatus(message, ok) {
@@ -426,8 +498,7 @@
                 toast('连接测试成功（' + (result.elapsedMs || 0) + ' ms）');
             } catch (error) {
                 setStatus('', false);
-                setError((error.message || '连接失败') +
-                    (error.detail ? ' · ' + error.detail : ''));
+                setError(error.message || '连接失败', error);
             } finally {
                 setBusy(false);
                 renderProfiles();
@@ -479,10 +550,8 @@
                 await loadProfiles();
                 if (ctx.onOpen) ctx.onOpen(session);
             } catch (error) {
-                const parts = [error.message || '连接失败'];
-                if (error.detail) parts.push(error.detail);
-                setError(parts.join(' · '));
-                toast(parts.join(' · '), 'error');
+                const report = setError(error.message || '连接失败', error);
+                toast(report.visible, 'error', { copyText: report.full });
             } finally {
                 setBusy(false);
                 if (dom.connConnectBtn) {
@@ -495,7 +564,14 @@
         async function deleteProfile(id) {
             const profile = state.profiles.find(function (p) { return p.id === id; });
             const name = profile ? profile.name : id;
-            if (!window.confirm('删除连接「' + name + '」？不会删除数据库文件。')) return;
+            const confirmed = await U.confirm({
+                title: '删除连接',
+                message: '删除连接「' + name + '」？',
+                hint: '仅移除本地保存的连接配置，不会删除数据库文件或远端数据。',
+                okText: '删除',
+                danger: true
+            });
+            if (!confirmed) return;
             try {
                 await api.connDelete(id);
                 if (editingId === id) editingId = '';
@@ -511,7 +587,12 @@
             const session = state.session(sessionId);
             if (!session) return;
             const name = (session.profile && session.profile.name) || sessionId;
-            if (!window.confirm('断开连接「' + name + '」？')) return;
+            const confirmed = await U.confirm({
+                title: '断开连接',
+                message: '断开连接「' + name + '」？',
+                hint: '已打开的查询标签会保留，后续操作需要重新连接。'
+            });
+            if (!confirmed) return;
             try {
                 await api.connClose(sessionId);
             } catch (error) {

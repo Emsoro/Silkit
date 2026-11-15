@@ -471,10 +471,16 @@
             toast('已标记 ' + (removedNew + marked) + ' 行待删除（保存后生效）');
         }
 
-        function revert(tab) {
+        async function revert(tab) {
             const t = ensure(tab);
             if (!dirtyCount(t)) return;
-            if (!window.confirm('撤销当前页所有未保存的修改？')) return;
+            if (!(await U.confirm({
+                title: '撤销修改',
+                message: '撤销当前页所有未保存的修改？',
+                hint: '本页已标记的新增、修改与删除都会还原。',
+                okText: '撤销',
+                danger: true
+            }))) return;
             resetEdits(t);
             rebuild(tab, false);
             updateDirty(tab);
@@ -523,12 +529,17 @@
         }
 
         // ------------------------------------------------------------ 排序/分页/筛选
-        function toggleSort(tab, index) {
+        async function toggleSort(tab, index) {
             const t = ensure(tab);
             const column = t.columns[index];
             if (!column) return;
             if (hasChanges(tab) &&
-                !window.confirm('切换排序会丢弃当前页未保存的修改，继续？')) return;
+                !(await U.confirm({
+                    title: '切换排序',
+                    message: '切换排序会丢弃当前页未保存的修改，继续？',
+                    okText: '继续',
+                    danger: true
+                }))) return;
             if (!t.order || t.order.column !== column.name) {
                 t.order = { column: column.name, desc: false };
             } else if (!t.order.desc) {
@@ -540,12 +551,17 @@
             load(tab);
         }
 
-        function pageBy(tab, delta) {
+        async function pageBy(tab, delta) {
             const t = ensure(tab);
             const next = t.page + delta;
             if (next < 0 || (delta > 0 && !t.hasMore)) return;
             if (hasChanges(tab) &&
-                !window.confirm('切换分页会丢弃当前页未保存的修改，继续？')) return;
+                !(await U.confirm({
+                    title: '切换分页',
+                    message: '切换分页会丢弃当前页未保存的修改，继续？',
+                    okText: '继续',
+                    danger: true
+                }))) return;
             t.page = next;
             load(tab);
         }
@@ -576,10 +592,15 @@
             }
         }
 
-        function applyFilters(tab) {
+        async function applyFilters(tab) {
             const t = ensure(tab);
             if (hasChanges(tab) &&
-                !window.confirm('更改搜索/筛选会丢弃当前页未保存的修改，继续？')) {
+                !(await U.confirm({
+                    title: '更改筛选',
+                    message: '更改搜索/筛选会丢弃当前页未保存的修改，继续？',
+                    okText: '继续',
+                    danger: true
+                }))) {
                 return false;
             }
             t.page = 0;
@@ -592,7 +613,7 @@
             if (dom.tableSearch) {
                 dom.tableSearch.addEventListener('input', function () {
                     clearTimeout(timer);
-                    timer = setTimeout(function () {
+                    timer = setTimeout(async function () {
                         const tab = state.activeTab();
                         if (!tab || tab.kind !== 'table') return;
                         const t = ensure(tab);
@@ -600,7 +621,7 @@
                         const next = dom.tableSearch.value.trim();
                         if (next === previous) return;
                         t.search = next;
-                        if (!applyFilters(tab)) {
+                        if (!(await applyFilters(tab))) {
                             t.search = previous;
                             dom.tableSearch.value = previous;
                         }
@@ -632,7 +653,7 @@
                 });
             }
             if (dom.tableFilterClear) {
-                dom.tableFilterClear.addEventListener('click', function () {
+                dom.tableFilterClear.addEventListener('click', async function () {
                     const tab = state.activeTab();
                     if (!tab) return;
                     const t = ensure(tab);
@@ -642,7 +663,7 @@
                     t.search = '';
                     if (dom.tableSearch) dom.tableSearch.value = '';
                     renderFilters(tab);
-                    if (!applyFilters(tab)) {
+                    if (!(await applyFilters(tab))) {
                         t.filters = previousFilters;
                         t.search = previousSearch;
                         if (dom.tableSearch) dom.tableSearch.value = previousSearch;
@@ -651,7 +672,7 @@
                 });
             }
             if (dom.tableFilterChips) {
-                dom.tableFilterChips.addEventListener('click', function (event) {
+                dom.tableFilterChips.addEventListener('click', async function (event) {
                     const button = event.target.closest('[data-filter-index]');
                     if (!button) return;
                     const tab = state.activeTab();
@@ -660,7 +681,7 @@
                     const index = Number(button.getAttribute('data-filter-index'));
                     const removed = t.filters.splice(index, 1)[0];
                     renderFilters(tab);
-                    if (!applyFilters(tab)) {
+                    if (!(await applyFilters(tab))) {
                         t.filters.splice(index, 0, removed);
                         renderFilters(tab);
                     }
@@ -677,7 +698,7 @@
             dom.tableFilterValue.placeholder = op === 'IN' ? '值1, 值2, …' : '值';
         }
 
-        function addFilter(tab) {
+        async function addFilter(tab) {
             const t = ensure(tab);
             const column = dom.tableFilterColumn && dom.tableFilterColumn.value;
             if (!column) {
@@ -703,7 +724,7 @@
             t.filters.push(filter);
             if (dom.tableFilterValue) dom.tableFilterValue.value = '';
             renderFilters(tab);
-            if (!applyFilters(tab)) {
+            if (!(await applyFilters(tab))) {
                 t.filters.pop();
                 renderFilters(tab);
             }
@@ -935,10 +956,16 @@
                 });
             }
             if (dom.tableReloadBtn) {
-                dom.tableReloadBtn.addEventListener('click', function () {
+                dom.tableReloadBtn.addEventListener('click', async function () {
                     const tab = state.activeTab();
                     if (!tab) return;
-                    if (hasChanges(tab) && !window.confirm('刷新会丢弃未保存的修改，继续？')) return;
+                    if (hasChanges(tab) &&
+                        !(await U.confirm({
+                            title: '刷新数据',
+                            message: '刷新会丢弃未保存的修改，继续？',
+                            okText: '刷新',
+                            danger: true
+                        }))) return;
                     reload(tab);
                 });
             }
@@ -982,14 +1009,19 @@
                     dom.tablePageSize.appendChild(option);
                 });
                 dom.tablePageSize.value = '500';
-                dom.tablePageSize.addEventListener('change', function () {
+                dom.tablePageSize.addEventListener('change', async function () {
                     const tab = state.activeTab();
                     if (!tab) return;
                     const t = ensure(tab);
                     const nextSize = Number(dom.tablePageSize.value) || 500;
                     if (nextSize === t.pageSize) return;
                     if (hasChanges(tab) &&
-                        !window.confirm('切换每页行数会丢弃当前页未保存的修改，继续？')) {
+                        !(await U.confirm({
+                            title: '切换每页行数',
+                            message: '切换每页行数会丢弃当前页未保存的修改，继续？',
+                            okText: '继续',
+                            danger: true
+                        }))) {
                         dom.tablePageSize.value = String(t.pageSize);
                         return;
                     }

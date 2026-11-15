@@ -586,8 +586,8 @@
                         '：' + error.message;
                 }
                 return '执行失败：' + error.message;
-            }, function (details) {
-                if (confirmDanger(details)) {
+            }, async function (details) {
+                if (await confirmDanger(details)) {
                     startRun({ token: details.token });
                 } else {
                     setStatus('已取消');
@@ -596,7 +596,7 @@
             });
         }
 
-        function confirmDanger(details) {
+        async function confirmDanger(details) {
             const info = details || {};
             const statements = Array.isArray(info.statements) ? info.statements : [];
             const I = window.SilkitI18n;
@@ -608,7 +608,14 @@
                 return '#' + (Number(item.index) + 1) + '  ' +
                     String(item.sql || '').replace(/\s+/g, ' ').slice(0, 120);
             }).join('\n');
-            return window.confirm(title + '\n\n' + summary + (preview ? '\n\n' + preview : ''));
+            return U.confirm({
+                title: title,
+                message: summary,
+                hint: '这些语句会直接作用于当前数据库，可在「设置」中关闭安全模式。',
+                preview: preview,
+                okText: '仍然执行',
+                danger: true
+            });
         }
 
         function runTask(current, onSuccess, onErrorText, onConfirmRequired) {

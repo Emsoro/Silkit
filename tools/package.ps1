@@ -49,7 +49,7 @@ if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
 New-Item -ItemType Directory -Path $stage -Force | Out-Null
 
 Copy-Item $exe $stage
-foreach ($file in @("README.md", "LICENSE", "THIRD-PARTY-NOTICES.md")) {
+foreach ($file in @("README.md", "README.en.md", "LICENSE", "THIRD-PARTY-NOTICES.md")) {
     $path = Join-Path $ProjectDir $file
     if (Test-Path $path) { Copy-Item $path $stage } else { Write-Warning "缺少 $file，已跳过" }
 }

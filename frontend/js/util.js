@@ -104,14 +104,20 @@
         return '"' + String(name == null ? '' : name).replace(/"/g, '""') + '"';
     }
 
+    // 始终返回 Promise：WebView2 下的 execCommand 回退可能同步抛错，
+    // 否则调用方的 .catch() 不会生效（复制按钮会静默失败）。
     function copyText(text) {
         const value = String(text == null ? '' : text);
-        if (navigator.clipboard && window.isSecureContext !== false) {
-            return navigator.clipboard.writeText(value).catch(function () {
-                return fallbackCopy(value);
-            });
+        try {
+            if (navigator.clipboard && window.isSecureContext !== false) {
+                return navigator.clipboard.writeText(value).catch(function () {
+                    return fallbackCopy(value);
+                });
+            }
+            return Promise.resolve(fallbackCopy(value));
+        } catch (error) {
+            return Promise.reject(error);
         }
-        return Promise.resolve(fallbackCopy(value));
     }
 
     function fallbackCopy(value) {
@@ -196,6 +202,80 @@
         }
     }
 
+    // 主题化确认框：WebView2 的 window.confirm 是系统原生弹窗，不跟随应用主题。
+    // 返回 Promise<boolean>，调用方需 `await U.confirm(...)`。
+    let confirmBound = false;
+    let confirmResolve = null;
+
+    function closeConfirm(result) {
+        const dialog = document.getElementById('appConfirm');
+        if (dialog) dialog.hidden = true;
+        if (confirmResolve) {
+            const resolve = confirmResolve;
+            confirmResolve = null;
+            resolve(result);
+        }
+    }
+
+    function confirmDialog(options) {
+        const opts = typeof options === 'string' ? { message: options } : (options || {});
+        const dialog = document.getElementById('appConfirm');
+        if (!dialog) return Promise.resolve(false);
+        // 同一时刻只保留一个确认框：新请求先按「取消」结束旧的。
+        if (confirmResolve) closeConfirm(false);
+
+        if (!confirmBound) {
+            const cancel = document.getElementById('appConfirmCancel');
+            const close = document.getElementById('appConfirmClose');
+            const ok = document.getElementById('appConfirmOk');
+            if (cancel) cancel.addEventListener('click', function () { closeConfirm(false); });
+            if (close) close.addEventListener('click', function () { closeConfirm(false); });
+            if (ok) ok.addEventListener('click', function () { closeConfirm(true); });
+            dialog.addEventListener('click', function (event) {
+                if (event.target === dialog) closeConfirm(false);
+            });
+            dialog.addEventListener('keydown', function (event) {
+                if (event.key === 'Escape') {
+                    event.preventDefault();
+                    closeConfirm(false);
+                } else if (event.key === 'Enter') {
+                    // 焦点在按钮上时交给原生 click，避免重复结算。
+                    if (event.target && event.target.tagName === 'BUTTON') return;
+                    event.preventDefault();
+                    closeConfirm(true);
+                }
+            });
+            confirmBound = true;
+        }
+
+        function setText(id, value) {
+            const node = document.getElementById(id);
+            if (node) node.textContent = value || '';
+        }
+        setText('appConfirmTitle', opts.title || '确认操作');
+        setText('appConfirmMessage', opts.message || '');
+        const hint = document.getElementById('appConfirmHint');
+        if (hint) {
+            hint.textContent = opts.hint || '';
+            hint.hidden = !opts.hint;
+        }
+        const preview = document.getElementById('appConfirmPreview');
+        if (preview) {
+            preview.textContent = opts.preview || '';
+            preview.hidden = !opts.preview;
+        }
+        const cancelBtn = document.getElementById('appConfirmCancel');
+        const okBtn = document.getElementById('appConfirmOk');
+        if (cancelBtn) cancelBtn.textContent = opts.cancelText || '取消';
+        if (okBtn) {
+            okBtn.textContent = opts.okText || '确认';
+            okBtn.className = 'btn ' + (opts.danger ? 'btn-danger-soft' : 'btn-primary');
+        }
+        dialog.hidden = false;
+        if (okBtn) okBtn.focus();
+        return new Promise(function (resolve) { confirmResolve = resolve; });
+    }
+
     window.SilkitUtil = {
         qs: qs,
         qsa: qsa,
@@ -217,6 +297,7 @@
         relativeTime: relativeTime,
         clockTime: clockTime,
         base64Bytes: base64Bytes,
-        hexPreview: hexPreview
+        hexPreview: hexPreview,
+        confirm: confirmDialog
     };
 })();
