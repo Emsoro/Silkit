@@ -6,7 +6,7 @@
 >
 > **产品名**：**Silkit**（silk + kit，“丝滑的数据库工具箱”）｜ 构建产物 `Silkit.exe` ｜ 数据目录 `%APPDATA%\Silkit` ｜ 代码目录 `D:\Work\CPlusPlus\Silkit`
 >
-> **规划日期**：2026-11-13 ｜ **当前版本**：v1.0.2（M0–M9 已交付；v1.0.2 查询上下文与智能补全已发布）｜ **文档状态**：实施基线 + 进度回写
+> **规划日期**：2026-11-13 ｜ **当前版本**：v1.0.3（M0–M9 已交付；v1.0.3 补全按整条语句限定列并在右侧显示所属路径）｜ **文档状态**：实施基线 + 进度回写
 >
 > **最近对标**：2026-11-15 对照 `D:\Cplusplus\dbx-0.6.69` 与 `D:\Cplusplus\GoNavi-1.2.2` 完成功能 Gap 梳理（§19），据此重排路线图（§14）并补齐 E2E 测试项与执行入口（§12.4 / §12.9）。
 
@@ -36,7 +36,7 @@
 
 > 2026-11-15 回写：M0–M9 已按 README / CHANGELOG / M9 发布验收统一刷新为「已完成」，此前表里残留的 🟡/🟢 是进度未回写造成的过期状态。**v1.1 起不再沿用 M 编号**，后续工作按 §19 的 Gap 优先级（P0/P1/P2）排期，并同步刷新 §14 路线图。
 >
-> 2026-11-15 回写（v1.0.2）：查询上下文与智能补全以 patch 增量交付，不占用 v1.1 里程碑编号。对象树选中库/表后新建查询自动 `USE`；查询页新增连接/库下拉、按标签记忆库并自动切回；补全升级为关键字 + 表/视图 + 列（`表名.` / `别名.`）。同轮修复「启动即弹查询页、关掉又弹一个」的缺陷：改为无标签空态。新增 `tools/test_hint.js`（31 项）与 `tools/test_tabs.js`（5 项）无浏览器自测；详见 §9.6 / §9.7 / §12.2 / §12.4.2 / §14。
+> 2026-11-15 回写（v1.0.2 / v1.0.3）：查询上下文与智能补全以 patch 增量交付，不占用 v1.1 里程碑编号。对象树选中库/表后新建查询自动 `USE`；查询页新增连接/库下拉、按标签记忆库并自动切回；补全升级为关键字 + 表/视图 + 列（`表名.` / `别名.`）。同轮修复「启动即弹查询页、关掉又弹一个」的缺陷：改为无标签空态。v1.0.3 再把表引用解析范围从「光标之前」扩展到「光标所在的整条语句」，列候选限定于语句中的表，并在候选右侧显示所属路径；`tools/test_hint.js` 扩充到 45 项。新增 `tools/test_tabs.js`（5 项）无浏览器自测；详见 §9.6 / §9.7 / §9.7.1 / §12.2 / §12.4.2 / §14。
 
 **总量**：约 56–68 个开发日（单人，含自测），按每周 5.5 天计约 **10–12 周**。
 
@@ -92,13 +92,15 @@
 | 2026-11-15 | §9.7 补全候选为「关键字 + 已加载表/视图」，列补全排到 v1.1 | v1.0.2 重写 `frontend/js/editor/hint.js`：候选含关键字 + 当前库表/视图 + 列；`表名.` / `别名.` 只提示该表列（带类型说明、插在点号后）；`FROM/JOIN/UPDATE/INTO` 中的表列进入裸标识符候选；PG schema 透传 | 原实现只按 `meta.children` 缓存少量表，写跨库 SQL 时命中率低 | 元数据按 `会话｜引擎｜库｜schema` 异步按需缓存，切库 / DDL 变更自动失效；`tools/test_hint.js` 31 项自测（§12.2）；触发延迟 500ms → 220ms，无连接时不拉起 anyword 兜底 |
 | 2026-11-15 | 新建查询默认使用当前活动会话与当前库 | v1.0.2 新建查询继承对象树选中的连接 / 库 / 表，不一致时自动切库（`conn.set_database`：MySQL 内部 `USE`、PG 重连、SQLite 限已 ATTACH 库）；查询页新增「连接 / 库」下拉，切换即时生效；标签激活 / 执行 SQL 前自动校正会话库 | 多标签共用一个会话，A 标签切库会污染 B 标签；从对象树打开查询还要手工切库 | 新增 `frontend/js/views/query_context.js`（下拉、切库、补全缓存刷新、库列表），`tabs.js` 在标签上持久化 `database / schema / connectionId / table`，`tree.js` 暴露选中上下文；见 §9.7.1 |
 | 2026-11-15 | 无标签时自动补一个查询页 | v1.0.2 修复：启动、连接成功、关闭最后一个标签都不再自动建查询页；改为显示 `#workspaceEmpty` 空态卡片（新建查询 / 打开 SQL / `Ctrl+N` 引导），空标签集随会话恢复持久化，重启后仍保持关闭 | `tabs.init()` 无标签时建默认查询页、`closeTab()` 关闭最后一个标签后又 `openQuery()`、`onOpen()` 连接成功也建一个，造成「一打开就有查询页、一点关就又弹出来一个」 | 去掉三处自动建页，新增空态视图与 5 项无浏览器回归自测 `tools/test_tabs.js`；关闭非激活标签时改用 `state.activeTab()` + `activate()`，顺带修正原来误切到相邻标签的问题 |
-| 2026-11-15 | 输入 `employees.` 弹出非该表的列 | v1.0.2 修复：点号补全严格化——`表名.` / `别名.` 只返回已确认存在的表的列，解析不到即返回空；`FROM/JOIN/UPDATE/INTO` 后的 `库名.`（PG `schema.`）识别为库限定符并提示该库的表名；裸标识符只补当前库中真实存在的表的列 | `resolveTable` 解析失败时把限定符本身当表名查列；`tableRefs` 用 `[`"\w.$]+` 吞掉结尾点号，把 `FROM employees.birth_date` 的列名误判成表；裸标识符分支又把这些伪表的列塞进候选，造成「串列」 | 重写 `frontend/js/editor/hint.js` 的限定符解析与严格解析；补 `loadScopes` 缓存库/schema 名；`tools/test_hint.js` 扩充到 31 项（§12.2） |\n| 2026-11-15 | §14 路线图只列到 v1.0 | 补 v1.0.1 / v1.0.2 两个 patch 版本行 | 连接诊断、SSL、主题确认框、C++20、查询上下文与补全都以 patch 形式交付，未建里程碑 | §14 表格新增两行，v1.1 仍留给 P0 完成度项 |
+| 2026-11-15 | 输入 `employees.` 弹出非该表的列 | v1.0.2 修复：点号补全严格化——`表名.` / `别名.` 只返回已确认存在的表的列，解析不到即返回空；`FROM/JOIN/UPDATE/INTO` 后的 `库名.`（PG `schema.`）识别为库限定符并提示该库的表名；裸标识符只补当前库中真实存在的表的列 | `resolveTable` 解析失败时把限定符本身当表名查列；`tableRefs` 用 `[`"\w.$]+` 吞掉结尾点号，把 `FROM employees.birth_date` 的列名误判成表；裸标识符分支又把这些伪表的列塞进候选，造成「串列」 | 重写 `frontend/js/editor/hint.js` 的限定符解析与严格解析；补 `loadScopes` 缓存库/schema 名；`tools/test_hint.js` 扩充到 31 项（§12.2） |
+| 2026-11-15 | §14 路线图只列到 v1.0 | 补 v1.0.1 / v1.0.2 两个 patch 版本行 | 连接诊断、SSL、主题确认框、C++20、查询上下文与补全都以 patch 形式交付，未建里程碑 | §14 表格新增两行，v1.1 仍留给 P0 完成度项 |
+| 2026-11-15 | 补全只解析光标之前的文本；候选名称带 `(table)` / `(view)` | v1.0.3 修复：`statementAt()` 以分号切分光标所在的整条语句（含光标之后的 `FROM`）并剥离注释，列候选只取语句中真实出现的表；`show-hint` 自定义 `render` 把类型与所属路径右对齐 | SELECT 列表写在 FROM 之前，输入 `departments.dept_no, d` 时 FROM 还没进入解析范围，导致 `dept_name` 不出现；候选右侧缺少来源信息 | `tools/test_hint.js` 扩充到 45 项（含用户实测 SQL、多语句与注释隔离、跨库/PG 路径、render DOM）；见 §9.7 / §12.2 |
 
 ### 0.3 版本标识位置
 
 | 位置 | 内容 |
 |---|---|
-| `CMakeLists.txt` | `project(Silkit VERSION 1.0.2 LANGUAGES CXX)` |
+| `CMakeLists.txt` | `project(Silkit VERSION 1.0.3 LANGUAGES CXX)` |
 | `src/app/version.h` | `SILKIT_VERSION` 兜底宏 |
 | `src/main.cpp` | 启动日志、窗口标题、`app.info` |
 | `frontend/index.html` | 右下角状态栏版本号（小胶囊徽章样式），由 `app.info` 填充 |
@@ -1357,7 +1359,7 @@ private:
 │ │▸ 测试 PG   │ │ │ 1  │ alice  │ a@example.com│ 2026-…    │                  │
 │ └───────────┘ │ └────┴────────┴──────────────┴───────────┘                  │
 ├───────────────┴──────────────────────────────────────────────────────────────┤
-│ 状态栏 24px  ●本地MySQL │ MySQL 8.4.3 │ app │ 自动提交 │ 12ms │ 42 行 │ UTF-8 │ v1.0.2 │
+│ 状态栏 24px  ●本地MySQL │ MySQL 8.4.3 │ app │ 自动提交 │ 12ms │ 42 行 │ UTF-8 │ v1.0.3 │
 └──────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -1492,7 +1494,7 @@ private:
 
 ```js
 const state = {
-  meta: { version: '1.0.2', engines: ['mysql', 'postgres', 'sqlite'] },
+  meta: { version: '1.0.3', engines: ['mysql', 'postgres', 'sqlite'] },
   connections: [],                    // 无密码
   sessions: {                         // sessionId -> runtime
     s1: { connectionId: 'c1', status: 'connected', serverVersion: '8.4.3',
@@ -1560,7 +1562,7 @@ const state = {
 ### 9.7 SQL 编辑器
 
 - CodeMirror 5：SQL 模式、行号、括号匹配、自动闭合、当前行高亮、搜索替换、Tab 缩进。
-- 自动补全（`Ctrl+Space` 或输入字母/点号 220ms 后触发；v1.0.2 重写 `frontend/js/editor/hint.js`）：
+- 自动补全（`Ctrl+Space` 或输入字母/点号 220ms 后触发；v1.0.2 重写、v1.0.3 增强 `frontend/js/editor/hint.js`）：
   - SQL 关键字 / 函数（内置列表，按引擎过滤）；
   - 当前库的表与视图，按 `会话｜引擎｜库｜schema` 异步按需拉取并缓存，切库 / DDL 变更自动失效；
   - 当前语句 `FROM/JOIN/UPDATE/INTO` 中出现的表的列，作为裸标识符候选；
@@ -1568,6 +1570,8 @@ const state = {
   - PG 透传 schema 限定名；无连接时不拉起 anyword 兜底；
   - **严格隔离（v1.0.2 回归修复）**：点号后只返回已确认存在的表的列，解析不到就返回空，绝不退化成关键字、表名或其它表的列；`FROM / JOIN / UPDATE / INTO` 后的 `库名.`（PG `schema.`）视为库限定符，改提示该库的表名；裸标识符分支也只补当前库中真实存在的表的列，避免把 `db.column` 里的列名当表名串列；
   - **候选排序**：`COMMON_KEYWORDS` 划分常用项，顺序为常用关键字（0）→ 表名（1）→ 列名（2）→ 冷门关键字（3，函数 / DDL 子句 / 引擎专属项保留但排末尾）。
+  - **整条语句解析（v1.0.3）**：`statementAt()` 以分号切分光标所在语句（含光标之后的 `FROM`），`tableRefs()` 剥离 `--` / `/* */` 注释后解析表引用；列候选只取该语句中真实存在的表，语句已写出表时不再混入对象树选中的表。因此 `SELECT departments.dept_no, d| FROM departments` 输入 `d` 也能提示 `dept_name`；
+  - **右侧所属路径（v1.0.3）**：`show-hint` 的 `hint.render` 把名称放左、类型与来源右对齐——列 `库.表`（PG `schema.表`，跨库限定符随目标库变化）、表库名、关键字 `keyword`；去掉名称后的 `(table)` / `(view)`，CSS 复用 `--text-dim` / `--text-faint` / `--accent-hover`。
 - 执行：
   - `F5`：执行全部语句（按分割器顺序）；
   - `Ctrl+Enter`：执行光标所在语句；
@@ -1581,13 +1585,14 @@ const state = {
 - 片段：命名、分组、插入；内置常用片段（SELECT/INSERT/UPDATE/DELETE/建表模板）。
 
 
-#### 9.7.1 查询上下文与补全元数据（v1.0.2）
+#### 9.7.1 查询上下文与补全元数据（v1.0.2 起，v1.0.3 增强）
 
 - `frontend/js/views/tree.js` 的 `selectNode()` 暴露当前选中连接 / 库 / schema / 表；顶栏「新建查询」、标签栏 `+`、`Ctrl+N` 通过 `tabs.openQueryFromTree()` 把该上下文传给 `openQuery()`。
 - `frontend/js/views/query_context.js` 提供编辑器工具条的「连接」「库」下拉：改连接 / 改库立即调用 `conn.set_database`（MySQL 内部 `USE`、PG 重连、SQLite 只允许已 ATTACH 的库），清空该会话补全缓存并刷新对象树；库列表按当前连接异步加载。
 - 每个查询标签持久化 `connectionId / database / schema / table`，随会话恢复写回 `settings.json`；激活标签或执行 SQL 前（`query.js`）若会话当前库与本标签不一致则自动切回，避免多标签共用一个会话时互相污染；切库失败会回退标签上的库并提示，不阻断本次执行。
 - 补全元数据以 `会话｜引擎｜库｜schema` 为键缓存，首次触发按需拉取、不阻塞输入；`Ctrl+Space`、自动触发、切换连接 / 库、编辑器获得焦点均走同一入口刷新候选。
 - **空态约束**：无标签时两个下拉随编辑器一起隐藏（`syncEmptyState()`），`queryContext.sync()` 仍可安全执行（上下文退化为无会话），不会因空标签触发切库或新建页。
+- **补全来源标注（v1.0.3）**：候选在 `makeItems()` 里携带 `_badge` / `_source`，`renderHintItem()` 生成 `.cm-hint-label` 与 `.cm-hint-meta`（`.cm-hint-badge` + `.cm-hint-source`）；`displayText` 保留纯文本降级。`scopeLabel()` 决定 MySQL 用库名、PG 用 schema 名。
 
 ### 9.8 结果面板
 
@@ -1970,6 +1975,8 @@ INSERT INTO `users` (`name`, `age`) VALUES (?, ?);
 - [x] EXPLAIN 对照 MySQL 8.4.13 与 PostgreSQL 18.0.7 实测（含 ANALYZE 警告）。
 
 > 2026-11-15 v1.0.2 增量（不新增 M 编号）：M4-4 补全升级为关键字 + 表/视图 + 列与 `表名.` / `别名.` 列提示；新增查询标签上下文继承、连接/库下拉与自动切库（§9.7.1）；修复「关闭最后一个标签又弹一个查询页」，改为无标签空态（§9.6）。新增 `tools/test_hint.js` 31 项与 `tools/test_tabs.js` 5 项无浏览器自测。
+>
+> 2026-11-15 v1.0.3 增量（不新增 M 编号）：补全按整条语句解析 `FROM`（含光标之后、忽略注释）并限定列来源，候选右侧显示所属路径；`tools/test_hint.js` 扩充到 45 项。
 - [ ] 20 个标签页切换无卡顿；1MB `.sql` 文件实测；历史 5000 条搜索 < 100ms（未实测）。
 
 ### M5 表格数据编辑（8–10 d）→ v0.5.0
@@ -2165,7 +2172,7 @@ CI 上把 `SILKIT_MYSQL_DATABASE` / `SILKIT_PG_DATABASE` 指向 `silkit_test` �
 | 9 | `integration_db` | 真实 MySQL/PG 连接、M5 CRUD、M6 DDL 全链路（`SILKIT_INTEGRATION_WRITE=1` 时） |
 | 10 | `e2e_real_db` | §12.4 的 14 项 × 双引擎真实库用例矩阵 |
 
-**前端逻辑自测（非 CTest）**：`node tools/test_hint.js`（31 项）覆盖智能补全的表/视图候选、`表名.` / `别名.` 列提示、`FROM` 表列、按库隔离、缓存失效与 PG schema 透传；`node tools/test_tabs.js`（5 项）覆盖启动无标签不建查询页、关闭最后一个标签停在空态、反复开关、关闭非激活标签不误切换；`node --check` 校验全部前端 JS。前端交互 E2E 仍按 §12.4.2 待接入 Playwright。
+**前端逻辑自测（非 CTest）**：`node tools/test_hint.js`（45 项）覆盖智能补全的表/视图候选、`表名.` / `别名.` 列提示、`FROM` 表列（含 FROM 位于光标之后、别名、多语句与注释隔离）、按库隔离、缓存失效、PG schema 透传、候选右侧所属路径与自定义 `render`；`node tools/test_tabs.js`（5 项）覆盖启动无标签不建查询页、关闭最后一个标签停在空态、反复开关、关闭非激活标签不误切换；`node --check` 校验全部前端 JS。前端交互 E2E 仍按 §12.4.2 待接入 Playwright。
 
 **要求**：核心纯逻辑覆盖率 ≥ 70%；新增解析/生成逻辑必须带测试；新增跨引擎行为必须同时加真实库 E2E 用例（避免「单测全绿、真库出错」——MySQL 数值列误判二进制与 PG 空表丢列头都是这样漏掉的）。
 
@@ -2232,7 +2239,7 @@ CI 上把 `SILKIT_MYSQL_DATABASE` / `SILKIT_PG_DATABASE` 指向 `silkit_test` �
 | U-13 | 连接失败错误条「复制信息」 | 手工 / Playwright + mock（构造 2026、1045 等错误） | 错误条最右侧按钮与错误 toast 均可复制；剪贴板含错误码/SQLSTATE/hint 与连接上下文且**不含密码**；按钮反馈「已复制」 | §0.2 2026-11-15 偏差记录 |
 | U-14 | 新建查询继承对象树选中库并自动 `USE` | Playwright + mock | 从库/表节点新建的标签工具条显示该库；查询上下文与选中节点一致 | §9.7.1 |
 | U-15 | 查询页连接 / 库下拉与多标签上下文隔离 | Playwright + mock | 切库即时生效、补全候选随库变化；A/B 标签互不污染，激活 / 执行自动切回本标签的库 | §9.7.1 |
-| U-16 | 智能补全（关键字 / 表 / 列 / `表名.` / `别名.` / `库名.`） | `node tools/test_hint.js` 或 Playwright + mock | 点号后只出该表列、候选带类型、替换区间不吞掉表名前缀；未知表名返回空不串列；FROM 后 `库名.` 出表名；切库后候选刷新 | §9.7 |
+| U-16 | 智能补全（关键字 / 表 / 列 / `表名.` / `别名.` / `库名.`） | `node tools/test_hint.js` 或 Playwright + mock | 点号后只出该表列、候选带类型、替换区间不吞掉表名前缀；未知表名返回空不串列；FROM 后 `库名.` 出表名；切库后候选刷新；SELECT 列表在前、FROM 在后时仍能提示该表列；候选右侧显示所属路径 | §9.7 |
 | U-17 | 无标签空态与彻底关闭 | `node tools/test_tabs.js` 或 Playwright + mock | 启动无标签不建查询页；关闭最后一个标签后停在空态且不会再弹新页；重启后仍保持关闭；空态按钮可新建查询 / 打开 SQL | §9.6 / §0.2 |
 
 > 现状：`frontend/js/mock/mock.js`（2259 行）已能模拟 `ipc.call`/`ipc.event` 与流式查询，但仓库没有 Playwright 依赖与 CI 任务。按 §19 判定为 **P1**，先用 §12.5 手工矩阵兜底；接入时复用 mock 数据，不得连真实库跑 UI 用例。
@@ -2384,6 +2391,7 @@ ctest --test-dir build -C Release -R "integration_db|e2e_real_db" -V
 | **v1.0** | Windows 单文件正式版 | M9 |
 | **v1.0.1** | 维护版：SSL 语义修复、连接失败诊断复制、13 处主题化确认框、M8 徽章清理、C++20、真实库 E2E 矩阵与英文 README | §0.2 |
 | **v1.0.2** | 体验增强：新建查询自动 `USE`、查询页连接/库下拉与标签上下文、关键字 + 表/视图 + 列智能补全（`表名.` / `别名.`）、无标签空态修复、两个无浏览器自测 | §9.6 / §9.7.1 |
+| **v1.0.3** | 补全修复：按整条语句解析 FROM 表限定列（含光标之后、忽略注释）、候选右侧显示所属路径、去掉 `(table)` / `(view)` 后缀、补全自测 45 项 | §9.7 / §9.7.1 |
 | **v1.1**（P0，日常完成度） | XLSX 导入/导出、结果复制为 INSERT/UPDATE、ER 图（只读、基于现有 FK 元数据）、EXPLAIN 计划树、连接配置导入导出、查询历史落 `history.jsonl`、断线自动重连、i18n 补齐动态视图、DML 只读预览、前端 Playwright E2E | §19 P0 |
 | **v1.2**（P1，专业增强） | SSH 隧道/代理、SSL 证书 UI、Schema Diff 只读对比、数据对比（按主键）、查询结果图表、单元格值格式化/掩码、模拟数据生成、会话/锁等待面板、深分页 keyset、SQL 审计中心（本地） | §19 P1 |
 | **v2.0**（P2，平台化，需重新评估定位） | 数据传输/同步、定时备份、SQL Server/Oracle 等新驱动、插件 SDK、MCP Server、AI SQL 助手（显式授权、默认不执行） | §19 P2 |
@@ -2391,7 +2399,7 @@ ctest --test-dir build -C Release -R "integration_db|e2e_real_db" -V
 
 > 2026-11-15 重排依据：原 v1.1 把「SSH、ER 图、Schema Diff、XLSX、用户管理」混在一起，没有区分「开发者每天会碰到」与「DBA 平台能力」。按 §19 对标后，**XLSX / 复制为 SQL / ER 图 / 计划可视化 / 历史与重连** 属于完成度底线（P0）；SSH、Schema Diff、同步属于专业增强（P1/P2）；用户权限管理、云/Web/MCP 与轻量定位冲突，降级或明确不做。E2E 用例（§12.4）优先覆盖 P0 涉及的既有链路回归。
 >
-> v1.0.1 / v1.0.2 是 patch 增量（缺陷修复 + 体验增强），不占用 v1.1 里程碑编号；两者均已随 `tools/check_version.py` 同步 8 处版本标识并产出便携包。
+> v1.0.1 / v1.0.2 / v1.0.3 是 patch 增量（缺陷修复 + 体验增强），不占用 v1.1 里程碑编号；三者均已随 `tools/check_version.py` 同步 8 处版本标识并产出便携包。
 
 **v1.1 预留接口**
 - `DriverRegistry::Register(std::unique_ptr<Driver>)`：新增数据库不动 UI。
@@ -2451,7 +2459,7 @@ powershell -ExecutionPolicy Bypass -File build.ps1 -DevMode
 
 ```cmake
 cmake_minimum_required(VERSION 3.21)
-project(Silkit VERSION 1.0.2 LANGUAGES CXX)
+project(Silkit VERSION 1.0.3 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -2501,7 +2509,7 @@ target_link_libraries(Silkit PRIVATE
 ```json
 {
   "name": "silkit",
-  "version-string": "1.0.2",
+  "version-string": "1.0.3",
   "dependencies": [
     "libmariadb",
     "libpq",
@@ -2635,7 +2643,7 @@ SortIncludes: CaseSensitive
 
 | 项目 | 定位 | 技术底座 | 规模证据 |
 |---|---|---|---|
-| **Silkit v1.0.2** | 单 exe、离线、Windows 轻量数据库工作台 | C++20 + TauriCPP（Win32 + WebView2）+ 原生 JS | 3 引擎、10 个 CTest 目标、约 9MB exe |
+| **Silkit v1.0.3** | 单 exe、离线、Windows 轻量数据库工作台 | C++20 + TauriCPP（Win32 + WebView2）+ 原生 JS | 3 引擎、10 个 CTest 目标、约 9MB exe |
 | **dbx 0.6.69** | 100+ 数据源的「数据库工作平台」 | Rust/Tauri 2 + Vue 3 + CodeMirror 6 | 27 个 Rust crate、88 个 `dbType`、82 个 Tauri command、299 个 app-tests + 1948 个前端 spec、125 个 Rust 集成测试 |
 | **GoNavi 1.2.2** | 桌面优先 + MCP 原生的多数据源工作台 | Go 1.24 + Wails v2 + React/Monaco | 12 内置 + 45+ 可选驱动代理、1097 个 `internal/app` Go 文件、1596 个 Go 测试 + 1355 个前端测试 |
 
@@ -2854,6 +2862,8 @@ SortIncludes: CaseSensitive
 **验证结果**：`ctest -C Release` 10/10 通过；`e2e_real_db` 28 passed / 0 failed / 0 skipped（MySQL 8.4.13 `employees` + PostgreSQL 18.7 `employees`）；`integration_db` 双引擎 M5 CRUD / M6 DDL 写路径全绿；报告 `build/e2e-report.md`。
 
 **v1.0.2 回归（2026-11-15，含空态与补全修复）**：`ctest -C Release` 10/10 通过；`e2e_real_db` 31 PASS / 0 FAIL（14 项 × MySQL 8.4.13 + PostgreSQL 18.7，另加 3307 无 TLS `SSL-01~03`）；`integration_db` 双引擎 M5/M6 写路径全绿；`node tools/test_hint.js` 31 项、`node tools/test_tabs.js` 5 项全通过；全部前端 JS `node --check` 通过；`tools/check_version.py` 8 处版本一致（1.0.2）；报告 `build/e2e-report.md`。
+
+**v1.0.3 回归（2026-11-15，补全修复）**：`ctest -C Release` 10/10 通过；`node tools/test_hint.js` 45 项、`node tools/test_tabs.js` 5 项全通过；全部前端 JS `node --check` 通过；`tools/check_version.py` 8 处版本一致（1.0.3）；Release exe 重新嵌入前端资源并重建便携包。
 
 ### 19.6 证据索引
 

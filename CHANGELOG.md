@@ -2,6 +2,22 @@
 
 本项目遵循里程碑版本号；日期为交付日期。
 
+## [1.0.3] — 2026-11-15
+
+### 修复
+
+- **补全看不到 SELECT 列表里的列**：此前只扫描光标之前的文本，写 `SELECT departments.dept_no, d| FROM departments` 这类 SELECT 列表在前的 SQL 时，`FROM` 尚未进入解析范围，输入 `d` 不会提示 `dept_name`。现在以分号切分光标所在的整条语句（含光标之后的部分）解析 `FROM / JOIN / UPDATE / INTO`，并剥离 `--` / `/* */` 注释；列候选限定于语句中真实出现的表，语句已写出 `FROM` 表时不再混入对象树里选中的其它表，前后语句之间也不会串列。
+- **候选展示杂乱**：名称后面不再跟 `(table)` / `(view)` 后缀。
+
+### 新增
+
+- **右侧所属路径**：借助 CodeMirror `show-hint` 的自定义 `render`，候选左侧保持名称，右侧统一右对齐显示类型与来源——列 `employees.departments`（PG 为 `schema.表`）、表 `employees`、关键字 `keyword`；跨库限定符会随目标库变化（如 `sakila.actor`）。样式复用五套主题的 `--text-dim` / `--text-faint` / `--accent-hover`，无 `render` 的旧版降级仍保留纯文本信息。
+
+### 变更
+
+- **自测**：`tools/test_hint.js` 由 31 项扩充到 **45 项**，新增「FROM 位于光标之后」「带别名」「多语句隔离」「注释不串列」「来源路径 / render」等回归；`tools/test_tabs.js` 5 项保持通过。
+- **版本号**：`1.0.2` → **`1.0.3`**（patch：补全缺陷修复与展示优化，不占用 `v1.1`）。CMake、`vcpkg.json`、`src/app/version.h`、状态栏、Mock 后端、中英文 README 版本说明 / 发布包名 / 验收清单 / 已知限制标题、`CODEPLAN.md` 同步；`tools/check_version.py` 校验 8 处全绿。
+
 ## [1.0.2] — 2026-11-15
 
 ### 新增

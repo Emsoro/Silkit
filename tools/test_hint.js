@@ -2,7 +2,8 @@
 // 前端智能补全的无浏览器单元自测：node tools/test_hint.js
 //
 // 用 vm 加载 frontend/js/editor/hint.js，替身实现 meta.children，覆盖：
-//   关键字 + 表名、表名.列名、别名.列名、FROM 表的裸列名、按库缓存隔离、invalidate。
+//   关键字 + 表名、表名.列名、别名.列名、FROM 表的裸列名（含 FROM 位于光标之后）、
+//   按库缓存隔离、invalidate、候选右侧所属路径与自定义 render。
 'use strict';
 
 const assert = require('assert');
@@ -120,9 +121,9 @@ function check(name, condition) {
     const any = await complete('SELECT * FROM ');
     check('空前缀时视图名进入候选', texts(any).indexOf('dept_emp_latest_date') >= 0);
     check('空前缀时关键字进入候选', texts(any).indexOf('SELECT') >= 0);
-    check('视图标记为 view', any.list.some(function (item) {
-        return item.text === 'dept_emp_latest_date' &&
-            item.displayText.indexOf('(view)') >= 0;
+    check('视图类型放在右侧 badge，名称不再带 (view)', any.list.some(function (item) {
+        return item.text === 'dept_emp_latest_date' && item._badge === 'view' &&
+            item.displayText.indexOf('(view)') < 0 && item.displayText.indexOf('(table)') < 0;
     }));
 
     const keyword = await complete('SEL');
@@ -231,6 +232,102 @@ function check(name, condition) {
     check('冷门关键字仍在候选末尾而非被丢弃',
         order.indexOf('COALESCE()') >= 0 &&
         ordered.list[ordered.list.length - 1]._priority === 3);
+
+    // 12. SELECT 列表写在 FROM 之前：光标之后的 FROM 也要参与列补全（用户实测 SQL）
+    const aheadSql = 'SELECT\ndepartments.dept_no, d\nFROM\ndepartments';
+    const aheadCaret = 'SELECT\ndepartments.dept_no, d'.length;
+    hint.invalidate(session.id);
+    const ahead = await complete(aheadSql, aheadCaret);
+    check('FROM 位于光标之后时，输入 d 能提示 dept_name',
+        texts(ahead).indexOf('dept_name') >= 0 && texts(ahead).indexOf('dept_no') >= 0);
+    check('列提示限定为 FROM 中的 departments，不串入 salaries 的列',
+        texts(ahead).indexOf('salary') < 0 && texts(ahead).indexOf('emp_no') < 0);
+    check('光标之后 FROM 表的列都标注所属库.表',
+        ahead.list.filter(function (item) {
+            return item.className === 'CodeMirror-hint-column';
+        }).length > 0 && ahead.list.filter(function (item) {
+            return item.className === 'CodeMirror-hint-column';
+        }).every(function (item) { return item._source === 'employees.departments'; }));
+
+    const aliasAheadSql = 'SELECT d\nFROM departments dep';
+    const aliasAhead = await complete(aliasAheadSql, 'SELECT d'.length);
+    check('光标之后的 FROM 带别名时也能拿到该表的列',
+        texts(aliasAhead).indexOf('dept_name') >= 0);
+
+    // 13. 多语句：前一条语句的表不能串进后一条语句的列
+    const multiSql = 'SELECT * FROM salaries;\nSELECT departments.dept_no, d\nFROM departments';
+    const multiCaret = 'SELECT * FROM salaries;\nSELECT departments.dept_no, d'.length;
+    const multi = await complete(multiSql, multiCaret);
+    check('按分号隔离前后语句，前一句的表不串列',
+        texts(multi).indexOf('dept_name') >= 0 && texts(multi).indexOf('salary') < 0);
+
+    const commented = await complete('SELECT d -- FROM salaries\nFROM departments',
+        'SELECT d'.length);
+    check('注释里提到的 FROM 表不会串进列提示',
+        texts(commented).indexOf('dept_name') >= 0 && texts(commented).indexOf('salary') < 0);
+
+    // 14. 语句已写出 FROM 表时，不再混入对象树里选中的其它表
+    const limited = await complete('SELECT d\nFROM departments', 'SELECT d'.length,
+        { table: 'salaries' });
+    check('列提示只取语句里的表，忽略树中选中的其它表',
+        texts(limited).indexOf('dept_name') >= 0 && texts(limited).indexOf('salary') < 0);
+
+    // 15. 右侧所属路径：列 = 库.表，表 = 库，关键字 = keyword
+    const depDotted = await complete('SELECT departments.');
+    check('列候选右侧路径为 employees.departments', depDotted.list.length > 0 &&
+        depDotted.list.every(function (item) {
+            return item._source === 'employees.departments';
+        }));
+    check('表候选右侧路径为所属库', any.list.some(function (item) {
+        return item.text === 'departments' && item._source === 'employees';
+    }));
+    check('关键字右侧统一显示 keyword', any.list.some(function (item) {
+        return item.text === 'SELECT' && item._source === 'keyword' &&
+            item.className === 'CodeMirror-hint-keyword';
+    }));
+
+    const cross = await complete('SELECT sakila.actor.');
+    check('跨库列名路径随目标库变化', cross.list.length > 0 &&
+        cross.list.every(function (item) { return item._source === 'sakila.actor'; }));
+
+    const pgSession = { id: 'pg1', profile: { engine: 'postgres' }, currentDb: 'employees' };
+    const pgResult = await hint.hint(pgSession, function () {
+        return { database: 'employees', schema: 'analytics', table: '' };
+    })(makeEditor('SELECT analytics.departments.'));
+    check('PG 列名路径使用 schema.表', pgResult.list.length > 0 &&
+        pgResult.list.every(function (item) { return item._source === 'analytics.departments'; }));
+
+    // 16. 自定义 render：左侧名称 + 右对齐的类型/路径（show-hint 支持 hint.render）
+    function fakeElt() {
+        const doc = {
+            createElement: function () {
+                return {
+                    className: '', childNodes: [],
+                    appendChild: function (child) { this.childNodes.push(child); return child; }
+                };
+            },
+            createTextNode: function (value) { return { text: value }; }
+        };
+        return {
+            ownerDocument: doc, childNodes: [],
+            appendChild: function (child) { this.childNodes.push(child); return child; }
+        };
+    }
+    const colItem = depDotted.list[0];
+    const rendered = fakeElt();
+    colItem.render(rendered, {}, colItem);
+    check('render 生成左侧名称与右侧来源（类型 + 路径）',
+        rendered.childNodes.length === 2 &&
+        rendered.childNodes[0].className === 'cm-hint-label' &&
+        rendered.childNodes[0].childNodes[0].text === colItem.text &&
+        rendered.childNodes[1].className === 'cm-hint-meta' &&
+        rendered.childNodes[1].childNodes.some(function (node) {
+            return node.className === 'cm-hint-source' &&
+                node.childNodes[0].text === colItem._source;
+        }));
+    check('无 render 降级时 displayText 仍含类型与路径',
+        colItem.displayText.indexOf(colItem.text) === 0 &&
+        colItem.displayText.indexOf('employees.departments') > 0);
 
     console.log('\n智能补全自测通过：' + passed + ' 项');
 })().catch(function (error) {

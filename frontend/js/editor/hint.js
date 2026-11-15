@@ -1,10 +1,13 @@
-// 智能补全（v1.0.2）：关键字 + 当前连接/库的表与视图 + 列。
+// 智能补全（v1.0.3）：关键字 + 当前连接/库的表与视图 + 列。
 //
 //   * 缓存维度是 sessionId|engine|database|schema，切换库后不会串到上一个库的表。
 //   * 输入 `表名.` / `别名.` 时只补全该表的列，并把列插在点号之后；解析不到表就返回空，
 //     绝不回退成关键字 / 表名 / 其他表的列（避免「串列」）。
 //   * FROM / JOIN / UPDATE / INTO 后的 `库名.`（或 PG `schema.`）是库限定符，提示该库的表名。
-//   * 语句中出现 FROM / JOIN / UPDATE / INTO 时，裸标识符只提示当前库中确实存在的表的列。
+//   * 表引用按「光标所在的整条语句」解析（以分号切分），因此 SELECT 列表写在 FROM 之前时，
+//     也能拿到光标之后 FROM 的表；裸列名只来自语句里的这些表，不再混入树里选中的其它表。
+//   * 每个候选右侧统一显示所属路径：列 = `库.表`（PG 为 `schema.表`），表 = 库/schema 名，
+//     关键字 = keyword；show-hint 的自定义 render 负责右对齐，名称不再跟 `(table)` / `(view)`。
 //   * 返回 Promise（CodeMirror show-hint 支持异步 hint），首次触发时现取元数据。
 (function () {
     'use strict';
@@ -61,6 +64,49 @@
 
     function unquote(name) {
         return String(name || '').replace(/^[`"\[]/, '').replace(/[`"\]]$/, '');
+    }
+
+    // 候选右侧显示的所属作用域：MySQL/SQLite 为库名，PG 为 schema 名。
+    function scopeLabel(scope) {
+        if (scope.engine === 'postgres') return scope.schema || scope.database || 'public';
+        return scope.database || 'main';
+    }
+
+    // 光标所在的单条语句（以分号为界）。SELECT 列表通常写在 FROM 之前，
+    // 只看光标之前的文本会漏掉尚未输入 / 位于光标之后的 FROM 子句。
+    function statementAt(before, fullText) {
+        const text = String(fullText || '');
+        if (!text) return String(before || '');
+        const offset = Math.min(String(before || '').length, text.length);
+        const start = text.lastIndexOf(';', Math.max(0, offset - 1)) + 1;
+        let end = text.indexOf(';', offset);
+        if (end < 0) end = text.length;
+        return text.slice(start, end);
+    }
+
+    // show-hint 支持 hint.render(elt, data, cur)：左侧候选名，右侧统一放类型与所属路径。
+    function renderHintItem(elt, data, cur) {
+        const doc = elt.ownerDocument || document;
+        const label = doc.createElement('span');
+        label.className = 'cm-hint-label';
+        label.appendChild(doc.createTextNode(cur.text));
+        elt.appendChild(label);
+
+        const meta = doc.createElement('span');
+        meta.className = 'cm-hint-meta';
+        if (cur._badge) {
+            const badge = doc.createElement('span');
+            badge.className = 'cm-hint-badge';
+            badge.appendChild(doc.createTextNode(cur._badge));
+            meta.appendChild(badge);
+        }
+        if (cur._source) {
+            const source = doc.createElement('span');
+            source.className = 'cm-hint-source';
+            source.appendChild(doc.createTextNode(cur._source));
+            meta.appendChild(source);
+        }
+        if (meta.childNodes.length) elt.appendChild(meta);
     }
 
     function create(ctx) {
@@ -194,10 +240,7 @@
                     const nodes = data && Array.isArray(data.nodes) ? data.nodes : [];
                     columns = nodes.filter(function (node) { return node && node.name; })
                         .map(function (node) {
-                            return {
-                                text: node.name,
-                                displayText: node.badge ? node.name + '  ' + node.badge : node.name
-                            };
+                            return { text: node.name, badge: node.badge || '' };
                         });
                 } catch (error) {
                     console.warn('[silkit] 补全读取列失败', error);
@@ -212,11 +255,15 @@
 
         // 解析 FROM/JOIN/UPDATE/INTO 后面的表名与别名，供 `别名.` 与裸列名补全。
         // 注意：`[`"\w.$]+` 会把结尾的点号也吞掉，导致把列名当表名，这里改为分段匹配。
+        // 注释里的 FROM 不参与解析，避免「注释提到别的表」造成串列。
         function tableRefs(text) {
             const map = new Map();
+            const source = String(text || '')
+                .replace(/\/\*[\s\S]*?\*\//g, ' ')
+                .replace(/--[^\n]*/g, ' ');
             const pattern = /\b(?:FROM|JOIN|UPDATE|INTO)\s+([`"\[]?[A-Za-z_][\w$]*[`"\]]?(?:\s*\.\s*[`"\[]?[A-Za-z_][\w$]*[`"\]]?)*)(?:\s+(?:AS\s+)?([A-Za-z_]\w*))?/gi;
             let match = null;
-            while ((match = pattern.exec(text)) !== null) {
+            while ((match = pattern.exec(source)) !== null) {
                 const parts = String(match[1]).split(/\s*\.\s*/).map(unquote);
                 const name = parts[parts.length - 1];
                 if (!name) continue;
@@ -250,7 +297,10 @@
             return info ? info.name : null;
         }
 
-        function makeItems(items, type, prefix, priority) {
+        // meta: { priority?: number, source?: string | (item) => string }
+        // 候选自身也可带 badge / source；displayText 保留纯文本降级（旧版 show-hint 无 render）。
+        function makeItems(items, type, prefix, meta) {
+            const options = typeof meta === 'number' ? { priority: meta } : (meta || {});
             const lower = String(prefix || '').toLowerCase();
             const seen = new Set();
             const result = [];
@@ -262,11 +312,20 @@
                 const identity = cls + ':' + text.toLowerCase();
                 if (seen.has(identity)) return;
                 seen.add(identity);
+                const badge = (typeof item === 'object' && item.badge) || '';
+                const source = (typeof item === 'object' && item.source) ||
+                    (typeof options.source === 'function' ? options.source(item) : options.source) || '';
+                const displayParts = [text];
+                if (badge) displayParts.push(badge);
+                if (source) displayParts.push(source);
                 result.push({
                     text: text,
-                    displayText: (typeof item === 'object' && item.displayText) || text,
+                    displayText: displayParts.join('  '),
                     className: 'CodeMirror-hint-' + cls,
-                    _priority: typeof priority === 'number' ? priority : PRIORITY[type]
+                    _priority: typeof options.priority === 'number' ? options.priority : PRIORITY[type],
+                    _badge: badge,
+                    _source: source,
+                    render: renderHintItem
                 });
             });
             return result;
@@ -298,7 +357,29 @@
                 return (async function () {
                     const entry = await loadTables(session, scope);
                     const before = editor.getRange({ line: 0, ch: 0 }, cursor);
-                    const refs = tableRefs(before);
+                    // 解析光标所在的整条语句（含光标之后的 FROM），并用分号隔离前后语句。
+                    const statement = statementAt(before, editor.getValue());
+                    const refs = tableRefs(statement);
+                    // 表候选：名称保持干净，所属库 / schema 与类型放到右侧。
+                    const tableItems = function (targetEntry, targetScope) {
+                        const src = scopeLabel(targetScope);
+                        const items = [];
+                        targetEntry.tables.forEach(function (info) { items.push(info); });
+                        return items.map(function (info) {
+                            return {
+                                text: info.name,
+                                badge: info.kind === 'view' ? 'view' : '',
+                                source: src
+                            };
+                        });
+                    };
+                    // 列候选：右侧显示 `库.表` / `schema.表` 的所属路径。
+                    const columnItems = function (columns, targetScope, tableName) {
+                        const src = scopeLabel(targetScope) + '.' + tableName;
+                        return columns.map(function (col) {
+                            return Object.assign({}, col, { source: src });
+                        });
+                    };
                     let list = [];
 
                     if (qualified) {
@@ -317,14 +398,7 @@
                                 : Object.assign({}, scope, scope.engine === 'postgres'
                                     ? { schema: scopeHit } : { database: scopeHit });
                             const targetEntry = await loadTables(session, targetScope);
-                            const tables = [];
-                            targetEntry.tables.forEach(function (info) { tables.push(info); });
-                            list = makeItems(tables.map(function (info) {
-                                return {
-                                    text: info.name,
-                                    displayText: info.name + (info.kind === 'view' ? '  (view)' : '  (table)')
-                                };
-                            }), 'table', word);
+                            list = makeItems(tableItems(targetEntry, targetScope), 'table', word);
                         } else {
                             // 多段限定符指定了别的库/schema 时，按目标作用域解析表。
                             let targetScope = scope;
@@ -336,41 +410,40 @@
                             const tableName = resolveTableStrict(refs, targetEntry, parts);
                             if (tableName) {
                                 const columns = await columnsOf(session, targetScope, tableName);
-                                list = makeItems(columns, 'column', word);
+                                list = makeItems(columnItems(columns, targetScope, tableName),
+                                    'column', word);
                             }
                             // 解析不到表时保持空列表：不混入关键字、表名或其他表的列。
                         }
                     } else {
                         const words = splitKeywords(entry.keywords);
-                        list = list.concat(makeItems(words.common, 'keyword', word));
-                        const tables = [];
-                        entry.tables.forEach(function (info) { tables.push(info); });
-                        list = list.concat(makeItems(tables.map(function (info) {
-                            return {
-                                text: info.name,
-                                displayText: info.name + (info.kind === 'view' ? '  (view)' : '  (table)')
-                            };
-                        }), 'table', word));
+                        list = list.concat(makeItems(words.common, 'keyword', word,
+                            { source: 'keyword' }));
+                        list = list.concat(makeItems(tableItems(entry, scope), 'table', word));
 
-                        // 裸标识符只补「语句里出现过、且当前库中确实存在」的表的列，
-                        // 避免把 `db.column` 里的列名当表名，从而串进别的表/库的列。
+                        // 裸标识符只补「整条语句里 FROM/JOIN/UPDATE/INTO 出现过、且当前库中确实存在」的表的列。
+                        // 语句已写出表时列就限定于这些表，不再混入对象树里选中的其它表。
                         const names = [];
                         refs.forEach(function (name) {
                             const info = findTable(entry, name);
                             if (info && names.indexOf(info.name) < 0) names.push(info.name);
                         });
-                        if (scope.table) {
+                        if (!names.length && scope.table) {
                             const picked = findTable(entry, scope.table);
-                            if (picked && names.indexOf(picked.name) < 0) names.push(picked.name);
+                            if (picked) names.push(picked.name);
                         }
                         const columnSets = await Promise.all(names.slice(0, 8).map(function (name) {
-                            return columnsOf(session, scope, name);
+                            return columnsOf(session, scope, name).then(function (columns) {
+                                return { name: name, columns: columns };
+                            });
                         }));
-                        columnSets.forEach(function (columns) {
-                            list = list.concat(makeItems(columns, 'column', word));
+                        columnSets.forEach(function (set) {
+                            list = list.concat(makeItems(columnItems(set.columns, scope, set.name),
+                                'column', word));
                         });
                         // 冷门关键字（函数、DDL 子句、引擎专属项）排到最后。
-                        list = list.concat(makeItems(words.rare, 'rareKeyword', word));
+                        list = list.concat(makeItems(words.rare, 'rareKeyword', word,
+                            { source: 'keyword' }));
                     }
 
                     list.sort(function (a, b) {

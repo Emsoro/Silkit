@@ -96,17 +96,50 @@
 }
 
 .CodeMirror-hint {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
     color: var(--text);
     padding: 4px 10px;
     border-radius: var(--radius-xs);
     cursor: pointer;
     white-space: nowrap;
     overflow: hidden;
-    text-overflow: ellipsis;
     max-width: 420px;
+}
+
+/* 候选名称靠左，类型与所属路径统一靠右对齐 */
+.CodeMirror-hint .cm-hint-label {
+    flex: 0 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.CodeMirror-hint .cm-hint-meta {
+    flex: 0 0 auto;
+    margin-left: auto;
+    display: inline-flex;
+    gap: 10px;
+    font-size: 11px;
+    white-space: nowrap;
+}
+
+.CodeMirror-hint .cm-hint-badge {
+    color: var(--text-dim);
+}
+
+.CodeMirror-hint .cm-hint-source {
+    color: var(--text-faint);
 }
 
 li.CodeMirror-hint-active {
     background: var(--accent-soft);
     color: var(--accent-hover);
+}
+
+li.CodeMirror-hint-active .cm-hint-badge,
+li.CodeMirror-hint-active .cm-hint-source {
+    color: var(--accent-hover);
+    opacity: 0.78;
 }
