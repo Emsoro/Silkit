@@ -275,7 +275,7 @@
             }
             if (mod && !event.shiftKey && event.code === 'KeyN') {
                 event.preventDefault();
-                if (workbench) workbench.app.tabs.openQuery(state.activeSession(), { focus: true });
+                if (workbench) workbench.app.tabs.openQueryFromTree();
                 return;
             }
             if (mod && !event.shiftKey && event.code === 'KeyW') {
@@ -416,7 +416,7 @@
 
         try {
             const info = await api.info();
-            const version = 'v' + (info.version || '1.0.1');
+            const version = 'v' + (info.version || '1.0.2');
             if ($('statusVersion')) $('statusVersion').textContent = version;
         } catch (error) {
             if ($('ipcStatus')) $('ipcStatus').textContent = 'IPC 不可用';

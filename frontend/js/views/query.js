@@ -75,6 +75,12 @@
             }
             if (state.activeSessionId !== session.id) state.setActiveSession(session.id);
 
+            // 标签上记录的库与会话当前库不一致时先自动切换（MySQL USE / PG 重连）。
+            if (ctx.queryContext) {
+                const switched = await ctx.queryContext.ensureDatabase(tab);
+                if (!switched) return;
+            }
+
             const picked = sqlFor(tab, scope);
             if (!picked) return;
             const sql = String(picked.sql || '').trim();

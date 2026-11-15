@@ -49,6 +49,7 @@
             dom.splitter = byId('splitter');
             dom.resultsPane = byId('resultsPane');
             dom.tablePane = byId('tablePane');
+            dom.empty = byId('workspaceEmpty');
 
             dom.tabbar.addEventListener('click', function (event) {
                 const close = event.target.closest('.tab-close');
@@ -68,7 +69,7 @@
                 if (node) closeTab(node.getAttribute('data-tab-id'));
             });
 
-            dom.tabAdd.addEventListener('click', function () { openQuery(); });
+            dom.tabAdd.addEventListener('click', function () { openQueryFromTree(); });
 
             if (dom.run) {
                 dom.run.addEventListener('click', function () {
@@ -85,11 +86,9 @@
 
             createEditor();
 
+            // 启动时不自动建查询页：没有恢复的标签就停在空态，由用户显式新建。
             if (!state.tabs.length) {
-                openQuery(null, {
-                    sql: '-- Silkit M4 · 查询工作区\n-- Ctrl+Enter 执行 · Ctrl+Space 补全 · Shift+Alt+F 格式化\n',
-                    focus: false
-                });
+                showEmptyState();
             } else {
                 state.tabs.forEach(ensureDoc);
                 activate(state.activeTabId || state.tabs[0].id);
@@ -133,8 +132,11 @@
             });
 
             cm.on('focus', function () {
-                const session = state.activeSession();
-                if (session && hint) hint.prefetch(session);
+                const tab = state.activeTab();
+                const session = tab && tab.sessionId ? state.session(tab.sessionId) : state.activeSession();
+                if (session && hint) {
+                    hint.prefetch(session, activeContext());
+                }
             });
 
             // 输入字母/点号后延迟触发补全（M4-4）。
@@ -147,29 +149,34 @@
                 clearTimeout(hintTimer);
                 hintTimer = setTimeout(function () {
                     if (!cm.hasFocus()) return;
-                    const cursor = cm.getCursor();
-                    const token = cm.getTokenAt(cursor);
-                    if (token && token.string && /^[A-Za-z0-9_$."`]+$/.test(token.string)) {
-                        cm.showHint({ hint: hintForSession(), completeSingle: false });
-                    }
-                }, 500);
+                    const fn = hintForSession();
+                    if (!fn) return;
+                    cm.showHint({ hint: fn, completeSingle: false });
+                }, 220);
             });
 
             cm.addKeyMap({
                 'Ctrl-Space': function () {
                     if (!autocompleteEnabled) return;
-                    cm.showHint({ hint: hintForSession(), completeSingle: false });
+                    const fn = hintForSession();
+                    if (fn) cm.showHint({ hint: fn, completeSingle: false });
                 }
             });
 
             cm.on('blur', function () { clearTimeout(hintTimer); });
         }
 
+        function activeContext() {
+            return ctx.queryContext ? ctx.queryContext.contextFor(state.activeTab()) : null;
+        }
+
         function hintForSession() {
             if (!hint) return undefined;
-            const session = state.activeSession();
+            const tab = state.activeTab();
+            const session = (tab && tab.sessionId && state.session(tab.sessionId)) ||
+                state.activeSession();
             if (!session) return undefined;
-            return hint.hint(session);
+            return hint.hint(session, function () { return activeContext(); });
         }
 
         function runScope() {
@@ -219,6 +226,24 @@
             });
 
             if (add) dom.tabbar.appendChild(add);
+            syncEmptyState();
+        }
+
+        // 没有标签时隐藏全部工作区面板，只显示空态卡片；有标签时反过来。
+        function syncEmptyState() {
+            const empty = !state.tabs.length;
+            if (dom.empty) dom.empty.hidden = !empty;
+            if (!empty) return;
+            if (dom.tablePane) dom.tablePane.hidden = true;
+            if (dom.editorPane) dom.editorPane.hidden = true;
+            if (dom.splitter) dom.splitter.hidden = true;
+            if (dom.resultsPane) dom.resultsPane.hidden = true;
+        }
+
+        function showEmptyState() {
+            render();
+            if (dom.empty) dom.empty.hidden = false;
+            if (ctx.queryContext) ctx.queryContext.sync({ force: true });
         }
 
         function refreshDirty(tab) {
@@ -244,7 +269,9 @@
         }
 
         function syncLayout(tab) {
+            if (!state.tabs.length) { syncEmptyState(); return; }
             const isTable = !!(tab && tab.kind === 'table');
+            if (dom.empty) dom.empty.hidden = true;
             if (dom.tablePane) dom.tablePane.hidden = !isTable;
             if (dom.editorPane) dom.editorPane.hidden = isTable;
             if (dom.splitter) dom.splitter.hidden = isTable;
@@ -284,6 +311,9 @@
             clearErrorHighlight();
             state.setActiveTab(id);
             present(next);
+            if (ctx.queryContext && next.kind === 'query') {
+                ctx.queryContext.onTabActivated(next);
+            }
         }
 
         function updateChrome(tab) {
@@ -296,12 +326,13 @@
                     dom.sub.classList.add('is-warn');
                 } else {
                     const profile = session.profile || {};
-                    const db = session.currentDb || 'main';
+                    const db = (tab.kind === 'query' && tab.database) || session.currentDb || 'main';
                     dom.sub.textContent = (profile.name || '已连接') + ' · ' + db +
                         (session.serverVersion ? ' · ' + session.serverVersion : '');
                     dom.sub.classList.remove('is-warn');
                 }
             }
+            if (ctx.queryContext) ctx.queryContext.sync();
             if (dom.run) {
                 dom.run.hidden = !!tab.running;
                 dom.run.setAttribute('aria-disabled', tab.running ? 'true' : 'false');
@@ -460,15 +491,37 @@
                 kind: 'query',
                 title: opts.title || ('查询 ' + querySeq),
                 sessionId: target ? target.id : null,
+                database: opts.database || '',
+                schema: opts.schema || '',
+                table: opts.table || '',
                 sql: opts.sql != null ? opts.sql : '',
                 dirty: !!opts.dirty,
                 filePath: opts.filePath || null
             });
             state.setActiveTab(tab.id);
             present(tab);
+            if (ctx.queryContext) {
+                ctx.queryContext.onTabOpened(tab).catch(function (error) {
+                    console.warn('[silkit] 应用查询上下文失败', error);
+                });
+            }
             if (ctx.onTabChanged) ctx.onTabChanged(tab);
             if (opts.focus !== false && cm) cm.focus();
             return tab;
+        }
+
+        // 顶栏 / 标签栏 / Ctrl+N 新建查询：优先继承对象树当前选中的连接与库。
+        function openQueryFromTree(options) {
+            const picked = ctx.tree && ctx.tree.selectedContext ? ctx.tree.selectedContext() : null;
+            const session = (picked && picked.session) || state.activeSession();
+            const context = {
+                focus: true,
+                database: picked ? picked.database : '',
+                schema: picked ? picked.schema : '',
+                table: picked && (picked.kind === 'table' || picked.kind === 'view')
+                    ? (picked.table || picked.name) : ''
+            };
+            return openQuery(session, Object.assign(context, options || {}));
         }
 
         function findTableTab(sessionId, ref) {
@@ -539,14 +592,14 @@
             }
             const wasActive = state.activeTabId === id;
             if (wasActive && tab.kind !== 'table') saveEditor();
-            const index = state.tabs.indexOf(tab);
             state.removeTab(id);
             if (ctx.onTabChanged) ctx.onTabChanged(tab);
-            const next = state.tabs[Math.min(index, state.tabs.length - 1)];
-            if (next) {
-                present(next);
+            // 关闭最后一个标签后停在空态，不再自动补建一个查询页。
+            if (state.tabs.length) {
+                const next = state.activeTab() || state.tabs[0];
+                activate(next.id, true);
             } else {
-                openQuery(null, { sql: '', focus: true });
+                showEmptyState();
             }
         }
 
@@ -596,6 +649,7 @@
             activate: activate,
             applySettings: applySettings,
             openQuery: openQuery,
+            openQueryFromTree: openQueryFromTree,
             openTable: openTable,
             closeTab: closeTab,
             closeActive: closeActive,

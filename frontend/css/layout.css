@@ -361,6 +361,86 @@
     min-height: 0;
 }
 
+/* ------------------------------------------------ 无标签空态（v1.0.2） */
+.workspace-empty {
+    flex: 1;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: var(--bg-0);
+}
+
+.workspace-empty[hidden] {
+    display: none !important;
+}
+
+.workspace-empty .empty-card {
+    width: min(440px, 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    padding: 30px 26px;
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: var(--bg-1);
+    box-shadow: 0 10px 30px color-mix(in srgb, var(--text) 7%, transparent);
+    text-align: center;
+}
+
+.workspace-empty .empty-mark {
+    display: grid;
+    place-items: center;
+    width: 54px;
+    height: 54px;
+    margin-bottom: 4px;
+    border-radius: 16px;
+    background: var(--accent-soft);
+    color: var(--accent);
+}
+
+.workspace-empty .empty-mark svg {
+    width: 27px;
+    height: 27px;
+}
+
+.workspace-empty .empty-title {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+}
+
+.workspace-empty .empty-hint {
+    margin: 0;
+    max-width: 360px;
+    font-size: 12px;
+    line-height: 1.7;
+    color: var(--text-faint);
+}
+
+.workspace-empty .empty-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.workspace-empty .empty-shortcuts {
+    margin: 6px 0 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--text-faint);
+}
+
+.workspace-empty .empty-dot {
+    opacity: .6;
+}
+
 .tabbar {
     height: var(--tabbar-h);
     flex: none;

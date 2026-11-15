@@ -5,14 +5,15 @@
 跨库数据库工作台（MySQL / MariaDB / PostgreSQL / SQLite），Windows 桌面端。
 C++20 + Win32 + WebView2，前端为原生 HTML/CSS/JS，无 Node 构建步骤。
 
-> 当前版本：**v1.0.1**（2026-11-15）。进度：**M0–M9 全部交付**：连接 → 对象树 → CodeMirror SQL 编辑器 → 流式结果（多结果/EXPLAIN）→ 表格数据编辑 → 表设计器 → 历史/片段 → CSV 导入、五种格式流式导出、SQL 转储 → 设置面板、安全模式与日志脱敏 → 发布打包。
+> 当前版本：**v1.0.2**（2026-11-15）。进度：**M0–M9 全部交付**：连接 → 对象树 → CodeMirror SQL 编辑器 → 流式结果（多结果/EXPLAIN）→ 表格数据编辑 → 表设计器 → 历史/片段 → CSV 导入、五种格式流式导出、SQL 转储 → 设置面板、安全模式与日志脱敏 → 发布打包；v1.0.2 起新建查询自动继承所选库、查询页可切连接/库并智能补全表与列。
 > 完整计划与偏差记录见 [CODEPLAN.md](CODEPLAN.md)。
 
 ## 版本说明
 
 | 版本 | 日期 | 类型 | 说明 |
 |---|---|---|---|
-| **v1.0.1** | 2026-11-15 | 维护版 | 修复 MariaDB Connector/C 3.4.5 在无 TLS 的 MySQL 协议服务端（如 SQLTiny）上即使选择 `disable` 仍强制 SSL 的连接失败；连接失败错误条与 toast 新增「复制信息」一键复制完整诊断；编译标准升级到 **C++20**；补充真实库 E2E 矩阵与一键执行入口；界面移除顶栏 `M8` 徽章与状态栏 M8 连接状态，右下角版本号改用徽章小胶囊样式；所有确认弹窗统一为主题化界面，不再弹出系统原生白框。详见 [CHANGELOG.md](CHANGELOG.md)。 |
+| **v1.0.2** | 2026-11-15 | 体验增强 | 新建查询自动继承对象树选中的连接与库并 `USE`；查询页新增「连接 / 库」下拉，切换后自动切库，标签各自记住上下文；SQL 补全升级为关键字 + 表/视图 + 列名，支持 `表名.` / `别名.` 与按库隔离的元数据缓存；修复启动即弹查询页且关掉又弹一个的问题，改为可彻底关闭的无标签空态。新增 `node tools/test_hint.js`（31 项）与 `node tools/test_tabs.js`（5 项）无浏览器自测。详见 [CHANGELOG.md](CHANGELOG.md)。 |
+| v1.0.1 | 2026-11-15 | 维护版 | 修复 MariaDB Connector/C 3.4.5 在无 TLS 的 MySQL 协议服务端（如 SQLTiny）上即使选择 `disable` 仍强制 SSL 的连接失败；连接失败错误条与 toast 新增「复制信息」一键复制完整诊断；编译标准升级到 **C++20**；补充真实库 E2E 矩阵与一键执行入口；界面移除顶栏 `M8` 徽章与状态栏 M8 连接状态，右下角版本号改用徽章小胶囊样式；所有确认弹窗统一为主题化界面，不再弹出系统原生白框。详见 [CHANGELOG.md](CHANGELOG.md)。 |
 | v1.0.0 | 2026-11-14 | 首个正式版 | M0–M9 全部交付，Windows 单 exe 便携发布（`Silkit-1.0.0-win-x64.zip`），内置 MySQL / MariaDB / PostgreSQL / SQLite 驱动。 |
 
 > 版本号以 `CMakeLists.txt` 的 `project(Silkit VERSION ...)` 为唯一来源；`vcpkg.json`、`src/app/version.h`、状态栏、Mock 后端与本文档保持一致，exe 版本资源由 CMake 自动生成。执行 `python tools/check_version.py` 校验一致性。
@@ -23,7 +24,9 @@ C++20 + Win32 + WebView2，前端为原生 HTML/CSS/JS，无 Node 构建步骤�
 |---|---|
 | 连接 | MySQL / MariaDB、PostgreSQL、SQLite；测试连接、DPAPI 保存密码、颜色与分组、只读模式 |
 | 对象浏览 | 库 / 模式 / 表 / 视图 / 函数 / 存储过程 / 触发器；懒加载、搜索、右键菜单、DDL 查看 |
-| 查询 | 多标签编辑器、语法高亮、元数据补全、执行当前/选中/全部、多结果集、EXPLAIN、取消、历史与片段 |
+| 查询 | 多标签编辑器、语法高亮、**关键字 + 表/视图 + 列名智能补全**、执行当前/选中/全部、多结果集、EXPLAIN、取消、历史与片段 |
+| 查询上下文 | 新建查询继承对象树选中的连接与库并自动 `USE`；编辑器工具条「连接 / 库」下拉、切换自动切库、每个标签各自记住所属库 |
+| 工作区空态 | 启动与关闭最后一个标签后不自动新建查询页，显示「无标签」引导卡片；关闭状态随会话恢复保留 |
 | 结果网格 | 虚拟滚动、列宽调整、排序筛选、TSV/CSV/JSON/INSERT 复制、长文本与 BLOB 查看、导出 |
 | 表数据 | 分页、服务端筛选排序、内联增删改、事务保存与回滚、SQL 预览、无主键只读保护 |
 | 表设计 | 列 / 索引 / 外键 / 表选项、SQL 预览与令牌执行、影响行数与风险提示 |
@@ -41,23 +44,38 @@ C++20 + Win32 + WebView2，前端为原生 HTML/CSS/JS，无 Node 构建步骤�
 
 > 平台：Windows 10 1809+ / Windows 11（x64）。依赖系统 Microsoft Edge WebView2 Runtime。
 
+### 查询上下文与智能补全（v1.0.2）
+
+- **自动继承选中库**：在左侧对象树选中数据库、表或视图后，点顶栏「新建查询」/ 标签栏 `+` / `Ctrl+N`，新标签直接绑定该连接与该库；若会话当前库不同，自动执行 `USE`（MySQL）/ `conn.set_database`（PG 重连、SQLite 限已 ATTACH 库），并在编辑器标题显示当前库。
+- **连接 / 库下拉**：编辑器工具条新增两个下拉，可随时改本标签使用的连接与库。库切换后立即生效（清空该会话的补全缓存并刷新对象树）；切换回标签或按 `Ctrl+Enter` 执行时，如果会话被别的标签切走了库，会自动切回本标签记录的库。标签的 `database / schema / table` 随会话恢复一起持久化。
+- **智能补全**：候选包含 SQL 关键字、当前库的表与视图，以及 `FROM / JOIN / UPDATE / INTO` 中表的列；输入 `表名.` 或 `别名.` 时**只**提示该表的列（列名带类型说明，插入位置在点号之后），解析不到表就返回空，不会串进其它表的列；`FROM / JOIN / UPDATE / INTO` 后的 `库名.`（PG 为 `schema.`）视为库限定符，提示该库的表名。候选按「常用关键字 → 表名 → 列名 → 冷门关键字」排序，函数与引擎专属子句不会挤掉表名/列名。元数据按 `会话 | 引擎 | 库 | schema` 缓存，切库或 DDL 变更后自动失效；首次触发按需异步拉取，不阻塞输入。
+- **自测**：`node tools/test_hint.js`（无浏览器，31 项）覆盖表名/视图、点号列补全、别名、库隔离、缓存失效与 schema 透传。
+
+### 无标签空态（v1.0.2 修复）
+
+启动、连接成功、关闭最后一个标签都不再自动补建查询页：主区域显示「没有打开的标签」卡片，提供「新建查询」「打开 SQL」按钮与 `Ctrl+N` 提示，编辑器、结果区与分割条一并隐藏。空标签集随会话恢复持久化，重启后仍保持关闭，只有显式新建查询、打开 `.sql` 或拖放文件才创建标签。`node tools/test_tabs.js`（5 项）锁定该行为，并覆盖关闭非激活标签不误切换。
+
 ## 发布与打包（M9 于 v1.0.0 交付）
 
-- **版本信息**：`CMakeLists.txt`、`vcpkg.json`、`src/app/version.h`、状态栏与 Mock 后端统一为 `1.0.1`（首发版 `1.0.0`）；exe 版本资源由 CMake 依据 `PROJECT_VERSION` 生成，`tools/check_version.py` 校验各处一致。
+- **版本信息**：`CMakeLists.txt`、`vcpkg.json`、`src/app/version.h`、状态栏与 Mock 后端统一为 `1.0.2`（首发版 `1.0.0`）；exe 版本资源由 CMake 依据 `PROJECT_VERSION` 生成，`tools/check_version.py` 校验各处一致。
 - **图标与窗口**：exe 内嵌多分辨率 `app_icon.ico`，标题栏/任务栏使用大小两种尺寸；窗口标题为「Silkit — 跨库数据库工作台」。
 - **关于页**：显示版本、数据目录、日志目录、配置文件与当前日志，可直接打开数据/日志目录。
 - **许可声明**：[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) 列出 TauriCPP、nlohmann/json、WebView2 SDK、SQLite、libmariadb、libpq 与 CodeMirror 的许可证与源码地址。
-- **发布包**：`tools/package.ps1` 构建 Release 并生成 `dist/Silkit-1.0.1-win-x64.zip`（exe + README + LICENSE + 第三方声明），解压即用；压缩包名中的版本号从 `CMakeLists.txt` 读取，无需手工同步。
+- **发布包**：`tools/package.ps1` 构建 Release 并生成 `dist/Silkit-1.0.2-win-x64.zip`（exe + 中英文 README + LICENSE + 第三方声明），解压即用；压缩包名中的版本号从 `CMakeLists.txt` 读取，无需手工同步。
 - **验收**：CTest 全绿、对比度检查通过、版本一致性检查通过；干净 Windows 11 虚拟机冒烟待人工执行（见下方清单）。
 
 ## 发布验收清单
 
-- [ ] 干净 Windows 11（有 WebView2）：解压 `dist/Silkit-1.0.1-win-x64.zip`，双击 `Silkit.exe` 能启动并显示晨樱主题。
+- [ ] 干净 Windows 11（有 WebView2）：解压 `dist/Silkit-1.0.2-win-x64.zip`，双击 `Silkit.exe` 能启动并显示晨樱主题。
 - [ ] 无 WebView2 的 Windows 10：启动时出现中文安装引导，安装运行时后可用。
 - [ ] 三库回归：SQLite 文件库、MySQL 8.x、PostgreSQL 13+ 各完成连接 → 对象树 → 查询 → 编辑表数据 → 设计表 → 导出/导入。
 - [ ] 重启后标签、SQL、侧栏布局恢复；五套主题切换无白闪。
 - [ ] 缩放 200% 与多显示器拖动下文字与网格清晰。
 - [ ] 只读连接拒绝写操作；开启安全模式后执行 `DROP TABLE` 需二次确认。
+- [ ] 选中其它库的表后「新建查询」，编辑器标题与「库」下拉显示该库，`SELECT DATABASE()` 返回它。
+- [ ] 查询页切换「库」后执行查询命中新库；切到另一标签再切回会自动恢复各自的库。
+- [ ] 输入 `表名.` 弹出该表列（含类型），输入 `别名.` 也正确；切库后候选随新库刷新。
+- [ ] `node tools/test_hint.js` 31 项全通过。
 - [ ] `%APPDATA%\Silkit\logs` 与 `settings.json` 中无明文密码。
 
 ## M0 已交付
@@ -188,7 +206,7 @@ C:\vcpkg\vcpkg.exe install webview2:x64-windows-static sqlite3:x64-windows-stati
 ### 发布包
 
 ```powershell
-# 构建 Release、运行 CTest 并生成 dist/Silkit-1.0.1-win-x64.zip
+# 构建 Release、运行 CTest 并生成 dist/Silkit-1.0.2-win-x64.zip
 .\tools\package.ps1
 
 # 跳过测试 / 只打包已构建的产物
@@ -207,12 +225,16 @@ python tools\check_version.py
 ```powershell
 python tools\contrast_check.py      # 只显示失败项与汇总
 python tools\contrast_check.py -v   # 显示全部 125 项配对
+node tools\test_hint.js             # 智能补全无浏览器自测（31 项）
+node tools\test_tabs.js             # 标签空态回归自测（5 项）
 ```
 
 ## 快捷键
 
 | 快捷键 | 功能 |
 |---|---|
+| `Ctrl+N` | 新建查询（继承对象树选中的连接与库） |
+| `Ctrl+Space` | 手动触发关键字 / 表 / 列补全 |
 | `Ctrl+Shift+T` | 打开 / 关闭主题面板 |
 | `Ctrl+Shift+L` | 当前浅色主题 ↔ 夜樱（记住上次浅色主题） |
 | `1`–`5` | 主题面板打开时快速选择第 N 套主题 |
@@ -268,7 +290,7 @@ Silkit/
 - **会话亲和**：每个连接一条 Session 线程，驱动对象不跨线程使用；`Cancel()` 单独设计，可跨线程调用。
 - **流式结果**：`query.execute` 按语句发 `statement` / `batch`，首批携带列元数据，达到 `maxRows` 后标记 `truncated`。
 
-## 已知限制（v1.0.1）
+## 已知限制（v1.0.2）
 
 - **平台**：目前仅 Windows 桌面端，依赖系统 WebView2 运行时；macOS / Linux 尚未支持。
 - **导入 / 导出 / 转储**：CSV 导入需整文件读入（上限 256MB）；SQL 文件执行整文件读入（上限 512MB）后逐条执行，尚未按块流式拆分；SQL 转储只覆盖表结构与数据，视图/函数/触发器定义请从详情面板另存 `.sql`。

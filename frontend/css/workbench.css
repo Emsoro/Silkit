@@ -1467,6 +1467,33 @@ body.is-col-resizing * {
     color: var(--text);
 }
 
+/* 查询页「连接 / 库」上下文选择（自动 USE 的可见入口） */
+.ctx-label {
+    flex: none;
+    color: var(--text-faint);
+    font-size: 11px;
+    white-space: nowrap;
+}
+
+.query-pick {
+    flex: 0 1 auto;
+    min-width: 88px;
+    max-width: 172px;
+    height: 24px;
+    padding: 2px 6px;
+    text-overflow: ellipsis;
+}
+
+.query-pick:disabled {
+    opacity: .6;
+    cursor: default;
+}
+
+@media (max-width: 1120px) {
+    .editor-sub { display: none; }
+    .query-pick { max-width: 128px; }
+}
+
 /* 运行按钮的播放图标：固定实心绿色，不跟随主题的 accent 变化 */
 #runBtn svg path {
     fill: #22c55e;

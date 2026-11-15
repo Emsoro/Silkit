@@ -518,6 +518,33 @@
             if (session && state.activeSessionId !== session.id) state.setActiveSession(session.id);
         }
 
+        // 新建查询时把当前选中的 连接 / 库 / schema / 表 带给查询标签（v1.0.2）。
+        function selectedContext() {
+            if (!activeNode || !dom.tree || !dom.tree.contains(activeNode)) return null;
+            const session = sessionOf(activeNode);
+            const kind = activeNode.getAttribute('data-kind') || '';
+            const name = activeNode.getAttribute('data-name') || '';
+            let database = activeNode.getAttribute('data-database') || '';
+            let schema = activeNode.getAttribute('data-schema') || '';
+            const table = activeNode.getAttribute('data-table') || '';
+            const engine = session && ((session.profile && session.profile.engine) || session.engine);
+            if (kind === 'database') {
+                if (engine === 'postgres') schema = name || schema;   // PG 树上的「库」节点其实是 schema
+                else database = name || database;
+            }
+            if (!database && session) {
+                database = session.currentDb || (session.profile && session.profile.database) || '';
+            }
+            return {
+                session: session,
+                kind: kind,
+                name: name,
+                database: database,
+                schema: schema,
+                table: table
+            };
+        }
+
         function onClick(event) {
             const node = event.target.closest('.tree-node');
             if (!node || !dom.tree.contains(node)) return;
@@ -880,6 +907,7 @@
             refreshSession: refreshSession,
             refreshActive: refreshActive,
             updateStatus: updateStatus,
+            selectedContext: selectedContext,
             filter: filter,
             hideMenu: hideMenu
         };

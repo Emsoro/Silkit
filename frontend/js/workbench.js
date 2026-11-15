@@ -103,12 +103,11 @@
             }
 
             const active = state.activeTab();
+            // 只把已有的空白查询标签绑到该会话；不再因为连接成功就自动弹一个查询页。
             if (active && active.kind === 'query' && !active.sessionId && isBlankSql(active.sql)) {
                 active.sessionId = session.id;
                 app.tabs.updateChrome(active);
                 app.tabs.render();
-            } else if (!(adopted && active && active.kind === 'table')) {
-                app.tabs.openQuery(session, { focus: true });
             }
             updateStatus();
         };
@@ -234,6 +233,9 @@
                     ref: tab.ref || null,
                     autoLimit: tab.autoLimit || null,
                     filePath: tab.filePath || null,
+                    database: tab.database || '',
+                    schema: tab.schema || '',
+                    table: tab.table || '',
                     scroll: Number(tab.editorScroll) || 0
                 };
             });
@@ -273,6 +275,9 @@
                     dirty: isTable ? false : !!item.dirty,
                     ref: isTable ? item.ref : null,
                     filePath: isTable ? null : (item.filePath || null),
+                    database: isTable ? '' : (item.database || ''),
+                    schema: isTable ? '' : (item.schema || ''),
+                    table: isTable ? '' : (item.table || ''),
                     editorScroll: Number(item.scroll) || 0
                 }));
             });
@@ -284,6 +289,8 @@
         app.hint = window.SilkitHint ? window.SilkitHint.create(app) : null;
         app.table = window.SilkitTable ? window.SilkitTable.create(app) : null;
         app.tabs = window.SilkitTabs.create(app);
+        app.queryContext = window.SilkitQueryContext
+            ? window.SilkitQueryContext.create(app) : null;
         app.detail = window.SilkitDetail.create(app);
         app.designer = window.SilkitDesigner ? window.SilkitDesigner.create(app) : null;
         app.tree = window.SilkitTree.create(app);
@@ -354,10 +361,11 @@
             app.detail.init();
             if (app.designer) app.designer.init();
             app.history.load(settings);
-            // 先恢复标签，再初始化标签视图（tabs.init 在无标签时才建默认标签）。
+            // 先恢复标签，再初始化标签视图（无标签时停在空态，不自动建查询页）。
             const restoreEnabled = !(settings && settings.ui && settings.ui.restoreTabs === false);
             const restored = restoreEnabled ? restoreTabs(settings) : false;
             app.tabs.init();
+            if (app.queryContext) app.queryContext.init();
             applySettings(settings);
             if (restored) {
                 const savedIndex = Number(settings && settings.query && settings.query.activeTab) || 0;
@@ -376,11 +384,19 @@
             if (dom.newConn) dom.newConn.addEventListener('click', function () { app.connections.openDialog(); });
             if (dom.newQuery) {
                 dom.newQuery.addEventListener('click', function () {
-                    app.tabs.openQuery(state.activeSession(), { focus: true });
+                    app.tabs.openQueryFromTree();
                 });
             }
             if (dom.openSql) {
                 dom.openSql.addEventListener('click', openSqlDialog);
+            }
+            const emptyNewQuery = byId('emptyNewQuery');
+            const emptyOpenSql = byId('emptyOpenSql');
+            if (emptyNewQuery) {
+                emptyNewQuery.addEventListener('click', function () { app.tabs.openQueryFromTree(); });
+            }
+            if (emptyOpenSql) {
+                emptyOpenSql.addEventListener('click', openSqlDialog);
             }
             if (dom.runSqlFile) {
                 dom.runSqlFile.addEventListener('click', function () {
