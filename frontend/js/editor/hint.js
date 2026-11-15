@@ -1,4 +1,4 @@
-// 智能补全（v1.0.3）：关键字 + 当前连接/库的表与视图 + 列。
+// 智能补全（v1.0.4）：关键字 + 当前连接/库的表与视图 + 列。
 //
 //   * 缓存维度是 sessionId|engine|database|schema，切换库后不会串到上一个库的表。
 //   * 输入 `表名.` / `别名.` 时只补全该表的列，并把列插在点号之后；解析不到表就返回空，
@@ -6,8 +6,9 @@
 //   * FROM / JOIN / UPDATE / INTO 后的 `库名.`（或 PG `schema.`）是库限定符，提示该库的表名。
 //   * 表引用按「光标所在的整条语句」解析（以分号切分），因此 SELECT 列表写在 FROM 之前时，
 //     也能拿到光标之后 FROM 的表；裸列名只来自语句里的这些表，不再混入树里选中的其它表。
-//   * 每个候选右侧统一显示所属路径：列 = `库.表`（PG 为 `schema.表`），表 = 库/schema 名，
-//     关键字 = keyword；show-hint 的自定义 render 负责右对齐，名称不再跟 `(table)` / `(view)`。
+//   * 右侧只显示来源路径：列 = `库.表`（PG 为 `schema.表`），表 = 库/schema 名；
+//     关键字不带任何右侧标签（左侧名称本身已足够识别）。自定义 render 负责右对齐，
+//     名称不再跟 `(table)` / `(view)`。
 //   * 返回 Promise（CodeMirror show-hint 支持异步 hint），首次触发时现取元数据。
 (function () {
     'use strict';
@@ -417,8 +418,7 @@
                         }
                     } else {
                         const words = splitKeywords(entry.keywords);
-                        list = list.concat(makeItems(words.common, 'keyword', word,
-                            { source: 'keyword' }));
+                        list = list.concat(makeItems(words.common, 'keyword', word));
                         list = list.concat(makeItems(tableItems(entry, scope), 'table', word));
 
                         // 裸标识符只补「整条语句里 FROM/JOIN/UPDATE/INTO 出现过、且当前库中确实存在」的表的列。
@@ -442,8 +442,7 @@
                                 'column', word));
                         });
                         // 冷门关键字（函数、DDL 子句、引擎专属项）排到最后。
-                        list = list.concat(makeItems(words.rare, 'rareKeyword', word,
-                            { source: 'keyword' }));
+                        list = list.concat(makeItems(words.rare, 'rareKeyword', word));
                     }
 
                     list.sort(function (a, b) {

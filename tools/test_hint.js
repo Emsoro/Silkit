@@ -272,7 +272,7 @@ function check(name, condition) {
     check('列提示只取语句里的表，忽略树中选中的其它表',
         texts(limited).indexOf('dept_name') >= 0 && texts(limited).indexOf('salary') < 0);
 
-    // 15. 右侧所属路径：列 = 库.表，表 = 库，关键字 = keyword
+    // 15. 右侧所属路径：列 = 库.表，表 = 库，关键字不带标签
     const depDotted = await complete('SELECT departments.');
     check('列候选右侧路径为 employees.departments', depDotted.list.length > 0 &&
         depDotted.list.every(function (item) {
@@ -281,8 +281,9 @@ function check(name, condition) {
     check('表候选右侧路径为所属库', any.list.some(function (item) {
         return item.text === 'departments' && item._source === 'employees';
     }));
-    check('关键字右侧统一显示 keyword', any.list.some(function (item) {
-        return item.text === 'SELECT' && item._source === 'keyword' &&
+    check('关键字右侧不显示 keyword 标签', any.list.some(function (item) {
+        return item.text === 'SELECT' && !item._source && !item._badge &&
+            item.displayText === 'SELECT' &&
             item.className === 'CodeMirror-hint-keyword';
     }));
 
@@ -328,6 +329,16 @@ function check(name, condition) {
     check('无 render 降级时 displayText 仍含类型与路径',
         colItem.displayText.indexOf(colItem.text) === 0 &&
         colItem.displayText.indexOf('employees.departments') > 0);
+
+    const keywordItem = any.list.filter(function (item) {
+        return item.text === 'SELECT';
+    })[0];
+    const keywordRendered = fakeElt();
+    keywordItem.render(keywordRendered, {}, keywordItem);
+    check('render 对关键字只生成名称，不生成右侧标签',
+        keywordRendered.childNodes.length === 1 &&
+        keywordRendered.childNodes[0].className === 'cm-hint-label' &&
+        keywordRendered.childNodes[0].childNodes[0].text === 'SELECT');
 
     console.log('\n智能补全自测通过：' + passed + ' 项');
 })().catch(function (error) {

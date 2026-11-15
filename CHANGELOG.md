@@ -2,6 +2,14 @@
 
 本项目遵循里程碑版本号；日期为交付日期。
 
+## [1.0.4] — 2026-11-15
+
+### 变更
+
+- **补全关键字去标签**：移除候选右侧的 `keyword` 标签。常用/冷门两档关键字都不再携带 `_source` / `_badge`，`renderHintItem()` 对关键字只渲染左侧名称、不生成 `.cm-hint-meta`；列（`库.表`）与表（库/schema 名）的来源路径保持不变，纯文本降级 `displayText` 也同步去掉关键字后缀。
+- **自测**：`tools/test_hint.js` 45 → **46 项**，把「右侧显示 keyword」断言反向更新为「关键字无右侧标签」，并新增「关键字 render 不生成右侧标签」断言；`tools/test_tabs.js` 5 项保持通过。
+- **版本号**：`1.0.3` → **`1.0.4`**（patch：展示细节调整，不占用 `v1.1`）。CMake、`vcpkg.json`、`src/app/version.h`、状态栏、Mock 后端、中英文 README 版本说明 / 发布包名 / 验收清单 / 已知限制标题、`CODEPLAN.md` 同步；`tools/check_version.py` 校验 8 处全绿。
+
 ## [1.0.3] — 2026-11-15
 
 ### 修复
@@ -11,7 +19,7 @@
 
 ### 新增
 
-- **右侧所属路径**：借助 CodeMirror `show-hint` 的自定义 `render`，候选左侧保持名称，右侧统一右对齐显示类型与来源——列 `employees.departments`（PG 为 `schema.表`）、表 `employees`、关键字 `keyword`；跨库限定符会随目标库变化（如 `sakila.actor`）。样式复用五套主题的 `--text-dim` / `--text-faint` / `--accent-hover`，无 `render` 的旧版降级仍保留纯文本信息。
+- **右侧所属路径**：借助 CodeMirror `show-hint` 的自定义 `render`，候选左侧保持名称，右侧统一右对齐显示类型与来源——列 `employees.departments`（PG 为 `schema.表`）、表 `employees`、关键字 `keyword`（该标签已在 v1.0.4 移除）；跨库限定符会随目标库变化（如 `sakila.actor`）。样式复用五套主题的 `--text-dim` / `--text-faint` / `--accent-hover`，无 `render` 的旧版降级仍保留纯文本信息。
 
 ### 变更
 
