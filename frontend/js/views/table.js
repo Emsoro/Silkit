@@ -1,4 +1,4 @@
-// 表数据视图（M5）：分页/排序/筛选/搜索、网格编辑状态机、SQL 预览与事务保存。
+// 表数据视图（M5）：分页/排序/筛选/搜索、网格编辑状态机与事务应用。
 //
 //   const table = SilkitTable.create(ctx);   // ctx: api/state/toast/results/tabs
 //   table.init();
@@ -43,14 +43,13 @@
                 'tableSearch', 'tableFilterColumn', 'tableFilterOp', 'tableFilterValue',
                 'tableFilterAdd', 'tableFilterClear', 'tableFilterChips', 'tableGrid', 'tableStatus',
                 'tablePrev', 'tableNext', 'tablePage', 'tablePageSize', 'tableTotal', 'tableError',
-                'tableViewCellBtn', 'tablePreview', 'tablePreviewList', 'tablePreviewWarn',
-                'tablePreviewCancel', 'tablePreviewRun', 'tablePreviewMeta', 'tablePreviewClose'];
+                'tableViewCellBtn'];
             ids.forEach(function (id) { dom[id] = byId(id); });
             if (!dom.tableGrid) return;
 
             grid = window.SilkitGrid.create(dom.tableGrid, {
                 emptyMessage: '没有数据',
-                emptyHint: '调整筛选条件，或点击「新增行」开始编辑',
+                emptyHint: '调整筛选条件，或点击「添加记录」开始编辑',
                 canEdit: function (row, col) {
                     const tab = state.activeTab();
                     return !!(tab && tab.kind === 'table' && canEditCell(tab.table, row, col));
@@ -84,7 +83,6 @@
 
             bindToolbar();
             bindFilterBar();
-            bindPreview();
 
             dom.tableGrid.addEventListener('contextmenu', function (event) {
                 const cell = event.target.closest('.vgrid-cell[data-col]');
@@ -129,8 +127,7 @@
                     loaded: false,
                     loadToken: 0,
                     error: null,
-                    errorRow: null,
-                    preview: null
+                    errorRow: null
                 };
             }
             return tab.table;
@@ -196,9 +193,12 @@
             const session = sessionFor(tab);
             if (!session) {
                 t.columns = [];
+                t.editable = false;
+                t.loading = false;
                 renderEmpty('未连接', '重新打开连接后即可浏览表数据');
                 dom.tableBadge.textContent = '未连接';
                 dom.tableName.textContent = tab.title || '表';
+                updateStatus(tab);
                 return;
             }
             if (!opts.keepEdits) resetEdits(t);
@@ -369,10 +369,7 @@
             }
             if (dom.tablePrev) dom.tablePrev.disabled = t.page <= 0 || t.loading;
             if (dom.tableNext) dom.tableNext.disabled = !t.hasMore || t.loading;
-            if (dom.tableSaveBtn) {
-                dom.tableSaveBtn.disabled = !pending || t.loading;
-                dom.tableSaveBtn.classList.toggle('is-accent', pending > 0);
-            }
+            if (dom.tableSaveBtn) dom.tableSaveBtn.disabled = !pending || t.loading;
             if (dom.tableRevertBtn) dom.tableRevertBtn.disabled = !pending || t.loading;
             if (dom.tableInsertBtn) dom.tableInsertBtn.disabled = !t.editable || t.loading;
             if (dom.tableDeleteBtn) dom.tableDeleteBtn.disabled = !t.editable || t.loading;
@@ -468,23 +465,23 @@
             if (removedNew) rebuild(tab, false);
             else refreshGrid(tab);
             updateDirty(tab);
-            toast('已标记 ' + (removedNew + marked) + ' 行待删除（保存后生效）');
+            toast('已标记 ' + (removedNew + marked) + ' 行待删除（应用后生效）');
         }
 
         async function revert(tab) {
             const t = ensure(tab);
             if (!dirtyCount(t)) return;
             if (!(await U.confirm({
-                title: '撤销修改',
-                message: '撤销当前页所有未保存的修改？',
+                title: '取消更改',
+                message: '放弃当前页所有未应用的修改？',
                 hint: '本页已标记的新增、修改与删除都会还原。',
-                okText: '撤销',
+                okText: '取消更改',
                 danger: true
             }))) return;
             resetEdits(t);
             rebuild(tab, false);
             updateDirty(tab);
-            toast('已撤销未保存的修改');
+            toast('已取消未应用的更改');
         }
 
         function viewCell(tab, rowIndex, colIndex) {
@@ -786,120 +783,41 @@
 
         async function save(tab) {
             const t = ensure(tab);
-            if (!hasChanges(tab)) {
-                toast('没有需要保存的修改');
-                return;
-            }
             if (t.loading) {
-                toast('仍在加载当前页，请稍后再保存', 'warn');
+                toast('仍在加载当前页，请稍后再应用', 'warn');
                 return;
             }
             const session = sessionFor(tab);
             if (!session) {
-                toast('连接已关闭，无法保存', 'error');
+                toast('连接已关闭，无法应用', 'error');
                 return;
             }
+            // 先把正在编辑的单元格提交到内存，避免最后输入的值被漏掉。
             if (grid.commitEdit) grid.commitEdit();
-            const changes = buildChanges(t);
-            try {
-                const preview = await api.tableApply(session.id, t.ref, changes, true);
-                openPreview(tab, changes, preview || {});
-            } catch (error) {
-                showApplyError(tab, error);
-            }
-        }
-
-        function bindPreview() {
-            if (dom.tablePreviewCancel) {
-                dom.tablePreviewCancel.addEventListener('click', closePreview);
-            }
-            if (dom.tablePreviewClose) {
-                dom.tablePreviewClose.addEventListener('click', closePreview);
-            }
-            if (dom.tablePreview) {
-                dom.tablePreview.addEventListener('click', function (event) {
-                    if (event.target === dom.tablePreview) closePreview();
-                });
-            }
-            if (dom.tablePreviewRun) {
-                dom.tablePreviewRun.addEventListener('click', function () {
-                    const tab = state.activeTab();
-                    if (tab && tab.table && tab.table.preview) runApply(tab);
-                });
-            }
-            document.addEventListener('keydown', function (event) {
-                if (event.key === 'Escape' && dom.tablePreview && !dom.tablePreview.hidden) {
-                    closePreview();
-                }
-            });
-        }
-
-        function openPreview(tab, changes, preview) {
-            const t = ensure(tab);
-            t.preview = { changes: changes, sqlPreview: preview.sqlPreview || [] };
-            if (dom.tablePreviewList) {
-                U.clear(dom.tablePreviewList);
-                t.preview.sqlPreview.forEach(function (sql) {
-                    dom.tablePreviewList.appendChild(U.el('li', 'preview-sql', sql));
-                });
-                if (!t.preview.sqlPreview.length) {
-                    dom.tablePreviewList.appendChild(U.el('li', 'preview-empty', '没有生成 SQL'));
-                }
-            }
-            if (dom.tablePreviewMeta) {
-                const changesCount = changes.inserts.length + changes.updates.length + changes.deletes.length;
-                dom.tablePreviewMeta.textContent = '新增 ' + changes.inserts.length +
-                    ' · 更新 ' + changes.updates.length + ' · 删除 ' + changes.deletes.length +
-                    '（共 ' + changesCount + ' 条语句）';
-            }
-            if (dom.tablePreviewWarn) {
-                dom.tablePreviewWarn.textContent = '执行失败会整体回滚并定位到出错行。';
-                dom.tablePreviewWarn.hidden = false;
-            }
-            if (dom.tablePreview) dom.tablePreview.hidden = false;
-            if (dom.tablePreviewRun) dom.tablePreviewRun.focus();
-        }
-
-        function closePreview() {
-            if (dom.tablePreview) dom.tablePreview.hidden = true;
-            const tab = state.activeTab();
-            if (tab && tab.table) tab.table.preview = null;
-        }
-
-        async function runApply(tab) {
-            const t = ensure(tab);
-            const preview = t.preview;
-            if (!preview) return;
-            const session = sessionFor(tab);
-            if (!session) {
-                closePreview();
-                showApplyError(tab, { message: '连接已关闭' });
+            if (!hasChanges(tab)) {
+                toast('没有需要应用的更改');
                 return;
             }
-            if (dom.tablePreviewRun) dom.tablePreviewRun.disabled = true;
+            const changes = buildChanges(t);
+            if (dom.tableSaveBtn) dom.tableSaveBtn.disabled = true;
             try {
-                const result = await api.tableApply(session.id, t.ref, preview.changes, false);
-                closePreview();
+                const result = await api.tableApply(session.id, t.ref, changes, false);
                 t.error = null;
                 t.errorRow = null;
-                toast('已保存 · 影响 ' + U.formatNumber(result.affected || 0) + ' 行' +
-                    (result.inTransaction ? '（通过 SAVEPOINT 保存，未提交事务）' : ''));
+                setError('');
+                toast('已应用更改 · 影响 ' + U.formatNumber(result.affected || 0) + ' 行');
                 if (result.warning) toast(result.warning, 'warn');
-                if (ctx.tree && ctx.tree.refreshSession) {
-                    // 数据变更不影响对象树结构；保留钩子以兼容后续 M6。
-                }
                 load(tab);
             } catch (error) {
-                closePreview();
                 showApplyError(tab, error);
             } finally {
-                if (dom.tablePreviewRun) dom.tablePreviewRun.disabled = false;
+                updateStatus(tab);
             }
         }
 
         function showApplyError(tab, error) {
             const t = ensure(tab);
-            const message = (error && error.message) || '保存失败';
+            const message = (error && error.message) || '应用失败';
             const detail = error && error.details ? error.details : {};
             let row = -1;
             if (typeof detail.clientIndex === 'number') {
@@ -908,14 +826,14 @@
             }
             t.error = message + (detail.sqlState ? ' [' + detail.sqlState + ']' : '');
             t.errorRow = row >= 0 && row < t.display.length ? row : null;
-            setError('保存失败：' + t.error +
+            setError('应用失败：' + t.error +
                 (t.errorRow != null ? '（第 ' + (t.errorRow + 1) + ' 行）' : ''));
             refreshGrid(tab);
             if (t.errorRow != null) {
                 grid.setFocusCell(t.errorRow, 0);
                 grid.focus();
             }
-            toast('保存失败，已回滚：' + message, 'error');
+            toast('应用失败，已回滚：' + message, 'error');
         }
 
         function truncate(tab) {
@@ -1066,8 +984,6 @@
         function close(tab) {
             if (!tab || !tab.table) return;
             tab.table.loadToken += 1;
-            tab.table.preview = null;
-            if (dom.tablePreview) dom.tablePreview.hidden = true;
         }
 
         return {

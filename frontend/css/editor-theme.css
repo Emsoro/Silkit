@@ -67,12 +67,16 @@
     color: var(--danger);
     font-weight: 700;
 }
-.editor-cm .cm-error-gutter::before {
+/* 错误行标记：只画在行背景条上，绝对定位不占文档流，既不挤动行号也不会重复 */
+.editor-cm .CodeMirror-gutter-background.cm-error-gutter::before {
     content: '●';
+    position: absolute;
+    left: 4px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 8px;
+    line-height: 1;
     color: var(--danger);
-    display: block;
-    font-size: 9px;
-    text-align: center;
 }
 
 /* 拖放提示 */

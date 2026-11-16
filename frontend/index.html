@@ -10,8 +10,9 @@
         (function () {
             try {
                 var theme = localStorage.getItem('silkit.theme') || 'bloom';
+                var darkThemes = { noir: 1, neon: 1, matrix: 1 };
                 var appearance = localStorage.getItem('silkit.appearance') ||
-                    (theme === 'noir' ? 'dark' : 'light');
+                    (darkThemes[theme] ? 'dark' : 'light');
                 document.documentElement.dataset.theme = theme;
                 document.documentElement.dataset.appearance = appearance;
             } catch (e) { /* ignore */ }
@@ -23,6 +24,9 @@
     <link rel="stylesheet" href="css/themes/lilac.css">
     <link rel="stylesheet" href="css/themes/mocha.css">
     <link rel="stylesheet" href="css/themes/mint.css">
+    <link rel="stylesheet" href="css/themes/neon.css">
+    <link rel="stylesheet" href="css/themes/mist.css">
+    <link rel="stylesheet" href="css/themes/matrix.css">
     <link rel="stylesheet" href="vendor/codemirror/codemirror.css">
     <link rel="stylesheet" href="css/editor-theme.css">
     <link rel="stylesheet" href="css/base.css">
@@ -125,17 +129,6 @@
                         <span class="table-badge" id="tableBadge">只读</span>
                     </div>
                     <span class="spacer"></span>
-                    <button class="btn btn-mini" type="button" id="tableInsertBtn" data-icon="plus"
-                            title="新增行（当前页末尾）">新增行</button>
-                    <button class="btn btn-mini" type="button" id="tableDeleteBtn" data-icon="trash"
-                            title="删除选中的行">删除行</button>
-                    <button class="btn btn-mini" type="button" id="tableRevertBtn"
-                            title="撤销当前页所有未保存修改">撤销</button>
-                    <button class="btn btn-mini" type="button" id="tableSaveBtn" data-icon="save"
-                            title="预览 SQL 并保存（Ctrl+S）">保存</button>
-                    <span class="topbar-sep"></span>
-                    <button class="btn btn-mini" type="button" id="tableReloadBtn" data-icon="refresh"
-                            title="重新加载当前页">刷新</button>
                     <button class="btn btn-mini" type="button" id="tableCountBtn"
                             title="执行 COUNT(*)，得到精确行数">精确计数</button>
                     <button class="btn btn-mini btn-danger-soft" type="button" id="tableTruncateBtn"
@@ -166,6 +159,18 @@
 
                 <div class="table-error" id="tableError" hidden></div>
                 <div class="table-grid" id="tableGrid"></div>
+                <div class="table-actions">
+                    <button class="btn btn-mini btn-icon" type="button" id="tableInsertBtn" data-icon="plus"
+                            title="添加记录：在末尾新增一条空记录" aria-label="添加记录"></button>
+                    <button class="btn btn-mini btn-icon" type="button" id="tableDeleteBtn" data-icon="minus"
+                            title="删除记录：删除当前选中的记录" aria-label="删除记录"></button>
+                    <button class="btn btn-mini btn-icon" type="button" id="tableSaveBtn" data-icon="check"
+                            title="应用更改：把当前页的修改写入数据库（Ctrl+S）" aria-label="应用更改"></button>
+                    <button class="btn btn-mini btn-icon" type="button" id="tableRevertBtn" data-icon="close"
+                            title="取消更改：放弃当前页所有未应用的修改" aria-label="取消更改"></button>
+                    <button class="btn btn-mini btn-icon" type="button" id="tableReloadBtn" data-icon="refresh"
+                            title="刷新当前页：重新加载这一页数据" aria-label="刷新当前页"></button>
+                </div>
                 <div class="table-foot">
                     <span class="table-status" id="tableStatus">加载中…</span>
                     <span class="spacer"></span>
@@ -180,8 +185,6 @@
             <section class="editor-pane" id="editorPane">
                 <div class="editor-head">
                     <span class="win-dots" aria-hidden="true"><i></i><i></i><i></i></span>
-                    <span class="editor-title" id="editorTitle">查询 1</span>
-                    <span class="editor-sub" id="editorSub">未连接 · 打开连接后即可执行</span>
                     <span class="spacer"></span>
                     <span class="ctx-label" data-i18n="editor.connection">连接</span>
                     <select id="querySessionSelect" class="input input-mini query-pick"
@@ -288,7 +291,7 @@
         <span class="spacer"></span>
         <span class="status-item" id="ipcStatus" data-i18n="status.ipc">IPC 就绪</span>
         <span class="status-item" id="statusTheme">晨樱</span>
-        <span class="status-item" id="statusVersion">v1.0.4</span>
+        <span class="status-item" id="statusVersion">v1.0.5</span>
     </footer>
 </div>
 
@@ -492,33 +495,6 @@
 </div>
 
 <!-- ---------------------------------------------------------------- SQL 预览（M5 保存） -->
-<div id="tablePreview" class="modal" hidden>
-    <div class="modal-dialog modal-wide modal-preview" role="dialog" aria-modal="true"
-         aria-labelledby="tablePreviewTitle">
-        <div class="modal-head">
-            <div class="modal-title">
-                <span data-icon="bolt"></span>
-                <span id="tablePreviewTitle">保存预览</span>
-            </div>
-            <button class="icon-btn" type="button" data-icon="close"
-                    id="tablePreviewClose" aria-label="关闭"></button>
-        </div>
-        <div class="preview-sub" id="tablePreviewMeta"></div>
-        <div class="preview-body">
-            <ol class="preview-list" id="tablePreviewList"></ol>
-            <div class="preview-warn" id="tablePreviewWarn"></div>
-        </div>
-        <div class="modal-foot">
-            <span class="muted">修改会在单个事务中执行</span>
-            <span class="spacer"></span>
-            <button id="tablePreviewCancel" class="btn" type="button">取消</button>
-            <button id="tablePreviewRun" class="btn btn-primary" type="button" data-icon="check">
-                执行并保存
-            </button>
-        </div>
-    </div>
-</div>
-
 <!-- ---------------------------------------------------------------- 对象详情 -->
 <div id="detailDialog" class="modal" hidden>
     <div class="modal-dialog modal-wide modal-detail" role="dialog" aria-modal="true" aria-labelledby="detailTitle">
@@ -565,12 +541,12 @@
 <div id="themePanel" class="theme-panel" role="dialog" aria-modal="false" aria-label="主题选择" hidden>
     <div class="theme-panel-head">
         <span>外观</span>
-        <span class="muted">5 套调色板</span>
+        <span class="muted">8 套调色板</span>
         <kbd>Ctrl+Shift+T</kbd>
     </div>
     <div class="theme-list" id="themeList" role="listbox" aria-label="主题列表"></div>
     <div class="theme-panel-foot">
-        <span>1–5 快选</span><span class="dot-sep"></span><span>Esc 关闭</span>
+        <span>1–8 快选</span><span class="dot-sep"></span><span>Esc 关闭</span>
         <span class="spacer"></span><span>自动保存</span>
     </div>
 </div>

@@ -549,7 +549,8 @@
             const node = event.target.closest('.tree-node');
             if (!node || !dom.tree.contains(node)) return;
             selectNode(node);
-            toggleNode(node);
+            // 只有点击左侧箭头才展开/折叠，点行本身只做选中，双击才是打开
+            if (event.target.closest('.caret')) toggleNode(node);
         }
 
         function onDoubleClick(event) {

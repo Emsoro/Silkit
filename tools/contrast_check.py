@@ -24,9 +24,10 @@ from typing import Dict, Iterable, List, NamedTuple, Optional, Tuple
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 THEME_DIR = REPO_ROOT / "frontend" / "css" / "themes"
-DEFAULT_ORDER = ["bloom", "noir", "lilac", "mocha", "mint"]
+DEFAULT_ORDER = ["bloom", "noir", "lilac", "mocha", "mint", "neon", "mist", "matrix"]
 
 TOKEN_RE = re.compile(r"--([a-z0-9-]+)\s*:\s*(#[0-9a-fA-F]{6})\b")
+ROOT_BLOCK_RE = re.compile(r":root\[data-theme=\"[a-z0-9-]+\"\]\s*\{")
 
 
 class Check(NamedTuple):
@@ -69,6 +70,27 @@ def parse_tokens(css: str) -> Dict[str, str]:
     return {match.group(1): match.group(2).upper() for match in TOKEN_RE.finditer(css)}
 
 
+def parse_root_tokens(css: str) -> Dict[str, str]:
+    """只解析 :root[data-theme] 主规则块。
+
+    主题文件还可以有作用域覆盖块（如 .sidebar 深色侧栏），它们会重定义同名
+    token，混在一起检查会拿深色侧栏的底色去比对浅色主区的语义色。
+    """
+    match = ROOT_BLOCK_RE.search(css)
+    if not match:
+        return {}
+    start = match.end()
+    depth = 1
+    index = start
+    while index < len(css) and depth:
+        if css[index] == "{":
+            depth += 1
+        elif css[index] == "}":
+            depth -= 1
+        index += 1
+    return parse_tokens(css[start:index])
+
+
 def hex_to_rgb(value: str) -> Tuple[int, int, int]:
     value = value.lstrip("#")
     if len(value) == 3:
@@ -109,7 +131,7 @@ def check_theme(path: Path, verbose: bool) -> Tuple[int, int]:
         print(f"  找不到主题文件: {path}")
         return 0, 1
 
-    tokens = parse_tokens(path.read_text(encoding="utf-8"))
+    tokens = parse_root_tokens(path.read_text(encoding="utf-8"))
     if not tokens:
         print(f"  {path.name}: 未解析到颜色 token")
         return 0, 1

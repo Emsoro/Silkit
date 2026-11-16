@@ -1,0 +1,66 @@
+/* 松绿 Pine —— 浅色主题：雾白底 + 松针绿，配近黑墨绿侧栏 */
+:root[data-theme="matrix"] {
+    color-scheme: light;
+
+    --bg-0: #F4FAF6;
+    --bg-1: #FFFFFF;
+    --bg-2: #E8F3EC;
+    --bg-3: #DBEDE2;
+    --bg-stripe: #F8FCFA;
+    --border: #DCEBE2;
+    --border-strong: #7A9285;
+
+    --text: #12201A;
+    --text-dim: #4C6156;
+    --text-faint: #7C9086;
+
+    --accent: #157A4D;
+    --accent-hover: #0F6540;
+    --accent-soft: #DFF2E7;
+    --on-accent: #FFFFFF;
+    --accent-2: #0E7C86;
+    --accent-2-soft: #E0F4F5;
+
+    --success: #0F7A46;
+    --warning: #A15C00;
+    --danger: #C93B3B;
+    --info: #2C5BD8;
+
+    --focus-ring: rgba(21, 122, 77, .30);
+    --selection: #CFE9DB;
+    --shadow-1: 0 1px 2px rgba(16, 48, 32, .08);
+    --shadow-2: 0 10px 30px rgba(16, 48, 32, .14);
+    --scroll-thumb: #C8DED1;
+
+    --syntax-keyword: #156B45;
+    --syntax-string: #1F6F5C;
+    --syntax-number: #7A3FB8;
+    --syntax-comment: #566B5F;
+    --syntax-function: #96543C;
+    --syntax-type: #1F5BB5;
+    --syntax-operator: #3B4C43;
+    --syntax-null: #A15C00;
+    --syntax-line: #F0F8F3;
+}
+
+/* 熊猫配色：左侧连接列表栏为近黑墨绿，右侧工作区为雾白。
+   只在 .sidebar 作用域内覆盖语义 token，树、搜索框、页脚自动跟随。 */
+:root[data-theme="matrix"] .sidebar {
+    --bg-0: #020A06;
+    --bg-1: #04120B;
+    --bg-2: #0A1F14;
+    --bg-3: #102B1C;
+    --bg-stripe: #06150D;
+    --border: #1A3726;
+    --border-strong: #4E6E5A;
+    --text: #E9F7EE;
+    --text-dim: #B4CEBD;
+    --text-faint: #93B29F;
+    --accent: #45E58A;
+    --accent-hover: #74F0AB;
+    --accent-soft: #0C2A19;
+    --on-accent: #04150A;
+    --selection: #123A25;
+    --scroll-thumb: #24382B;
+    --focus-ring: rgba(69, 229, 138, .35);
+}

@@ -108,6 +108,12 @@ target_link_libraries(integration_db PRIVATE silkit_test_lib)
 add_test(NAME integration_db COMMAND integration_db)
 set_tests_properties(integration_db PROPERTIES TIMEOUT 90)
 
+# E2E：本地 SQLite 文件库功能回归（索引/视图、筛选、编辑、导入导出），零外部依赖。
+add_executable(e2e_sqlite_workflow e2e/e2e_sqlite_workflow.cpp)
+target_link_libraries(e2e_sqlite_workflow PRIVATE silkit_test_lib)
+add_test(NAME e2e_sqlite COMMAND e2e_sqlite_workflow)
+set_tests_properties(e2e_sqlite PROPERTIES TIMEOUT 60)
+
 # E2E：真实 MySQL / PostgreSQL 服务器上的用例矩阵（CODEPLAN §12.4 / §12.9）。
 # 通过 SILKIT_MYSQL_HOST / SILKIT_PG_HOST 启用；未设置时整组 SKIP 且不计入失败。
 add_executable(e2e_real_db e2e/e2e_real_db.cpp)

@@ -41,8 +41,6 @@
             dom.tabbar = byId('tabbar');
             dom.tabAdd = byId('tabAdd');
             dom.host = byId('sqlEditor');
-            dom.title = byId('editorTitle');
-            dom.sub = byId('editorSub');
             dom.run = byId('runBtn');
             dom.cancel = byId('cancelBtn');
             dom.editorPane = byId('editorPane');
@@ -218,7 +216,8 @@
                     const spin = U.el('span', 'tab-spinner');
                     spin.setAttribute('aria-label', '执行中');
                     node.appendChild(spin);
-                } else {
+                } else if (tab.dirty) {
+                    // 圆点只表示「有未保存修改」；表标签没有草稿状态，不显示。
                     node.appendChild(dot);
                 }
                 node.appendChild(close);
@@ -318,20 +317,6 @@
 
         function updateChrome(tab) {
             if (!tab) return;
-            if (dom.title) dom.title.textContent = tab.title;
-            if (dom.sub) {
-                const session = tab.sessionId ? state.session(tab.sessionId) : null;
-                if (!session) {
-                    dom.sub.textContent = '未连接 · 打开连接后即可执行';
-                    dom.sub.classList.add('is-warn');
-                } else {
-                    const profile = session.profile || {};
-                    const db = (tab.kind === 'query' && tab.database) || session.currentDb || 'main';
-                    dom.sub.textContent = (profile.name || '已连接') + ' · ' + db +
-                        (session.serverVersion ? ' · ' + session.serverVersion : '');
-                    dom.sub.classList.remove('is-warn');
-                }
-            }
             if (ctx.queryContext) ctx.queryContext.sync();
             if (dom.run) {
                 dom.run.hidden = !!tab.running;

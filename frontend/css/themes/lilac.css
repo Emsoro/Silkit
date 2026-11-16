@@ -1,44 +1,66 @@
-/* 薰衣草 Lilac */
+/* 薰衣草 Lilac —— 浅色主题：紫罗兰主色 + 冷白底，参考 ysadmin 后台配色 */
 :root[data-theme="lilac"] {
     color-scheme: light;
 
-    --bg-0: #FAF7FF;
+    --bg-0: #F7F6FB;
     --bg-1: #FFFFFF;
-    --bg-2: #F3EDFC;
-    --bg-3: #EBE1F9;
-    --bg-stripe: #FDFBFF;
-    --border: #EDE3F7;
-    --border-strong: #9A7BC4;
+    --bg-2: #F3EFFD;
+    --bg-3: #E9E2FB;
+    --bg-stripe: #FBFAFE;
+    --border: #E7E1F4;
+    --border-strong: #8A7CA8;
 
-    --text: #2F2438;
-    --text-dim: #6F5F80;
-    --text-faint: #8C7C9D;
+    --text: #1E1A2B;
+    --text-dim: #615B72;
+    --text-faint: #8B85A0;
 
-    --accent: #6D4FC4;
-    --accent-hover: #5B3FB0;
-    --accent-soft: #F0EBFB;
+    --accent: #6A45EC;
+    --accent-hover: #5733D6;
+    --accent-soft: #EFEAFE;
     --on-accent: #FFFFFF;
-    --accent-2: #C2255C;
-    --accent-2-soft: #FCE7EF;
+    --accent-2: #0D7C67;
+    --accent-2-soft: #E3F5F0;
 
-    --success: #197A50;
+    --success: #17855C;
     --warning: #A15C00;
-    --danger: #C92A2A;
-    --info: #1C64B0;
+    --danger: #C93B3B;
+    --info: #2C5BD8;
 
-    --focus-ring: rgba(109, 79, 196, .30);
-    --selection: #E4D8F8;
-    --shadow-1: 0 1px 2px rgba(60, 40, 90, .07);
-    --shadow-2: 0 10px 30px rgba(60, 40, 90, .14);
-    --scroll-thumb: #D6C5EC;
+    --focus-ring: rgba(106, 69, 236, .30);
+    --selection: #E3DBFB;
+    --shadow-1: 0 1px 2px rgba(46, 30, 90, .07);
+    --shadow-2: 0 10px 30px rgba(46, 30, 90, .14);
+    --scroll-thumb: #D8CDF2;
 
-    --syntax-keyword: #6D28A8;
+    --syntax-keyword: #6B21C8;
     --syntax-string: #1F6F5C;
     --syntax-number: #A61E5A;
-    --syntax-comment: #6F5F80;
+    --syntax-comment: #615B72;
     --syntax-function: #96543C;
-    --syntax-type: #1C64B0;
-    --syntax-operator: #5B4A66;
+    --syntax-type: #2C5BD8;
+    --syntax-operator: #574F66;
     --syntax-null: #A15C00;
-    --syntax-line: #F6F0FE;
+    --syntax-line: #F5F1FE;
+}
+
+/* 熊猫配色：左侧连接列表栏转深色，主工作区保持浅色。
+   只在 .sidebar 作用域内覆盖语义 token，树、搜索框、页脚自动跟随。 */
+:root[data-theme="lilac"] .sidebar {
+    --bg-0: #1B1428;
+    --bg-1: #241B33;
+    --bg-2: #31254A;
+    --bg-3: #3D2F5C;
+    --bg-stripe: #2A2038;
+    --border: #3A2C55;
+    --border-strong: #7A6A96;
+    --text: #F2ECFA;
+    --text-dim: #CFC2E4;
+    --text-faint: #9D8FB8;
+    --accent: #A78BFA;
+    --accent-hover: #BCA6FF;
+    --accent-soft: #3C2C5E;
+    --on-accent: #1B1428;
+    --selection: #4A3768;
+    --scroll-thumb: #42345C;
+    --focus-ring: rgba(167, 139, 250, .35);
 }

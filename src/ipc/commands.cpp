@@ -42,12 +42,15 @@ struct ThemeInfo {
     const char* accent;
 };
 
-constexpr std::array<ThemeInfo, 5> kThemes{{
+constexpr std::array<ThemeInfo, 8> kThemes{{
     {"bloom", "晨樱 Bloom", "light", "#FFF7F9", "#C2255C"},
     {"noir", "夜樱 Noir", "dark", "#17121A", "#F06595"},
-    {"lilac", "薰衣草 Lilac", "light", "#FAF7FF", "#6D4FC4"},
+    {"lilac", "薰衣草 Lilac", "light", "#F7F6FB", "#6A45EC"},
     {"mocha", "奶咖 Mocha", "light", "#FBF7F3", "#96563D"},
     {"mint", "薄荷 Mint", "light", "#F5FBF9", "#237668"},
+    {"neon", "霓虹蓝 Neon Blue", "light", "#F4F7FC", "#0A66C2"},
+    {"mist", "雾蓝 Mist", "light", "#F0F6FC", "#0B63B8"},
+    {"matrix", "松绿 Pine", "light", "#F4FAF6", "#157A4D"},
 }};
 
 const ThemeInfo* FindTheme(const std::string& id) {
@@ -337,3 +340,4 @@ void RegisterCommands(AsyncRouter& router,
 }
 
 }  // namespace silkit::ipc
+

@@ -7,13 +7,14 @@ Built with C++20 + Win32 + WebView2; the frontend is plain HTML/CSS/JS with no N
 
 > `CODEPLAN.md` and `CHANGELOG.md` are currently available in Chinese only.
 
-> Current version: **v1.0.4** (2026-11-15). Progress: **M0–M9 all delivered** — connections → object tree → CodeMirror SQL editor → streaming results (multi-result / EXPLAIN) → tabular data editing → table designer → history / snippets → CSV import, five streaming export formats, SQL dump → settings, safe mode and log redaction → release packaging. Since v1.0.2, new query tabs inherit the selected database, the query page has connection / database pickers, and completion covers tables and columns; v1.0.3 scopes columns to the FROM tables of the whole statement and shows their source path on the right; v1.0.4 removes the right-side label from keyword candidates.
+> Current version: **v1.0.5** (2026-11-16). Progress: **M0–M9 all delivered** — connections → object tree → CodeMirror SQL editor → streaming results (multi-result / EXPLAIN) → tabular data editing → table designer → history / snippets → CSV import, five streaming export formats, SQL dump → settings, safe mode and log redaction → release packaging. Since v1.0.2, new query tabs inherit the selected database, the query page has connection / database pickers, and completion covers tables and columns; v1.0.3 scopes columns to the FROM tables of the whole statement and shows their source path on the right; v1.0.4 removes the right-side label from keyword candidates; v1.0.5 adds a local SQLite end-to-end regression and three themes.
 > The full plan and deviation log are in [CODEPLAN.md](CODEPLAN.md).
 
 ## Release Notes
 
 | Version | Date | Type | Summary |
 |---|---|---|---|
+| **v1.0.5** | 2026-11-16 | Tests & UI | Added a local SQLite end-to-end functional test covering index/view metadata, paging, filtering and search, cell inserts/updates/deletes with apply (transaction + rollback), CSV/JSON/SQL export and CSV import round-trip. Data-table tabs no longer show a meaningless dot; the dot only marks unsaved query changes. Added the Neon, Matrix and Mist themes. See [CHANGELOG.md](CHANGELOG.md). |
 | **v1.0.4** | 2026-11-15 | Polish | Only source paths remain on the right of completion candidates (`db.table` for columns, database name for tables); keywords no longer show the `keyword` label and render just the name. `node tools/test_hint.js` grew to 46 checks. See [CHANGELOG.md](CHANGELOG.md). |
 | **v1.0.3** | 2026-11-15 | Completion fix | Table references are parsed from the whole statement at the caret (split on semicolons), including a `FROM` clause that comes after the caret, so column candidates are limited to the tables actually used in the statement. Every candidate shows its source path on the right (column `employees.departments`, table `employees`, keyword `keyword`) and the `(table)` / `(view)` suffixes are gone. `node tools/test_hint.js` grew to 45 checks (the keyword label was removed in v1.0.4). See [CHANGELOG.md](CHANGELOG.md). |
 | **v1.0.2** | 2026-11-15 | UX enhancement | New query tabs inherit the connection and database selected in the object tree and run `USE` automatically; the query page gains "Connection / Database" pickers that switch databases on change, with per-tab context persisted; SQL completion now offers keywords, tables/views and columns, including `table.` / `alias.` column lists and per-database metadata caching; fixed the query tab that appeared on startup and reappeared after being closed by introducing a closable empty state. Added two browser-free self-tests: `node tools/test_hint.js` (31 checks) and `node tools/test_tabs.js` (5 checks). See [CHANGELOG.md](CHANGELOG.md). |
@@ -61,19 +62,19 @@ Startup, a successful connection, and closing the last tab no longer spawn a que
 
 ## Release & Packaging (M9, delivered in v1.0.0)
 
-- **Version info**: `CMakeLists.txt`, `vcpkg.json`, `src/app/version.h`, the status bar and the mock backend all read `1.0.4` (`1.0.0` in the initial release); the exe version resource is generated from `PROJECT_VERSION`, and `tools/check_version.py` verifies consistency.
+- **Version info**: `CMakeLists.txt`, `vcpkg.json`, `src/app/version.h`, the status bar and the mock backend all read `1.0.5` (`1.0.0` in the initial release); the exe version resource is generated from `PROJECT_VERSION`, and `tools/check_version.py` verifies consistency.
 - **Icon & window**: the exe embeds a multi-resolution `app_icon.ico` used in both title bar and taskbar sizes; the window title is "Silkit — Cross-Database Workbench".
 - **About page**: shows version, data directory, log directory, config file and current log, with shortcuts to open the data / log directories.
 - **License notices**: [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) lists licenses and source URLs for TauriCPP, nlohmann/json, the WebView2 SDK, SQLite, libmariadb, libpq and CodeMirror.
-- **Release package**: `tools/package.ps1` builds Release and produces `dist/Silkit-1.0.4-win-x64.zip` (exe + Chinese/English README + LICENSE + third-party notices); just unzip and run. The version in the archive name is read from `CMakeLists.txt`, so no manual sync is needed.
+- **Release package**: `tools/package.ps1` builds Release and produces `dist/Silkit-1.0.5-win-x64.zip` (exe + Chinese/English README + LICENSE + third-party notices); just unzip and run. The version in the archive name is read from `CMakeLists.txt`, so no manual sync is needed.
 - **Validation**: CTest all green, contrast check passed, version consistency check passed; a clean Windows 11 VM smoke test is still pending manual execution (see checklist below).
 
 ## Release Acceptance Checklist
 
-- [ ] Clean Windows 11 (with WebView2): unzip `dist/Silkit-1.0.4-win-x64.zip`, double-click `Silkit.exe`, it starts and shows the Bloom theme.
+- [ ] Clean Windows 11 (with WebView2): unzip `dist/Silkit-1.0.5-win-x64.zip`, double-click `Silkit.exe`, it starts and shows the Bloom theme.
 - [ ] Windows 10 without WebView2: startup shows the localized installation guide, and the app works after installing the runtime.
 - [ ] Three-engine regression: SQLite file database, MySQL 8.x and PostgreSQL 13+ each complete connect → object tree → query → edit table data → design table → export / import.
-- [ ] After restart, tabs, SQL and sidebar layout are restored; switching between all five themes produces no white flash.
+- [ ] After restart, tabs, SQL and sidebar layout are restored; switching between all eight themes produces no white flash.
 - [ ] Text and grid stay crisp at 200% scaling and when dragging across monitors.
 - [ ] Read-only connections reject writes; with safe mode on, executing `DROP TABLE` requires a second confirmation.
 - [ ] After selecting a table in another database, "New Query" shows that database in the editor subtitle and picker, and `SELECT DATABASE()` returns it.
@@ -87,10 +88,10 @@ Startup, a successful connection, and closing the last tab no longer spawn a que
 - A buildable single-file `Silkit.exe` (static CRT, only depends on the system WebView2 runtime)
 - Asynchronous IPC: `ipc.call` returns immediately; a worker thread pool posts back `progress / result / error / cancelled` via `ipc.event`
 - UI shell: top bar, object tree, SQL editor, result grid, message panel, status bar, draggable splitters
-- Five themes + top-bar switcher + shortcuts; theme and window background are persisted, no white flash on startup
+- Eight themes + top-bar switcher + shortcuts; theme and window background are persisted, no white flash on startup
 - Config written atomically to `%APPDATA%\Silkit\settings.json`; daily logs under `%APPDATA%\Silkit\logs\`
 - Self-test entry: "Self-test" in the top bar runs a 3-step async task that can be cancelled mid-run
-- `tools/contrast_check.py`: validates key color pairs of all five themes (WCAG 2.1)
+- `tools/contrast_check.py`: validates key color pairs of all eight themes (WCAG 2.1)
 
 ## M1 Delivered
 
@@ -144,6 +145,7 @@ Startup, a successful connection, and closing the last tab no longer spawn a que
 - **Transactional save**: `table.apply` runs INSERT/UPDATE/DELETE in a transaction (SAVEPOINT if the connection is already in one); any failing statement rolls everything back and points to the failing row (`clientIndex`). An SQL preview is shown before saving.
 - **Cell viewer**: double-click / right-click opens long text, JSON, image and HEX views with save-as.
 - **Copy / export**: range selection, TSV copy, SQL / INSERT copy formats.
+- **End-to-end regression**: CTest `e2e_sqlite` chains index/view metadata, paging/sorting/filtering/search, `table.apply` transaction and rollback, CSV/JSON/SQL export and CSV import round-trip on a temporary SQLite file database — 67 assertions, no external services.
 - **Validated against real servers on all three engines**: CRUD, unique-key conflict rollback and exact row count pass on MySQL 8.4.13 and PostgreSQL 18.7; `test_table_ops` (SQLite) covers per-engine SQL building and rollback.
 
 ## M4 Query Workspace Delivered
@@ -210,7 +212,7 @@ Output: `build\Release\Silkit.exe`.
 ### Release Package
 
 ```powershell
-# Build Release, run CTest and produce dist/Silkit-1.0.4-win-x64.zip
+# Build Release, run CTest and produce dist/Silkit-1.0.5-win-x64.zip
 .\tools\package.ps1
 
 # Skip tests / only package an existing build
@@ -253,9 +255,12 @@ node tools\test_tabs.js             # tab empty-state regression self-test (5 ch
 |---|---|---|---|
 | `bloom` | Bloom (morning cherry) | Light (default) | `#C2255C` |
 | `noir` | Noir (night cherry) | Dark | `#F06595` |
-| `lilac` | Lilac | Light | `#6D4FC4` |
+| `lilac` | Lilac | Light | `#6A45EC` |
 | `mocha` | Mocha | Light | `#96563D` |
 | `mint` | Mint | Light | `#237668` |
+| `neon` | Neon Blue | Light | `#0A66C2` |
+| `mist` | Mist | Light | `#0B63B8` |
+| `matrix` | Pine | Light | `#157A4D` |
 
 Theme files contain only CSS variables; component styles reference semantic tokens (`--bg-0`, `--text`, `--accent`, …).
 To add a theme, copy `frontend/css/themes/bloom.css`, change the variables, and register it in `js/themes.js` and `src/ipc/commands.cpp`.
@@ -276,7 +281,7 @@ Silkit/
 │  ├─ index.html               # Shell + first-frame anti-flash script
 │  ├─ css/                     # tokens / base / layout / workbench + themes/*.css
 │  └─ js/                      # bridge / api / state / themes / views / components / mock
-├─ tests/                      # silkit_smoke + sqlite_driver (CTest)
+├─ tests/                      # silkit_smoke + sqlite_driver + e2e_sqlite (CTest)
 ├─ tools/contrast_check.py     # WCAG contrast check
 ├─ TauriCPP/                   # Win32 + WebView2 framework (vendored)
 ├─ CODEPLAN.md                 # Full product / technical / milestone plan
@@ -294,7 +299,7 @@ Silkit/
 - **Session affinity**: one Session thread per connection, driver objects are never used across threads; `Cancel()` is designed separately to be callable cross-thread.
 - **Streaming results**: `query.execute` emits `statement` / `batch` per statement, the first batch carries column metadata, and results are marked `truncated` once `maxRows` is reached.
 
-## Known Limitations (v1.0.4)
+## Known Limitations (v1.0.5)
 
 - **Platform**: Windows desktop only, depends on the system WebView2 runtime; macOS / Linux are not supported yet.
 - **Import / export / dump**: CSV import reads the whole file (256MB cap); SQL file execution reads the whole file (512MB cap) and then executes statement by statement, without chunked streaming; SQL dumps cover only table schema and data — save view / function / trigger definitions as `.sql` from the detail panel.
@@ -315,3 +320,4 @@ Silkit/
 
 Silkit is released under the MIT license, see [LICENSE](LICENSE). The bundled TauriCPP framework remains copyright of its original authors.
 Licenses and source URLs of third-party components (libmariadb LGPL-2.1, libpq, SQLite, CodeMirror, nlohmann/json, WebView2 SDK) are listed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+

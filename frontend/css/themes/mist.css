@@ -1,0 +1,44 @@
+/* 雾蓝 Mist —— 浅色主题：雾蓝 + 天青，清爽通透 */
+:root[data-theme="mist"] {
+    color-scheme: light;
+
+    --bg-0: #F0F6FC;
+    --bg-1: #FFFFFF;
+    --bg-2: #E3F0FC;
+    --bg-3: #D5E8FA;
+    --bg-stripe: #F7FBFF;
+    --border: #D9E7F5;
+    --border-strong: #6E8299;
+
+    --text: #17212B;
+    --text-dim: #4E5F70;
+    --text-faint: #7B8B9B;
+
+    --accent: #0B63B8;
+    --accent-hover: #095299;
+    --accent-soft: #DCEBFC;
+    --on-accent: #FFFFFF;
+    --accent-2: #0E7C86;
+    --accent-2-soft: #E0F4F6;
+
+    --success: #14784A;
+    --warning: #9A6100;
+    --danger: #C02B2B;
+    --info: #1A63AC;
+
+    --focus-ring: rgba(11, 99, 184, .28);
+    --selection: #BFE0FF;
+    --shadow-1: 0 1px 2px rgba(30, 60, 90, .08);
+    --shadow-2: 0 12px 34px rgba(30, 60, 90, .16);
+    --scroll-thumb: #C3D4E4;
+
+    --syntax-keyword: #0B63B8;
+    --syntax-string: #1C6E51;
+    --syntax-number: #5A46B8;
+    --syntax-comment: #65737F;
+    --syntax-function: #0E7C86;
+    --syntax-type: #1A63AC;
+    --syntax-operator: #3F4C59;
+    --syntax-null: #9A6100;
+    --syntax-line: #EDF6FF;
+}

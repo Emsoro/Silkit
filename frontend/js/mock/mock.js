@@ -19,9 +19,12 @@
     const THEMES = [
         { id: 'bloom', name: '晨樱 Bloom', appearance: 'light', bg: '#FFF7F9', accent: '#C2255C' },
         { id: 'noir', name: '夜樱 Noir', appearance: 'dark', bg: '#17121A', accent: '#F06595' },
-        { id: 'lilac', name: '薰衣草 Lilac', appearance: 'light', bg: '#FAF7FF', accent: '#6D4FC4' },
+        { id: 'lilac', name: '薰衣草 Lilac', appearance: 'light', bg: '#F7F6FB', accent: '#6A45EC' },
         { id: 'mocha', name: '奶咖 Mocha', appearance: 'light', bg: '#FBF7F3', accent: '#96563D' },
-        { id: 'mint', name: '薄荷 Mint', appearance: 'light', bg: '#F5FBF9', accent: '#237668' }
+        { id: 'mint', name: '薄荷 Mint', appearance: 'light', bg: '#F5FBF9', accent: '#237668' },
+        { id: 'neon', name: '霓虹蓝 Neon Blue', appearance: 'light', bg: '#F4F7FC', accent: '#0A66C2' },
+        { id: 'mist', name: '雾蓝 Mist', appearance: 'light', bg: '#F0F6FC', accent: '#0B63B8' },
+        { id: 'matrix', name: '松绿 Pine', appearance: 'light', bg: '#F4FAF6', accent: '#157A4D' }
     ];
 
     const DEFAULTS = {
@@ -1564,7 +1567,7 @@
         switch (cmd) {
             case 'app.info':
                 reply(reqId, {
-                    ok: true, name: 'Silkit', version: '1.0.4', build: 'browser mock',
+                    ok: true, name: 'Silkit', version: '1.0.5', build: 'browser mock',
                     platform: 'web', engines: ['sqlite', 'mysql', 'postgres'],
                     plannedEngines: [], dataDir: '(browser mock)'
                 });
@@ -2257,3 +2260,4 @@
 
     window.MockBridge = { invoke: invoke, listen: listen, emit: emit, isMock: true };
 })();
+

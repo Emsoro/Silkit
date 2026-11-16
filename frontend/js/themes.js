@@ -1,4 +1,4 @@
-// 主题系统：5 套调色板 → <html data-theme data-appearance>。
+// 主题系统：8 套调色板 → <html data-theme data-appearance>。
 // 主题文件只包含语义 token，组件 CSS 不感知具体主题。
 (function () {
     'use strict';
@@ -16,7 +16,7 @@
         },
         {
             id: 'lilac', name: '薰衣草', en: 'Lilac', appearance: 'light',
-            swatches: ['#FAF7FF', '#F3EDFC', '#6D4FC4']
+            swatches: ['#F7F6FB', '#F3EFFD', '#6A45EC']
         },
         {
             id: 'mocha', name: '奶咖', en: 'Mocha', appearance: 'light',
@@ -25,6 +25,18 @@
         {
             id: 'mint', name: '薄荷', en: 'Mint', appearance: 'light',
             swatches: ['#F5FBF9', '#EAF6F2', '#237668']
+        },
+        {
+            id: 'neon', name: '霓虹蓝', en: 'Neon Blue', appearance: 'light',
+            swatches: ['#F4F7FC', '#E9F0FA', '#0A66C2']
+        },
+        {
+            id: 'mist', name: '雾蓝', en: 'Mist', appearance: 'light',
+            swatches: ['#F0F6FC', '#E3F0FC', '#0B63B8']
+        },
+        {
+            id: 'matrix', name: '松绿', en: 'Pine', appearance: 'light',
+            swatches: ['#F4FAF6', '#E8F3EC', '#157A4D']
         }
     ];
 
@@ -278,3 +290,4 @@
         focusIndex: function () { return focusIndex; }
     };
 })();
+

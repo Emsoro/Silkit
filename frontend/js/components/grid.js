@@ -623,6 +623,10 @@
             state.dragAnchor = { row: target.row, col: target.col };
             state.dragging = true;
             event.preventDefault();
+            // 单击即进入编辑；切换到另一格时会先提交上一格的输入。
+            if (!event.shiftKey && canEditCell(target.row, target.col)) {
+                beginEdit(target.row, target.col);
+            }
         });
 
         shell.addEventListener('mouseover', function (event) {

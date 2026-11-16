@@ -42,3 +42,25 @@
     --syntax-null: #A15C00;
     --syntax-line: #FFF0F5;
 }
+
+/* 熊猫配色：左侧连接列表栏转深色酒红，主工作区保持浅粉。
+   只在 .sidebar 作用域内覆盖语义 token，树、搜索框、页脚自动跟随。 */
+:root[data-theme="bloom"] .sidebar {
+    --bg-0: #1F141A;
+    --bg-1: #2A1B23;
+    --bg-2: #3A2530;
+    --bg-3: #4A2F3E;
+    --bg-stripe: #31202A;
+    --border: #462C39;
+    --border-strong: #9A7383;
+    --text: #FBF0F4;
+    --text-dim: #DCC0CC;
+    --text-faint: #B08F9E;
+    --accent: #FFA8C5;
+    --accent-hover: #FFC2D6;
+    --accent-soft: #4A2B3A;
+    --on-accent: #1F141A;
+    --selection: #573243;
+    --scroll-thumb: #4D3341;
+    --focus-ring: rgba(255, 168, 197, .35);
+}

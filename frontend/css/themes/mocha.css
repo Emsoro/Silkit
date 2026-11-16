@@ -41,3 +41,25 @@
     --syntax-null: #A15C00;
     --syntax-line: #FBF2EA;
 }
+
+/* 熊猫配色：左侧连接列表栏转深咖啡色，主工作区保持浅奶咖。
+   只在 .sidebar 作用域内覆盖语义 token，树、搜索框、页脚自动跟随。 */
+:root[data-theme="mocha"] .sidebar {
+    --bg-0: #1A1411;
+    --bg-1: #221A15;
+    --bg-2: #2F241C;
+    --bg-3: #3D2F25;
+    --bg-stripe: #271E18;
+    --border: #3A2C22;
+    --border-strong: #8C7256;
+    --text: #F7EFE7;
+    --text-dim: #D8C7B7;
+    --text-faint: #AC9885;
+    --accent: #E8B58F;
+    --accent-hover: #F2C9A8;
+    --accent-soft: #3E2C20;
+    --on-accent: #1A1411;
+    --selection: #4A3628;
+    --scroll-thumb: #42332A;
+    --focus-ring: rgba(232, 181, 143, .35);
+}

@@ -244,7 +244,7 @@
     }
 
     function modalOpen() {
-        const ids = ['connDialog', 'cellViewer', 'detailDialog', 'tablePreview', 'ioDialog',
+        const ids = ['connDialog', 'cellViewer', 'detailDialog', 'ioDialog',
                      'settingsDialog', 'ddlConfirm', 'designerDialog', 'appConfirm'];
         for (let i = 0; i < ids.length; i += 1) {
             const node = $(ids[i]);
@@ -348,7 +348,7 @@
                     toast('外观：' + theme.name + ' ' + theme.en);
                     return;
                 }
-                if (!mod && !isField(event.target) && /^[1-5]$/.test(event.key)) {
+                if (!mod && !isField(event.target) && /^[1-8]$/.test(event.key)) {
                     event.preventDefault();
                     const theme = themes.apply(themes.THEMES[Number(event.key) - 1].id);
                     themes.setFocus(Number(event.key) - 1);
@@ -416,7 +416,7 @@
 
         try {
             const info = await api.info();
-            const version = 'v' + (info.version || '1.0.4');
+            const version = 'v' + (info.version || '1.0.5');
             if ($('statusVersion')) $('statusVersion').textContent = version;
         } catch (error) {
             if ($('ipcStatus')) $('ipcStatus').textContent = 'IPC 不可用';

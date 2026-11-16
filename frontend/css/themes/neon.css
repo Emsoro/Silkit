@@ -1,0 +1,67 @@
+/* 霓虹蓝 Neon Blue —— 浅色主题：冷白底 + 电光蓝，配深海军蓝侧栏 */
+:root[data-theme="neon"] {
+    color-scheme: light;
+
+    --bg-0: #F4F7FC;
+    --bg-1: #FFFFFF;
+    --bg-2: #E9F0FA;
+    --bg-3: #DCE7F7;
+    --bg-stripe: #F8FBFF;
+    --border: #DCE6F5;
+    --border-strong: #7C90AE;
+
+    --text: #101828;
+    --text-dim: #4E5F76;
+    --text-faint: #7E8FA6;
+
+    --accent: #0A66C2;
+    --accent-hover: #0857A6;
+    --accent-soft: #E3EEFC;
+    --on-accent: #FFFFFF;
+    --accent-2: #5B3DF5;
+    --accent-2-soft: #EEEAFE;
+
+    --success: #0E7C46;
+    --warning: #A15C00;
+    --danger: #C93B3B;
+    --info: #2563EB;
+
+    --focus-ring: rgba(11, 111, 209, .30);
+    --selection: #CFE3FA;
+    --shadow-1: 0 1px 2px rgba(20, 40, 80, .08);
+    --shadow-2: 0 10px 30px rgba(20, 40, 80, .14);
+    --scroll-thumb: #C9D8EA;
+
+    --syntax-keyword: #0B6BA8;
+    --syntax-string: #187A50;
+    --syntax-number: #7A3FB8;
+    --syntax-comment: #5E6E80;
+    --syntax-function: #A34700;
+    --syntax-type: #1F5BB5;
+    --syntax-operator: #3E4C5C;
+    --syntax-null: #A15C00;
+    --syntax-line: #F1F6FD;
+}
+
+/* 熊猫配色：左侧连接列表栏为深海军蓝，右侧工作区保持冷白。
+   只在 .sidebar 作用域内覆盖语义 token，树、搜索框、页脚自动跟随。 */
+:root[data-theme="neon"] .sidebar {
+    --bg-0: #070B14;
+    --bg-1: #0C1424;
+    --bg-2: #16213A;
+    --bg-3: #1F2C49;
+    --bg-stripe: #0A1120;
+    --border: #24314C;
+    --border-strong: #63748F;
+    --text: #E6EDF7;
+    --text-dim: #A9B6C9;
+    --text-faint: #8FA0B8;
+    --accent: #3FD8F2;
+    --accent-hover: #71E7FA;
+    --accent-soft: #123A48;
+    --on-accent: #04191D;
+    --selection: #16465A;
+    --scroll-thumb: #2E3A52;
+    --focus-ring: rgba(63, 216, 242, .35);
+}
+
